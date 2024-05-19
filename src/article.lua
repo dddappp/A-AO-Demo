@@ -55,10 +55,12 @@ function article.new(title, body, owner)
 end
 
 -- local ArticleCreated = {}
+-- BoundedContext.GetEventTypeDiscriminatorName
 
 function article.new_article_created(article_id, title, body, owner)
     local event = {}
     -- setmetatable(self, { __index = ArticleCreated })
+    event.event_type = "ArticleCreated"
     event.article_id = article_id
     event.title = title
     event.body = body
@@ -71,6 +73,7 @@ end
 function article.new_article_body_updated(state, body)
     local event = {}
     -- setmetatable(self, { __index = ArticleBodyUpdated })
+    event.event_type = "ArticleBodyUpdated"
     event.article_id = state.article_id
     event.version = state.version
     event.body = body

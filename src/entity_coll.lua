@@ -48,12 +48,12 @@ function entity_coll.get(table, entity_id)
     end
 end
 
-function entity_coll.get_copy(table, entity_id)
-    if (table[entity_id]) then
-        return utils.deepcopy(table[entity_id])
-    else
-        error(ERRORS.ID_NOT_EXISTS)
-    end
-end
+-- function entity_coll.get_copy(table, entity_id)
+--     if (table[entity_id]) then
+--         return utils.deepcopy(table[entity_id])
+--     else
+--         error(ERRORS.ID_NOT_EXISTS)
+--     end
+-- end
 
 return entity_coll

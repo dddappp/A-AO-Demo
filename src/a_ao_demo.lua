@@ -21,6 +21,12 @@ local article_aggregate = require("article_aggregate")
 
 article_aggregate.init(ArticleTable, ArticleIdSequence)
 
+article_aggregate.set_logger({
+    log = function(msg)
+        ao.log(msg)
+    end
+})
+
 local function extract_error_code(err)
     return tostring(err):match("([^ ]+)$") or "UNKNOWN_ERROR"
 end
@@ -66,6 +72,7 @@ local function update_article_body(msg, env, response)
         Data = json.encode(status and { event = result } or
             { error = extract_error_code(result) })
     })
+    -- error("xxx")
     -- -- TODO or not return anything?
     -- if not status then
     --     error(result)
@@ -89,7 +96,7 @@ Handlers.add(
     create_article
 )
 
--- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, body = "new_body_1" }) })
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, version = 3, body = "new_body_1" }) })
 
 Handlers.add(
     "update_article_body",
