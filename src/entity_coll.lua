@@ -1,5 +1,3 @@
-local utils = require("utils")
-
 local ERRORS = {
     ID_EXISTS = "ID_EXISTS",
     ID_NOT_EXISTS = "ID_NOT_EXISTS"

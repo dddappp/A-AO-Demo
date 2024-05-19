@@ -70,12 +70,12 @@ end
 
 -- local ArticleBodyUpdated = {}
 
-function article.new_article_body_updated(state, body)
+function article.new_article_body_updated(_state, body)
     local event = {}
     -- setmetatable(self, { __index = ArticleBodyUpdated })
     event.event_type = "ArticleBodyUpdated"
-    event.article_id = state.article_id
-    event.version = state.version
+    event.article_id = _state.article_id
+    event.version = _state.version
     event.body = body
     return event
 end

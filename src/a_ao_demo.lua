@@ -15,8 +15,13 @@ ArticleIdSequence = ArticleIdSequence and (
     end
 )(ArticleIdSequence) or { 0 }
 
+local X_TAGS = {
+    NO_RESPONSE_REQUIRED = "X-NoResponseRequired",
+}
+
 local json = require("json")
 local entity_coll = require("entity_coll")
+local utils = require("utils")
 local article_aggregate = require("article_aggregate")
 
 article_aggregate.init(ArticleTable, ArticleIdSequence)
@@ -50,15 +55,17 @@ local function create_article(msg, env, response)
         local event = article_aggregate.create(cmd, msg, env)
         return event
     end))
-    ao.send({
-        Target = msg.From,
-        Data = json.encode(status and { event = result } or
-            { error = extract_error_code(result) })
-    })
-    -- -- TODO or not return anything?
-    -- if not status then
-    --     error(result)
-    -- end
+    if (not utils.convert_to_boolean(msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
+        ao.send({
+            Target = msg.From,
+            Data = json.encode(status and { event = result } or
+                { error = extract_error_code(result) })
+        })
+    else
+        if not status then
+            error(result)
+        end
+    end
 end
 
 local function update_article_body(msg, env, response)
@@ -67,16 +74,17 @@ local function update_article_body(msg, env, response)
         local event = article_aggregate.update_body(cmd, msg, env)
         return event
     end))
-    ao.send({
-        Target = msg.From,
-        Data = json.encode(status and { event = result } or
-            { error = extract_error_code(result) })
-    })
-    -- error("xxx")
-    -- -- TODO or not return anything?
-    -- if not status then
-    --     error(result)
-    -- end
+    if (not utils.convert_to_boolean(msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
+        ao.send({
+            Target = msg.From,
+            Data = json.encode(status and { event = result } or
+                { error = extract_error_code(result) })
+        })
+    else
+        if not status then
+            error(result)
+        end
+    end
 end
 
 
@@ -97,6 +105,7 @@ Handlers.add(
 )
 
 -- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, version = 3, body = "new_body_1" }) })
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody", ["X-NoResponseRequired"] = "true" }, Data = json.encode({ article_id = 1, version = 8,  body = "new_body_u" }) })
 
 Handlers.add(
     "update_article_body",
