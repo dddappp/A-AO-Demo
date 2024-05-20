@@ -36,17 +36,31 @@ local function extract_error_code(err)
     return tostring(err):match("([^ ]+)$") or "UNKNOWN_ERROR"
 end
 
+local function respond(status, result_or_error, request_msg)
+    ao.send({
+        Target = request_msg.From,
+        Data = json.encode(status and { result = result_or_error } or { error = extract_error_code(result_or_error) })
+    })
+end
+
+local function handle_response_based_on_tag(status, result_or_error, request_msg)
+    if (not utils.convert_to_boolean(request_msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
+        respond(status, result_or_error, request_msg)
+    else
+        if not status then
+            error(result_or_error)
+        end
+    end
+end
+
+
 local function get_artilce(msg, env, response)
     local status, result = pcall((function()
         local cmd = json.decode(msg.Data)
         local state = entity_coll.get(ArticleTable, cmd.article_id)
         return state
     end))
-    ao.send({
-        Target = msg.From,
-        Data = json.encode(status and { state = result } or
-            { error = extract_error_code(result) })
-    })
+    respond(status, result, msg)
 end
 
 local function create_article(msg, env, response)
@@ -55,17 +69,7 @@ local function create_article(msg, env, response)
         local event = article_aggregate.create(cmd, msg, env)
         return event
     end))
-    if (not utils.convert_to_boolean(msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
-        ao.send({
-            Target = msg.From,
-            Data = json.encode(status and { event = result } or
-                { error = extract_error_code(result) })
-        })
-    else
-        if not status then
-            error(result)
-        end
-    end
+    handle_response_based_on_tag(status, result, msg)
 end
 
 local function update_article_body(msg, env, response)
@@ -74,17 +78,7 @@ local function update_article_body(msg, env, response)
         local event = article_aggregate.update_body(cmd, msg, env)
         return event
     end))
-    if (not utils.convert_to_boolean(msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
-        ao.send({
-            Target = msg.From,
-            Data = json.encode(status and { event = result } or
-                { error = extract_error_code(result) })
-        })
-    else
-        if not status then
-            error(result)
-        end
-    end
+    handle_response_based_on_tag(status, result, msg)
 end
 
 

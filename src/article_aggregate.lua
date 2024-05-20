@@ -61,8 +61,8 @@ function article_aggregate.create(cmd, msg, env)
 end
 
 function article_aggregate.update_body(cmd, msg, env)
-    -- local state = entity_coll.get_copy(article_table, cmd.article_id)
-    local state = entity_coll.get(article_table, cmd.article_id)
+    local state = entity_coll.get_copy(article_table, cmd.article_id)
+    -- local state = entity_coll.get(article_table, cmd.article_id)
     if (state.version ~= cmd.version) then
         error(ERRORS.CONCURRENCY_CONFLICT)
     end
@@ -78,6 +78,8 @@ function article_aggregate.update_body(cmd, msg, env)
     local new_state = article_update_body_logic.mutate(state, event, msg, env)
     new_state.article_id = article_id
     new_state.version = (version and version or 0) + 1
+    -- state.body = 'Just for test'
+    -- error("JUST FOR TEST")
     entity_coll.update(article_table, new_state)
     if (logger) then
         logger.log(event)
