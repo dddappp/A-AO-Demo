@@ -18,7 +18,7 @@ article_aggregate.ERRORS = ERRORS
 
 local article_table
 local article_id_sequence
-local logger
+-- local logger
 
 
 local function current_article_id()
@@ -41,9 +41,9 @@ function article_aggregate.init(table, seq)
     article_id_sequence = seq
 end
 
-function article_aggregate.set_logger(l)
-    logger = l
-end
+-- function article_aggregate.set_logger(l)
+--     logger = l
+-- end
 
 function article_aggregate.create(cmd, msg, env)
     cmd.article_id = next_article_id()
@@ -53,11 +53,13 @@ function article_aggregate.create(cmd, msg, env)
     end
     local state = article_create_logic.new(event, msg, env)
     state.article_id = event.article_id
-    entity_coll.add(article_table, state)
-    if (logger) then
-        logger.log(event)
+    -- if (logger) then
+    --     logger.log(event)
+    -- end
+    local commit = function()
+        entity_coll.add(article_table, state)
     end
-    return event
+    return event, commit
 end
 
 function article_aggregate.update_body(cmd, msg, env)
@@ -80,11 +82,13 @@ function article_aggregate.update_body(cmd, msg, env)
     new_state.version = (version and version or 0) + 1
     -- state.body = 'Just for test'
     -- error("JUST FOR TEST")
-    entity_coll.update(article_table, new_state)
-    if (logger) then
-        logger.log(event)
+    -- if (logger) then
+    --     logger.log(event)
+    -- end
+    local commit = function()
+        entity_coll.update(article_table, new_state)
     end
-    return event
+    return event, commit
 end
 
 return article_aggregate
