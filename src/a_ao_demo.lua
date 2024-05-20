@@ -19,6 +19,10 @@ local X_TAGS = {
     NO_RESPONSE_REQUIRED = "X-NoResponseRequired",
 }
 
+local MESSAGE_PASS_THROUGH_TAGS = {
+    "X-SAGA_ID",
+}
+
 local json = require("json")
 local entity_coll = require("entity_coll")
 local utils = require("utils")
@@ -37,9 +41,17 @@ local function extract_error_code(err)
 end
 
 local function respond(status, result_or_error, request_msg)
+    local data = status and { result = result_or_error } or { error = extract_error_code(result_or_error) };
+    local tags = {}
+    for _, tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
+        if request_msg.Tags[tag] then
+            tags[tag] = request_msg.Tags[tag]
+        end
+    end
     ao.send({
         Target = request_msg.From,
-        Data = json.encode(status and { result = result_or_error } or { error = extract_error_code(result_or_error) })
+        Data = json.encode(data),
+        Tags = tags
     })
 end
 
@@ -100,6 +112,7 @@ Handlers.add(
 
 -- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, version = 3, body = "new_body_1" }) })
 -- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody", ["X-NoResponseRequired"] = "true" }, Data = json.encode({ article_id = 1, version = 8,  body = "new_body_u" }) })
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody", ["X-NoResponseRequired"] = "false", ["X-SAGA_ID"] = "TEST_SAGA_ID" }, Data = json.encode({ article_id = 1, version = 13,  body = "new_body_13" }) })
 
 Handlers.add(
     "update_article_body",
