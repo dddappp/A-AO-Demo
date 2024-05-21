@@ -1,13 +1,13 @@
 ArticleTable = ArticleTable and (
     function(old_data)
-        -- May need to do some migration of old data
+        -- May need to migrate old data
         return old_data
     end
 )(ArticleTable) or {}
 
 ArticleIdSequence = ArticleIdSequence and (
     function(old_data)
-        -- May need to do some migration of old data
+        -- May need to migrate old data
         if type(old_data) ~= "table" then
             return { 100000 }
         end
@@ -17,6 +17,7 @@ ArticleIdSequence = ArticleIdSequence and (
 
 local X_TAGS = {
     NO_RESPONSE_REQUIRED = "X-NoResponseRequired",
+    RESPONSE_ACTION = "X-ResponseAction",
 }
 
 local MESSAGE_PASS_THROUGH_TAGS = {
@@ -50,6 +51,9 @@ local function respond(status, result_or_error, request_msg)
         if request_msg.Tags[tag] then
             tags[tag] = request_msg.Tags[tag]
         end
+    end
+    if request_msg.Tags[X_TAGS.RESPONSE_ACTION] then
+        tags["Action"] = request_msg.Tags[X_TAGS.RESPONSE_ACTION]
     end
     ao.send({
         Target = request_msg.From,

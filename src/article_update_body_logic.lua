@@ -2,8 +2,8 @@ local article = require("article")
 
 local article_update_body_logic = {}
 
-function article_update_body_logic.verify(state, cmd, msg, env)
-    return article.new_article_body_updated(state, cmd.body)
+function article_update_body_logic.verify(state, body, cmd, msg, env)
+    return article.new_article_body_updated(state, body)
 end
 
 function article_update_body_logic.mutate(state, event, msg, env)

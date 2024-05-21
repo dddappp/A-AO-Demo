@@ -2,8 +2,8 @@ local article = require("article")
 
 local article_create_logic = {}
 
-function article_create_logic.verify(cmd, msg, env)
-    return article.new_article_created(cmd.article_id, cmd.title, cmd.body, cmd.owner)
+function article_create_logic.verify(article_id, title, body, owner, cmd, msg, env)
+    return article.new_article_created(article_id, title, body, owner)
 end
 
 function article_create_logic.new(event, msg, env)
