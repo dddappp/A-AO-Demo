@@ -23,13 +23,24 @@ SagaInstances = SagaInstances and (
     end
 )(SagaInstances) or {}
 
+SagaIdSequence = SagaIdSequence and (
+    function(old_data)
+        -- May need to migrate old data
+        return old_data
+    end
+)(SagaIdSequence) or { 0 }
 
 
 local json = require("json")
 local entity_coll = require("entity_coll")
 local utils = require("utils")
+local saga = require("saga")
 local article_aggregate = require("article_aggregate")
 local test_local_tx_service = require("test_local_tx_service")
+local inventory_service = require("inventory_service")
+
+
+saga.init(SagaInstances, SagaIdSequence)
 
 article_aggregate.init(ArticleTable, ArticleIdSequence)
 
@@ -41,6 +52,7 @@ article_aggregate.init(ArticleTable, ArticleIdSequence)
 
 test_local_tx_service.init(article_aggregate) -- ArticleTable, article_aggregate)
 
+inventory_service.init(saga, {}, {})          -- todo
 
 local function get_artilce(msg, env, response)
     local status, result = pcall((function()
@@ -74,6 +86,21 @@ local function test_update_and_create_articles(msg, env, response)
     end))
     utils.handle_response_based_on_tag(status, result, commit, msg)
 end
+
+
+
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "GetSagatInstance" }, Data = json.encode({ saga_id = 1 }) })
+
+Handlers.add(
+    "get_sage_instance",
+    Handlers.utils.hasMatchingTag("Action", "GetSagatInstance"),
+    function(msg, env, response)
+        local cmd = json.decode(msg.Data)
+        local saga_id = cmd.saga_id
+        local s = entity_coll.get(SagaInstances, saga_id)
+        utils.respond(true, s, msg)
+    end
+)
 
 
 -- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "GetArticle" }, Data = json.encode({ article_id = 1 }) })
@@ -130,4 +157,14 @@ Handlers.add(
     "test_update_and_create_articles",
     Handlers.utils.hasMatchingTag("Action", "TestUpdateAndCreateArticles"),
     test_update_and_create_articles
+)
+
+-- inventory_service_process_inventory_surplus_or_shortage
+
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "x",  version = 15 }) })
+
+Handlers.add(
+    "inventory_service_process_inventory_surplus_or_shortage",
+    Handlers.utils.hasMatchingTag("Action", "InventoryService_ProcessInventorySurplusOrShortage"),
+    inventory_service.process_inventory_surplus_or_shortage
 )

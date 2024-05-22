@@ -57,7 +57,7 @@ function article_aggregate.create(cmd, msg, env)
     --     logger.log(event)
     -- end
     local commit = function()
-        entity_coll.add(article_table, state)
+        entity_coll.add(article_table, article_id, state)
     end
     return event, commit
 end
@@ -86,7 +86,7 @@ function article_aggregate.update_body(cmd, msg, env)
     --     logger.log(event)
     -- end
     local commit = function()
-        entity_coll.update(article_table, new_state)
+        entity_coll.update(article_table, article_id, new_state)
     end
     return event, commit
 end

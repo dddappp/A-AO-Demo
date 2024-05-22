@@ -30,7 +30,6 @@ function utils.convert_to_boolean(val)
     return (val and true) or false
 end
 
-
 function utils.extract_error_code(err)
     return tostring(err):match("([^ ]+)$") or "UNKNOWN_ERROR"
 end
@@ -63,6 +62,19 @@ function utils.handle_response_based_on_tag(status, result_or_error, commit, req
         if not status then
             error(result_or_error)
         end
+    end
+end
+
+function utils.commit_send(status, request_or_error, commit, target, tags)
+    if (status) then
+        commit()
+        ao.send({
+            Target = target,
+            Data = json.encode(request_or_error),
+            Tags = tags
+        })
+    else
+        error(request_or_error)
     end
 end
 
