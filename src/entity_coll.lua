@@ -1,4 +1,4 @@
-local utils = require("utils")
+-- local utils = require("utils")
 
 local ERRORS = {
     ID_EXISTS = "ID_EXISTS",
@@ -6,6 +6,23 @@ local ERRORS = {
 }
 
 local entity_coll = { ERRORS = ERRORS }
+
+
+local function deepcopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[deepcopy(orig_key)] = deepcopy(orig_value)
+        end
+        -- setmetatable(copy, deepcopy(getmetatable(orig)))
+        setmetatable(copy, getmetatable(orig))
+    else
+        copy = orig
+    end
+    return copy
+end
 
 -- class table
 -- local Articles = {}
@@ -50,7 +67,7 @@ end
 
 function entity_coll.get_copy(table, entity_id)
     if (table[entity_id]) then
-        return utils.deepcopy(table[entity_id])
+        return deepcopy(table[entity_id])
     else
         error(ERRORS.ID_NOT_EXISTS)
     end

@@ -15,14 +15,15 @@ ArticleIdSequence = ArticleIdSequence and (
     end
 )(ArticleIdSequence) or { 0 }
 
-local X_TAGS = {
-    NO_RESPONSE_REQUIRED = "X-NoResponseRequired",
-    RESPONSE_ACTION = "X-ResponseAction",
-}
 
-local MESSAGE_PASS_THROUGH_TAGS = {
-    "X-SAGA_ID",
-}
+SagaInstances = SagaInstances and (
+    function(old_data)
+        -- May need to migrate old data
+        return old_data
+    end
+)(SagaInstances) or {}
+
+
 
 local json = require("json")
 local entity_coll = require("entity_coll")
@@ -40,41 +41,6 @@ article_aggregate.init(ArticleTable, ArticleIdSequence)
 
 test_local_tx_service.init(article_aggregate) -- ArticleTable, article_aggregate)
 
-local function extract_error_code(err)
-    return tostring(err):match("([^ ]+)$") or "UNKNOWN_ERROR"
-end
-
-local function respond(status, result_or_error, request_msg)
-    local data = status and { result = result_or_error } or { error = extract_error_code(result_or_error) };
-    local tags = {}
-    for _, tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
-        if request_msg.Tags[tag] then
-            tags[tag] = request_msg.Tags[tag]
-        end
-    end
-    if request_msg.Tags[X_TAGS.RESPONSE_ACTION] then
-        tags["Action"] = request_msg.Tags[X_TAGS.RESPONSE_ACTION]
-    end
-    ao.send({
-        Target = request_msg.From,
-        Data = json.encode(data),
-        Tags = tags
-    })
-end
-
-local function handle_response_based_on_tag(status, result_or_error, commit, request_msg)
-    if status then
-        commit()
-    end
-    if (not utils.convert_to_boolean(request_msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
-        respond(status, result_or_error, request_msg)
-    else
-        if not status then
-            error(result_or_error)
-        end
-    end
-end
-
 
 local function get_artilce(msg, env, response)
     local status, result = pcall((function()
@@ -82,7 +48,7 @@ local function get_artilce(msg, env, response)
         local state = entity_coll.get(ArticleTable, cmd.article_id)
         return state
     end))
-    respond(status, result, msg)
+    utils.respond(status, result, msg)
 end
 
 local function create_article(msg, env, response)
@@ -90,7 +56,7 @@ local function create_article(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.create(cmd, msg, env)
     end))
-    handle_response_based_on_tag(status, result, commit, msg)
+    utils.handle_response_based_on_tag(status, result, commit, msg)
 end
 
 local function update_article_body(msg, env, response)
@@ -98,7 +64,7 @@ local function update_article_body(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.update_body(cmd, msg, env)
     end))
-    handle_response_based_on_tag(status, result, commit, msg)
+    utils.handle_response_based_on_tag(status, result, commit, msg)
 end
 
 local function test_update_and_create_articles(msg, env, response)
@@ -106,7 +72,7 @@ local function test_update_and_create_articles(msg, env, response)
         local cmd = json.decode(msg.Data)
         return test_local_tx_service.test_update_and_create_articles(cmd, msg, env)
     end))
-    handle_response_based_on_tag(status, result, commit, msg)
+    utils.handle_response_based_on_tag(status, result, commit, msg)
 end
 
 
@@ -126,7 +92,7 @@ Handlers.add(
         for _ in pairs(ArticleTable) do
             count = count + 1
         end
-        respond(true, count, msg)
+        utils.respond(true, count, msg)
     end
 )
 
@@ -136,7 +102,7 @@ Handlers.add(
     "get_article_id_sequence",
     Handlers.utils.hasMatchingTag("Action", "GetArticleIdSequence"),
     function(msg, env, response)
-        respond(true, ArticleIdSequence, msg)
+        utils.respond(true, ArticleIdSequence, msg)
     end
 )
 

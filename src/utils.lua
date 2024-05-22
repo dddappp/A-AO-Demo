@@ -1,5 +1,16 @@
 local utils = {}
 
+local json = require("json")
+
+local X_TAGS = {
+    NO_RESPONSE_REQUIRED = "X-NoResponseRequired",
+    RESPONSE_ACTION = "X-ResponseAction",
+}
+
+local MESSAGE_PASS_THROUGH_TAGS = {
+    "X-SAGA_ID",
+}
+
 local string_to_boolean_mappings = {
     ["true"] = true,
     ["false"] = false,
@@ -19,20 +30,40 @@ function utils.convert_to_boolean(val)
     return (val and true) or false
 end
 
-function utils.deepcopy(orig)
-    local orig_type = type(orig)
-    local copy
-    if orig_type == 'table' then
-        copy = {}
-        for orig_key, orig_value in next, orig, nil do
-            copy[utils.deepcopy(orig_key)] = utils.deepcopy(orig_value)
+
+function utils.extract_error_code(err)
+    return tostring(err):match("([^ ]+)$") or "UNKNOWN_ERROR"
+end
+
+function utils.respond(status, result_or_error, request_msg)
+    local data = status and { result = result_or_error } or { error = utils.extract_error_code(result_or_error) };
+    local tags = {}
+    for _, tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
+        if request_msg.Tags[tag] then
+            tags[tag] = request_msg.Tags[tag]
         end
-        -- setmetatable(copy, Utils.deepcopy(getmetatable(orig)))
-        setmetatable(copy, getmetatable(orig))
-    else
-        copy = orig
     end
-    return copy
+    if request_msg.Tags[X_TAGS.RESPONSE_ACTION] then
+        tags["Action"] = request_msg.Tags[X_TAGS.RESPONSE_ACTION]
+    end
+    ao.send({
+        Target = request_msg.From,
+        Data = json.encode(data),
+        Tags = tags
+    })
+end
+
+function utils.handle_response_based_on_tag(status, result_or_error, commit, request_msg)
+    if status then
+        commit()
+    end
+    if (not utils.convert_to_boolean(request_msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
+        utils.respond(status, result_or_error, request_msg)
+    else
+        if not status then
+            error(result_or_error)
+        end
+    end
 end
 
 return utils
