@@ -59,4 +59,18 @@ function saga.create_saga_instance(saga_type, target, tags, context)
     return saga_id, commit
 end
 
+function saga.move_saga_instances_forward(saga_id, target, tags, context)
+    local s = saga.get_saga_instance_copy(saga_id)
+    s.current_step = s.current_step + 1
+    s.participants[s.current_step] = {
+        target = target,
+        tags = tags,
+    }
+    s.context = context
+    local commit = function()
+        entity_coll.update(saga_instances, saga_id, s)
+    end
+    return commit
+end
+
 return saga

@@ -69,16 +69,29 @@ function messaging.handle_response_based_on_tag(status, result_or_error, commit,
     end
 end
 
+local function send(target, data, tags)
+    ao.send({
+        Target = target,
+        Data = json.encode(data),
+        Tags = tags
+    })
+end
+
 function messaging.commit_send(status, request_or_error, commit, target, tags)
     if (status) then
         commit()
     end
-    ao.send({
-        Target = target,
-        Data = json.encode(request_or_error),
-        Tags = tags
-    })
+    send(target, request_or_error, tags)
     -- NOTE: not throw error(request_or_error)?
+end
+
+function messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
+    if (status) then
+        commit()
+        send(target, request_or_error, tags)
+    else
+        error(request_or_error)
+    end
 end
 
 return messaging

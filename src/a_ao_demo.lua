@@ -62,7 +62,12 @@ inventory_service.init(saga,
         end
     },
     {
-
+        get_target = function()
+            return "ixer2JAwpnIWRDBXQbNZdOYrOs3Ab3kjmIzRUxdY7U4"
+        end,
+        get_create_single_line_in_out_action = function()
+            return "CreateSingleLineInOut"
+        end
     } -- todo
 )
 
@@ -184,10 +189,18 @@ Handlers.add(
 
 -- inventory_service_process_inventory_surplus_or_shortage
 
--- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "x" }) })
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "x", quantity = 100 }) })
 
 Handlers.add(
     "inventory_service_process_inventory_surplus_or_shortage",
     Handlers.utils.hasMatchingTag("Action", inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE),
     inventory_service.process_inventory_surplus_or_shortage
+)
+
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback", ["X-SagaId"] = "19" }, Data = json.encode({ result = { product_id = 1, location = "x", version = 11, quantity = 110 } }) })
+
+Handlers.add(
+    "inventory_service_process_inventory_surplus_or_shortage_get_inventory_item_callback",
+    Handlers.utils.hasMatchingTag("Action", inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK),
+    inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback
 )
