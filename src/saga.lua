@@ -25,6 +25,18 @@ local function next_saga_id()
     return saga_id_sequence[1]
 end
 
+function saga.get_saga_instance(saga_id)
+    return entity_coll.get(saga_instances, saga_id)
+end
+
+function saga.get_saga_instance_copy(saga_id)
+    return entity_coll.get_copy(saga_instances, saga_id)
+end
+
+function saga.contains_saga_instance(saga_id)
+    return entity_coll.contains(saga_instances, saga_id)
+end
+
 function saga.create_saga_instance(saga_type, target, tags, context)
     local saga_id = next_saga_id()
     local s = {

@@ -47,15 +47,15 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
     local tags = { Action = inventory_item.get_get_inventory_item_action() }
     local status, request, commit, saga_id = pcall((function()
         local cmd = json.decode(msg.Data)
-        local req = {
+        local request = {
             product_id = cmd.product_id,
             location = cmd.location,
         }
         local saga_id, commit = saga.create_saga_instance(ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE, target, tags,
             cmd)
-        return req, commit, saga_id
+        return request, commit, saga_id
     end))
-    -- tags[messaging.X_TAGS.SAGA_ID] = saga_id
+    tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
     tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK
     messaging.commit_send(status, request, commit, target, tags)
 

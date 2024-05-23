@@ -174,7 +174,7 @@ Handlers.add(
     update_article_body
 )
 
--- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "TestUpdateAndCreateArticles" }, Data = json.encode({ article_id_to_update = 1, version = 15, body = "new_body_15", new_article_titile = "new_article_titile"}) })
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "TestUpdateAndCreateArticles" }, Data = json.encode({ article_id_to_update = 1, version = 29, body = "new_body_29", new_article_titile = "new_article_titile"}) })
 
 Handlers.add(
     "test_update_and_create_articles",
@@ -184,7 +184,7 @@ Handlers.add(
 
 -- inventory_service_process_inventory_surplus_or_shortage
 
--- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "x",  version = 15 }) })
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "x" }) })
 
 Handlers.add(
     "inventory_service_process_inventory_surplus_or_shortage",
