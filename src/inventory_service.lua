@@ -31,15 +31,20 @@ inventory_service.ACTIONS = ACTIONS
 
 -- required components
 
-local saga
-local inventory_item;
-local in_out;
+local saga = require("saga")
 
-function inventory_service.init(_saga, _inventory_item, _in_out)
-    saga = _saga;
-    inventory_item = _inventory_item;
-    in_out = _in_out;
-end
+local required_components = require("inventory_service_init")
+local inventory_item = required_components.inventory_item;
+local in_out = required_components.in_out;
+
+-- function inventory_service.init(--_saga,
+--     _inventory_item,
+--     _in_out
+-- )
+--     -- saga = _saga;
+--     inventory_item = _inventory_item;
+--     in_out = _in_out;
+-- end
 
 -- process an inventory surplus or shortage
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)

@@ -52,24 +52,6 @@ article_aggregate.init(ArticleTable, ArticleIdSequence)
 
 test_local_tx_service.init(article_aggregate) -- ArticleTable, article_aggregate)
 
-inventory_service.init(saga,
-    {
-        get_target = function()
-            return "ixer2JAwpnIWRDBXQbNZdOYrOs3Ab3kjmIzRUxdY7U4"
-        end,
-        get_get_inventory_item_action = function()
-            return "GetInventoryItem"
-        end
-    },
-    {
-        get_target = function()
-            return "ixer2JAwpnIWRDBXQbNZdOYrOs3Ab3kjmIzRUxdY7U4"
-        end,
-        get_create_single_line_in_out_action = function()
-            return "CreateSingleLineInOut"
-        end
-    } -- todo
-)
 
 local function get_artilce(msg, env, response)
     local status, result = pcall((function()
