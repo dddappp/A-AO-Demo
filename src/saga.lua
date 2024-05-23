@@ -37,7 +37,7 @@ function saga.contains_saga_instance(saga_id)
     return entity_coll.contains(saga_instances, saga_id)
 end
 
-function saga.create_saga_instance(saga_type, target, tags, context)
+function saga.create_saga_instance(saga_type, target, tags, context, original_message)
     local saga_id = next_saga_id()
     local s = {
         saga_id = saga_id,
@@ -52,6 +52,7 @@ function saga.create_saga_instance(saga_type, target, tags, context)
         },
         compensations = {},
         context = context,
+        original_message = original_message,
     }
     local commit = function()
         entity_coll.add(saga_instances, saga_id, s)

@@ -153,7 +153,7 @@ Handlers.add(
 
 -- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, version = 3, body = "new_body_1" }) })
 -- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody", ["X-NoResponseRequired"] = "true" }, Data = json.encode({ article_id = 1, version = 8,  body = "new_body_u" }) })
--- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody", ["X-NoResponseRequired"] = "false", ["X-SAGA_ID"] = "TEST_SAGA_ID" }, Data = json.encode({ article_id = 1, version = 13,  body = "new_body_13" }) })
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "UpdateArticleBody", ["X-NoResponseRequired"] = "false", ["X-SagaId"] = "TEST_SAGA_ID" }, Data = json.encode({ article_id = 1, version = 13,  body = "new_body_13" }) })
 
 Handlers.add(
     "update_article_body",
@@ -179,10 +179,34 @@ Handlers.add(
     inventory_service.process_inventory_surplus_or_shortage
 )
 
--- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback", ["X-SagaId"] = "19" }, Data = json.encode({ result = { product_id = 1, location = "x", version = 11, quantity = 110 } }) })
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = { product_id = 1, location = "x", version = 11, quantity = 110 } }) })
 
 Handlers.add(
     "inventory_service_process_inventory_surplus_or_shortage_get_inventory_item_callback",
     Handlers.utils.hasMatchingTag("Action", inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK),
     inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback
+)
+
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = { in_out_id = 1, version = 0 } }) })
+
+Handlers.add(
+    "inventory_service_process_inventory_surplus_or_shortage_create_single_line_in_out_callback",
+    Handlers.utils.hasMatchingTag("Action", inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK),
+    inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_callback
+)
+
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_AddInventoryItemEntry_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = {} }) })
+
+Handlers.add(
+    "inventory_service_process_inventory_surplus_or_shortage_add_inventory_item_entry_callback",
+    Handlers.utils.hasMatchingTag("Action", inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK),
+    inventory_service.process_inventory_surplus_or_shortage_add_inventory_item_entry_callback
+)
+
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CompleteInOut_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = {} }) })
+
+Handlers.add(
+    "inventory_service_process_inventory_surplus_or_shortage_complete_in_out_callback",
+    Handlers.utils.hasMatchingTag("Action", inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK),
+    inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback
 )

@@ -6,7 +6,10 @@ return {
         end,
         get_get_inventory_item_action = function()
             return "GetInventoryItem"
-        end
+        end,
+        get_add_inventory_item_entry_action = function()
+            return "AddInventoryItemEntry"
+        end,
     },
     in_out = {
         get_target = function()
@@ -14,6 +17,9 @@ return {
         end,
         get_create_single_line_in_out_action = function()
             return "CreateSingleLineInOut"
-        end
-    } -- todo
+        end,
+        get_complete_in_out_action = function()
+            return "CompleteInOut"
+        end,
+    }
 }
