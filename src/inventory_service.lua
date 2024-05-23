@@ -1,5 +1,5 @@
 local json = require("json")
-local utils = require("utils")
+local messaging = require("messaging")
 
 --[[
 
@@ -19,6 +19,14 @@ local utils = require("utils")
 ]]
 local inventory_service = {}
 
+local ACTIONS = {
+    PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE = "InventoryService_ProcessInventorySurplusOrShortage",
+    PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK =
+    "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItemCallback",
+}
+
+inventory_service.ACTIONS = ACTIONS
+
 -- required components
 
 local saga
@@ -35,20 +43,21 @@ end
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
     -- -- create or update inventory item
     -- local inventoryItemState = inventory_item.getInventoryItem(inventoryItem);
-    local target = "ixer2JAwpnIWRDBXQbNZdOYrOs3Ab3kjmIzRUxdY7U4" -- todo get from inventory_item component
-    local tags = { Action = "GetInventoryItem" }
-    local status, result, commit = pcall((function()
+    local target = inventory_item.get_target()
+    local tags = { Action = inventory_item.get_get_inventory_item_action() }
+    local status, request, commit, saga_id = pcall((function()
         local cmd = json.decode(msg.Data)
         local req = {
             product_id = cmd.product_id,
             location = cmd.location,
         }
-        local _, c = saga.create_saga_instance("InventoryService_ProcessInventorySurplusOrShortage", target, tags)
-        -- return req, function()
-        -- end
-        return req, c
+        local saga_id, commit = saga.create_saga_instance(ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE, target, tags,
+            cmd)
+        return req, commit, saga_id
     end))
-    utils.commit_send(status, result, commit, target, tags)
+    -- tags[messaging.X_TAGS.SAGA_ID] = saga_id
+    tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK
+    messaging.commit_send(status, request, commit, target, tags)
 
     -- -- create single line inbound or outbound order
     -- local inOutState = in_out.createSingleLineInOut(inventoryItem, inOut);

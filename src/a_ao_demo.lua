@@ -33,7 +33,7 @@ SagaIdSequence = SagaIdSequence and (
 
 local json = require("json")
 local entity_coll = require("entity_coll")
-local utils = require("utils")
+local messaging = require("messaging")
 local saga = require("saga")
 local article_aggregate = require("article_aggregate")
 local test_local_tx_service = require("test_local_tx_service")
@@ -52,7 +52,19 @@ article_aggregate.init(ArticleTable, ArticleIdSequence)
 
 test_local_tx_service.init(article_aggregate) -- ArticleTable, article_aggregate)
 
-inventory_service.init(saga, {}, {})          -- todo
+inventory_service.init(saga,
+    {
+        get_target = function()
+            return "ixer2JAwpnIWRDBXQbNZdOYrOs3Ab3kjmIzRUxdY7U4"
+        end,
+        get_get_inventory_item_action = function()
+            return "GetInventoryItem"
+        end
+    },
+    {
+
+    } -- todo
+)
 
 local function get_artilce(msg, env, response)
     local status, result = pcall((function()
@@ -60,7 +72,7 @@ local function get_artilce(msg, env, response)
         local state = entity_coll.get(ArticleTable, cmd.article_id)
         return state
     end))
-    utils.respond(status, result, msg)
+    messaging.respond(status, result, msg)
 end
 
 local function create_article(msg, env, response)
@@ -68,7 +80,7 @@ local function create_article(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.create(cmd, msg, env)
     end))
-    utils.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.handle_response_based_on_tag(status, result, commit, msg)
 end
 
 local function update_article_body(msg, env, response)
@@ -76,7 +88,7 @@ local function update_article_body(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.update_body(cmd, msg, env)
     end))
-    utils.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.handle_response_based_on_tag(status, result, commit, msg)
 end
 
 local function test_update_and_create_articles(msg, env, response)
@@ -84,21 +96,32 @@ local function test_update_and_create_articles(msg, env, response)
         local cmd = json.decode(msg.Data)
         return test_local_tx_service.test_update_and_create_articles(cmd, msg, env)
     end))
-    utils.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.handle_response_based_on_tag(status, result, commit, msg)
 end
 
 
 
--- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "GetSagatInstance" }, Data = json.encode({ saga_id = 1 }) })
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = 1 }) })
 
 Handlers.add(
     "get_sage_instance",
-    Handlers.utils.hasMatchingTag("Action", "GetSagatInstance"),
+    Handlers.utils.hasMatchingTag("Action", "GetSagaInstance"),
     function(msg, env, response)
         local cmd = json.decode(msg.Data)
         local saga_id = cmd.saga_id
         local s = entity_coll.get(SagaInstances, saga_id)
-        utils.respond(true, s, msg)
+        messaging.respond(true, s, msg)
+    end
+)
+
+
+-- Send({ Target = "GJdFeMi7T2cQgUdJgVl5OMWS_EphtBz9USrEi_TQE0I", Tags = { Action = "GetSagaIdSequence" } })
+
+Handlers.add(
+    "get_sage_id_sequence",
+    Handlers.utils.hasMatchingTag("Action", "GetSagaIdSequence"),
+    function(msg, env, response)
+        messaging.respond(true, SagaIdSequence, msg)
     end
 )
 
@@ -119,7 +142,7 @@ Handlers.add(
         for _ in pairs(ArticleTable) do
             count = count + 1
         end
-        utils.respond(true, count, msg)
+        messaging.respond(true, count, msg)
     end
 )
 
@@ -129,7 +152,7 @@ Handlers.add(
     "get_article_id_sequence",
     Handlers.utils.hasMatchingTag("Action", "GetArticleIdSequence"),
     function(msg, env, response)
-        utils.respond(true, ArticleIdSequence, msg)
+        messaging.respond(true, ArticleIdSequence, msg)
     end
 )
 
@@ -165,6 +188,6 @@ Handlers.add(
 
 Handlers.add(
     "inventory_service_process_inventory_surplus_or_shortage",
-    Handlers.utils.hasMatchingTag("Action", "InventoryService_ProcessInventorySurplusOrShortage"),
+    Handlers.utils.hasMatchingTag("Action", inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE),
     inventory_service.process_inventory_surplus_or_shortage
 )

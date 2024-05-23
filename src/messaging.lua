@@ -1,15 +1,19 @@
-local utils = {}
+local messaging = {}
 
 local json = require("json")
 
 local X_TAGS = {
     NO_RESPONSE_REQUIRED = "X-NoResponseRequired",
     RESPONSE_ACTION = "X-ResponseAction",
+    SAGA_ID = "X-SagaId",
 }
 
 local MESSAGE_PASS_THROUGH_TAGS = {
-    "X-SAGA_ID",
+    X_TAGS.SAGA_ID,
 }
+
+messaging.X_TAGS = X_TAGS
+messaging.MESSAGE_PASS_THROUGH_TAGS = MESSAGE_PASS_THROUGH_TAGS
 
 local string_to_boolean_mappings = {
     ["true"] = true,
@@ -20,7 +24,7 @@ local string_to_boolean_mappings = {
     ["0"] = false
 }
 
-function utils.convert_to_boolean(val)
+function messaging.convert_to_boolean(val)
     if (type(val) == "string") then
         return string_to_boolean_mappings[val:lower()] or false
     end
@@ -30,12 +34,12 @@ function utils.convert_to_boolean(val)
     return (val and true) or false
 end
 
-function utils.extract_error_code(err)
+function messaging.extract_error_code(err)
     return tostring(err):match("([^ ]+)$") or "UNKNOWN_ERROR"
 end
 
-function utils.respond(status, result_or_error, request_msg)
-    local data = status and { result = result_or_error } or { error = utils.extract_error_code(result_or_error) };
+function messaging.respond(status, result_or_error, request_msg)
+    local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
     local tags = {}
     for _, tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
         if request_msg.Tags[tag] then
@@ -52,12 +56,12 @@ function utils.respond(status, result_or_error, request_msg)
     })
 end
 
-function utils.handle_response_based_on_tag(status, result_or_error, commit, request_msg)
+function messaging.handle_response_based_on_tag(status, result_or_error, commit, request_msg)
     if status then
         commit()
     end
-    if (not utils.convert_to_boolean(request_msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
-        utils.respond(status, result_or_error, request_msg)
+    if (not messaging.convert_to_boolean(request_msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
+        messaging.respond(status, result_or_error, request_msg)
     else
         if not status then
             error(result_or_error)
@@ -65,17 +69,16 @@ function utils.handle_response_based_on_tag(status, result_or_error, commit, req
     end
 end
 
-function utils.commit_send(status, request_or_error, commit, target, tags)
+function messaging.commit_send(status, request_or_error, commit, target, tags)
     if (status) then
         commit()
-        ao.send({
-            Target = target,
-            Data = json.encode(request_or_error),
-            Tags = tags
-        })
-    else
-        error(request_or_error)
     end
+    ao.send({
+        Target = target,
+        Data = json.encode(request_or_error),
+        Tags = tags
+    })
+    -- NOTE: not throw error(request_or_error)?
 end
 
-return utils
+return messaging
