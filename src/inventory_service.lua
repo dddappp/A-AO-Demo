@@ -44,9 +44,9 @@ inventory_service.ACTIONS = ACTIONS
 
 local saga = require("saga")
 
-local required_components = require("inventory_service_init")
-local inventory_item = required_components.inventory_item;
-local in_out = required_components.in_out;
+local config = require("inventory_service_config")
+local inventory_item_config = config.inventory_item;
+local in_out_config = config.in_out;
 
 -- function inventory_service.init(--_saga,
 --     _inventory_item,
@@ -60,8 +60,8 @@ local in_out = required_components.in_out;
 -- process an inventory surplus or shortage
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
     -- create or update inventory item
-    local target = inventory_item.get_target()
-    local tags = { Action = inventory_item.get_get_inventory_item_action() }
+    local target = inventory_item_config.get_target()
+    local tags = { Action = inventory_item_config.get_get_inventory_item_action() }
     local cmd = json.decode(msg.Data)
     local request = {
         product_id = cmd.product_id,
@@ -92,8 +92,8 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
         error(ERRORS.INVALID_MESSAGE)
     end
     local context = saga_instance.context
-    local target = in_out.get_target()
-    local tags = { Action = in_out.get_create_single_line_in_out_action() }
+    local target = in_out_config.get_target()
+    local tags = { Action = in_out_config.get_create_single_line_in_out_action() }
     local data = json.decode(msg.Data)
     if (data.error) then
         -- error(data.error)
@@ -135,8 +135,8 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
         error(ERRORS.INVALID_MESSAGE)
     end
     local context = saga_instance.context
-    local target = inventory_item.get_target()
-    local tags = { Action = inventory_item.get_add_inventory_item_entry_action() }
+    local target = inventory_item_config.get_target()
+    local tags = { Action = inventory_item_config.get_add_inventory_item_entry_action() }
     local data = json.decode(msg.Data)
     if (data.error) then
         -- error(data.error)
@@ -171,8 +171,8 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
         error(ERRORS.INVALID_MESSAGE)
     end
     local context = saga_instance.context
-    local target = in_out.get_target()
-    local tags = { Action = in_out.get_complete_in_out_action() }
+    local target = in_out_config.get_target()
+    local tags = { Action = in_out_config.get_complete_in_out_action() }
     local data = json.decode(msg.Data)
     if (data.error) then
         -- error(data.error)
