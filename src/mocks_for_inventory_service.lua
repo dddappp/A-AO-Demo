@@ -54,11 +54,8 @@ Handlers.add(
     inventory_item_config.get_add_inventory_item_entry_action(),
     Handlers.utils.hasMatchingTag("Action", inventory_item_config.get_add_inventory_item_entry_action()),
     function(msg, env, response)
-        messaging.respond(
-            true,
-            {},
-            msg
-        )
+        -- messaging.respond(true, {}, msg) -- success
+        messaging.respond(false, "TEST_ERROR", msg) -- error
     end
 )
 
@@ -68,10 +65,14 @@ Handlers.add(
     in_out_config.get_complete_in_out_action(),
     Handlers.utils.hasMatchingTag("Action", in_out_config.get_complete_in_out_action()),
     function(msg, env, response)
-        messaging.respond(
-            true,
-            {},
-            msg
-        )
+        messaging.respond(true, {}, msg) -- success
+    end
+)
+
+Handlers.add(
+    in_out_config.get_void_in_out_action(),
+    Handlers.utils.hasMatchingTag("Action", in_out_config.get_void_in_out_action()),
+    function(msg, env, response)
+        messaging.respond(true, {}, msg) -- success
     end
 )

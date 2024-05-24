@@ -21,5 +21,8 @@ return {
         get_complete_in_out_action = function()
             return "CompleteInOut"
         end,
+        get_void_in_out_action = function()
+            return "VoidInOut"
+        end,
     }
 }

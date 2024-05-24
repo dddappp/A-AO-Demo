@@ -24,6 +24,7 @@ local inventory_service = {}
 
 local ERRORS = {
     INVALID_MESSAGE = "INVALID_MESSAGE",
+    COMPENSATION_FAILED = "COMPENSATION_FAILED",
 }
 
 inventory_service.ERRORS = ERRORS
@@ -38,6 +39,8 @@ local ACTIONS = {
     "InventoryService_ProcessInventorySurplusOrShortage_AddInventoryItemEntry_Callback",
     PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK =
     "InventoryService_ProcessInventorySurplusOrShortage_CompleteInOut_Callback",
+    PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK =
+    "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Compensation_Callback",
 }
 
 inventory_service.ACTIONS = ACTIONS
@@ -59,6 +62,23 @@ local in_out_config = config.in_out;
 --     in_out = _in_out;
 -- end
 
+
+local function respond_original_requester(saga_instance, status, result_or_error, commit)
+    local original_message_from = saga_instance.original_message and saga_instance.original_message.from or nil
+    local tags = {}
+    if (saga_instance.original_message and saga_instance.original_message.response_action) then
+        tags[messaging.X_TAGS.RESPONSE_ACTION] = saga_instance.original_message.response_action
+    end
+    if (saga_instance.original_message and saga_instance.original_message.no_response_required) then
+        tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED] = saga_instance.original_message.no_response_required
+    end
+    -- tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+    messaging.handle_response_based_on_tag(status, result_or_error, commit, {
+        From = original_message_from,
+        Tags = tags,
+    })
+end
+
 -- process an inventory surplus or shortage
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
     local cmd = json.decode(msg.Data)
@@ -70,7 +90,7 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
         product_id = cmd.product_id,
         location = cmd.location,
     }
-    local status, request_or_error, commit, saga_id = pcall((function()
+    local status, request_or_error, commit, _ = pcall((function()
         local saga_id, commit = saga.create_saga_instance(ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE, target, tags,
             cmd,
             {
@@ -79,11 +99,12 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
                 no_response_required = msg.Tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED],
             }
         )
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
+            .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK
         return request, commit, saga_id
     end))
-    tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
-    tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK
-    messaging.commit_send(status, request_or_error, commit, target, tags)
+    messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 end
 
 local function process_inventory_surplus_or_shortage_on_get_inventory_item_reply(context, result)
@@ -113,33 +134,100 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
     end
     local result = data.result
 
-    local target = in_out_config.get_target()
-    local tags = { Action = in_out_config.get_create_single_line_in_out_action() }
-
     -- NOTE: on reply
     process_inventory_surplus_or_shortage_on_get_inventory_item_reply(context, result)
 
     -- create single line inbound or outbound order
+    local target = in_out_config.get_target()
+    local tags = { Action = in_out_config.get_create_single_line_in_out_action() }
     local request = {
         product_id = context.product_id,
         location = context.location,
         movement_quantity = context.movement_quantity,
     }
     local status, request_or_error, commit = pcall((function()
-        local commit = saga.move_saga_instances_forward(saga_id, 1, target, tags, context)
+        local commit = saga.move_saga_instance_forward(saga_id, 1, target, tags, context)
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
+            .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK
         return request, commit
     end))
-    tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
-    tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
-        .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK
     messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 end
 
-local function process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(context)
-    -- todo invoke remote void_in_out
-    return {}, function()
-        -- commit
+function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback(msg, env,
+                                                                                                                 response)
+    local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
+    local saga_instance = saga.get_saga_instance_copy(saga_id)
+    if (saga_instance.current_step ~= 2 or not saga_instance.compensating) then
+        error(ERRORS.INVALID_MESSAGE)
     end
+    local context = saga_instance.context
+
+    local data = json.decode(msg.Data)
+    if (data.error) then
+        error(ERRORS.COMPENSATION_FAILED)
+    end
+    local result = data.result
+
+    local status, result_or_error, commit = pcall((function()
+        local commit = saga.rollback_saga_instance(saga_id, 2 - 1, nil, nil, nil)
+        return {
+            -- NOTE: return result to original requestor?
+        }, commit
+    end))
+
+    respond_original_requester(saga_instance, status, result_or_error, commit)
+end
+
+local function process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context,
+                                                                                          local_compensations)
+    local local_step = 0
+    local local_commits = {}
+    if (local_compensations) then
+        for _, local_compensation in ipairs(local_compensations) do
+            -- invoke local
+            local local_status_1, local_result_or_error_1, local_commit_1 = pcall((function()
+                return local_compensation(context)
+            end))
+            if (not local_status_1) then
+                error(local_result_or_error_1) -- NOTE: just throw error
+            end
+            local_step = local_step + 1
+            local_commits[local_step] = local_commit_1
+        end
+    end
+
+    -- -- If no remote compensations
+    -- local commit = saga.rollback_saga_instance(saga_id, 4 - local_step - 1, nil, nil, nil)
+    -- total_commit = (function()
+    --     commit()
+    --     total_commit()
+    -- end)
+    -- total_commit()
+    -- -- return
+
+    -- void InOut
+    local target = in_out_config.get_target()
+    local tags = { Action = in_out_config.get_void_in_out_action() }
+    local request = {
+        in_out_id = context.in_out_id,
+        version = context.in_out_version,
+    }
+    local status, request_or_error, commit = pcall((function()
+        local commit = saga.rollback_saga_instance(saga_id, local_step + 1, target, tags, context)
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
+            .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK
+        return request, commit
+    end))
+    local total_commit = function()
+        for _, local_commit in ipairs(local_commits) do
+            local_commit()
+        end
+        commit()
+    end
+    messaging.commit_send_or_error(status, request_or_error, total_commit, target, tags)
 end
 
 
@@ -194,12 +282,12 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
         movement_quantity = context.movement_quantity,
     }
     local status, request_or_error, commit = pcall((function()
-        local commit = saga.move_saga_instances_forward(saga_id, 2, target, tags, context)
+        local commit = saga.move_saga_instance_forward(saga_id, 2, target, tags, context)
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
+            .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK
         return request, commit
     end))
-    tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
-    tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
-        .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK
     local total_commit = function()
         local_commit_1()
         commit()                                                                         -- commit saga instance update
@@ -217,9 +305,10 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
 
     local data = json.decode(msg.Data)
     if (data.error) then
-        --todo process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(context)
+        process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context, {
+            process_inventory_surplus_or_shortage_compensate_do_something_locally
+        })
         return
-        -- todo handle error
     end
     local result = data.result
 
@@ -232,12 +321,12 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
         version = context.in_out_version,
     }
     local status, request_or_error, commit = pcall((function()
-        local commit = saga.move_saga_instances_forward(saga_id, 1, target, tags, context)
+        local commit = saga.move_saga_instance_forward(saga_id, 1, target, tags, context)
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
+            .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK
         return request, commit
     end))
-    tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
-    tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
-        .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK
     messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 end
 
@@ -257,26 +346,14 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
     end
     local result = data.result -- NOTE: last step result
 
-    local original_message_from = saga_instance.original_message and saga_instance.original_message.from or nil
-    local tags = {}
-    if (saga_instance.original_message and saga_instance.original_message.response_action) then
-        tags[messaging.X_TAGS.RESPONSE_ACTION] = saga_instance.original_message.response_action
-    end
-    if (saga_instance.original_message and saga_instance.original_message.no_response_required) then
-        tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED] = saga_instance.original_message.no_response_required
-    end
-
     local status, result_or_error, commit = pcall((function()
         local commit = saga.complete_saga_instance(saga_id, context) -- NOTE: tags?
         return {
             -- NOTE: return result to original requestor?
         }, commit
     end))
-    -- tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
-    messaging.handle_response_based_on_tag(status, result_or_error, commit, {
-        From = original_message_from,
-        Tags = tags,
-    })
+
+    respond_original_requester(saga_instance, status, result_or_error, commit)
 end
 
 return inventory_service

@@ -82,7 +82,7 @@ end
 -- end
 
 --- Move saga instance's current_step forward and record participant information
-function saga.move_saga_instances_forward(saga_id, step, target, tags, context)
+function saga.move_saga_instance_forward(saga_id, step, target, tags, context)
     local s = saga.get_saga_instance_copy(saga_id)
     for _ = 1, step - 1, 1 do
         s.current_step = s.current_step + 1
@@ -100,6 +100,28 @@ function saga.move_saga_instances_forward(saga_id, step, target, tags, context)
     return commit
 end
 
+function saga.rollback_saga_instance(saga_id, step, target, tags, context)
+    local s = saga.get_saga_instance_copy(saga_id)
+    s.compensating = true
+    for _ = 1, step - 1, 1 do
+        s.current_step = s.current_step - 1
+        s.compensations[#s.compensations + 1] = {} -- invoke local
+    end
+    s.current_step = s.current_step - 1
+    s.compensations[#s.compensations + 1] = target and {
+        target = target,
+        tags = tags or {},
+    } or {}
+    if (s.current_step <= 1) then
+        s.completed = true
+    end
+    s.context = context
+    local commit = function()
+        entity_coll.update(saga_instances, saga_id, s)
+    end
+    return commit
+end
+
 --- Complete saga instance
 function saga.complete_saga_instance(saga_id, context)
     local s = saga.get_saga_instance_copy(saga_id)
@@ -110,6 +132,5 @@ function saga.complete_saga_instance(saga_id, context)
     end
     return commit
 end
-
 
 return saga
