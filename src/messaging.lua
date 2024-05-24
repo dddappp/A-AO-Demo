@@ -35,7 +35,7 @@ function messaging.convert_to_boolean(val)
 end
 
 function messaging.extract_error_code(err)
-    return tostring(err):match("([^ ]+)$") or "UNKNOWN_ERROR"
+    return tostring(err):match("([^ ]+)$") or "INTERNAL_ERROR"
 end
 
 function messaging.respond(status, result_or_error, request_msg)

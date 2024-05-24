@@ -100,12 +100,12 @@ function saga.move_saga_instance_forward(saga_id, step, target, tags, context)
     return commit
 end
 
-function saga.rollback_saga_instance(saga_id, step, target, tags, context)
+function saga.rollback_saga_instance(saga_id, step, target, tags, context, error)
     local s = saga.get_saga_instance_copy(saga_id)
     s.compensating = true
     for _ = 1, step - 1, 1 do
         s.current_step = s.current_step - 1
-        s.compensations[#s.compensations + 1] = {} -- invoke local
+        s.compensations[#s.compensations + 1] = {} -- invoke local or empty step
     end
     s.current_step = s.current_step - 1
     s.compensations[#s.compensations + 1] = target and {
@@ -115,7 +115,12 @@ function saga.rollback_saga_instance(saga_id, step, target, tags, context)
     if (s.current_step <= 1) then
         s.completed = true
     end
-    s.context = context
+    if context then
+        s.context = context
+    end
+    if error then
+        s.error = tostring(error)
+    end
     local commit = function()
         entity_coll.update(saga_instances, saga_id, s)
     end
