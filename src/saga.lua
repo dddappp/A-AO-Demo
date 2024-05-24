@@ -44,6 +44,7 @@ function saga.create_saga_instance(saga_type, target, tags, context, original_me
         saga_type = saga_type,
         current_step = 1,
         compensating = false,
+        completed = false,
         participants = {
             {
                 target = target,
@@ -60,6 +61,7 @@ function saga.create_saga_instance(saga_type, target, tags, context, original_me
     return saga_id, commit
 end
 
+--- Move saga instance's current_step forward and record participant information
 function saga.move_saga_instances_forward(saga_id, target, tags, context)
     local s = saga.get_saga_instance_copy(saga_id)
     s.current_step = s.current_step + 1
@@ -68,6 +70,37 @@ function saga.move_saga_instances_forward(saga_id, target, tags, context)
         tags = tags,
     }
     s.context = context
+    local commit = function()
+        entity_coll.update(saga_instances, saga_id, s)
+    end
+    return commit
+end
+
+--- Complete saga instance
+function saga.complete_saga_instance(saga_id, context)
+    local s = saga.get_saga_instance_copy(saga_id)
+    s.completed = true
+    s.context = context
+    local commit = function()
+        entity_coll.update(saga_instances, saga_id, s)
+    end
+    return commit
+end
+
+--- Increase saga instance's current_step
+function saga.increment_saga_instance_current_step(saga_id)
+    local s = saga.get_saga_instance_copy(saga_id)
+    s.current_step = s.current_step + 1
+    local commit = function()
+        entity_coll.update(saga_instances, saga_id, s)
+    end
+    return commit
+end
+
+--- Decrease saga instance's current_step
+function saga.decrement_saga_instance_current_step(saga_id)
+    local s = saga.get_saga_instance_copy(saga_id)
+    s.current_step = s.current_step - 1
     local commit = function()
         entity_coll.update(saga_instances, saga_id, s)
     end

@@ -11,6 +11,8 @@ local messaging = require("messaging")
             .invokeParticipant(this::createSingleLineInOut)
             .withCompensation(this::voidInOut)
         .step()
+            .invokeLocal(this::doSomethingLocally)
+        .step()
             .invokeParticipant(this::addInventoryItemEntry)
         .step()
             .invokeParticipant(this::completeInOut)
@@ -59,10 +61,11 @@ local in_out_config = config.in_out;
 
 -- process an inventory surplus or shortage
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
+    local cmd = json.decode(msg.Data)
+
     -- create or update inventory item
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_get_inventory_item_action() }
-    local cmd = json.decode(msg.Data)
     local request = {
         product_id = cmd.product_id,
         location = cmd.location,
@@ -83,7 +86,27 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
     messaging.commit_send(status, request_or_error, commit, target, tags)
 end
 
+local function on_get_inventory_item_reply(context, result)
+    context.item_version = result.item_version
+    local on_hand_quantity = result.quantity
+    local adjusted_quantity = context.quantity
+    local movement_quantity = adjusted_quantity > on_hand_quantity and
+        adjusted_quantity - on_hand_quantity or
+        on_hand_quantity - adjusted_quantity
+    context.movement_quantity = movement_quantity
+    -- --------------------
+    -- todo handle "adjusted_quantity = on_hand_quantity"
+end
+
 function inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback(msg, env, response)
+    local data = json.decode(msg.Data)
+    if (data.error) then
+        -- error(data.error)
+        return
+        -- todo handle error
+    end
+    local result = data.result
+
     -- create single line inbound or outbound order
     local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
     local saga_instance = saga.get_saga_instance_copy(saga_id)
@@ -94,24 +117,10 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
     local context = saga_instance.context
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_create_single_line_in_out_action() }
-    local data = json.decode(msg.Data)
-    if (data.error) then
-        -- error(data.error)
-        return
-        -- todo handle error
-    end
-    local result = data.result
 
     -- NOTE: on reply
-    context.item_version = result.item_version
-    local on_hand_quantity = result.quantity
-    local adjusted_quantity = context.quantity
-    local movement_quantity = adjusted_quantity > on_hand_quantity and
-        adjusted_quantity - on_hand_quantity or
-        on_hand_quantity - adjusted_quantity
-    context.movement_quantity = movement_quantity
-    -- todo handle "adjusted_quantity = on_hand_quantity"
-    -- --------------------
+    on_get_inventory_item_reply(context, result)
+
     local request = {
         product_id = context.product_id,
         location = context.location,
@@ -127,16 +136,14 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
     messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 end
 
-function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_callback(msg, env, response)
-    -- add inventory item entry
-    local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
-    local saga_instance = saga.get_saga_instance_copy(saga_id)
-    if (saga_instance.current_step ~= 2 or saga_instance.compensating) then
-        error(ERRORS.INVALID_MESSAGE)
+local function do_something_locally(context)
+    -- do something locally
+    return {}, function()
+        -- commit
     end
-    local context = saga_instance.context
-    local target = inventory_item_config.get_target()
-    local tags = { Action = inventory_item_config.get_add_inventory_item_entry_action() }
+end
+
+function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_callback(msg, env, response)
     local data = json.decode(msg.Data)
     if (data.error) then
         -- error(data.error)
@@ -144,6 +151,28 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
         -- todo handle error
     end
     local result = data.result
+
+
+    local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
+    local saga_instance = saga.get_saga_instance_copy(saga_id)
+    if (saga_instance.current_step ~= 2 or saga_instance.compensating) then
+        error(ERRORS.INVALID_MESSAGE)
+    end
+    local context = saga_instance.context
+
+    -- invoke local
+    local local_status, local_result_or_error, local_commit = pcall((function()
+        return do_something_locally(context)
+    end))
+    if (not local_status) then
+       -- error(local_result_or_error)
+       -- todo handle error
+    end
+
+    -- add inventory item entry
+    local target = inventory_item_config.get_target()
+    local tags = { Action = inventory_item_config.get_add_inventory_item_entry_action() }
+
     context.in_out_id = result.in_out_id
     context.in_out_version = result.version
 
@@ -160,10 +189,22 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
     tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
         .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK
-    messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
+    local total_commit = function()
+        local_commit()
+        commit()
+    end
+    messaging.commit_send_or_error(status, request_or_error, total_commit, target, tags) -- commit
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_add_inventory_item_entry_callback(msg, env, response)
+    local data = json.decode(msg.Data)
+    if (data.error) then
+        -- error(data.error)
+        return
+        -- todo handle error
+    end
+    local result = data.result
+
     -- complete in/out
     local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
     local saga_instance = saga.get_saga_instance_copy(saga_id)
@@ -173,13 +214,6 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
     local context = saga_instance.context
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_complete_in_out_action() }
-    local data = json.decode(msg.Data)
-    if (data.error) then
-        -- error(data.error)
-        return
-        -- todo handle error
-    end
-    local result = data.result
 
     local request = {
         in_out_id = context.in_out_id,
@@ -196,6 +230,14 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback(msg, env, response)
+    local data = json.decode(msg.Data)
+    if (data.error) then
+        -- error(data.error)
+        return
+        -- todo handle error
+    end
+    local result = data.result -- NOTE: last step result
+
     -- complete in/out
     local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
     local saga_instance = saga.get_saga_instance_copy(saga_id)
@@ -211,17 +253,12 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
     if (saga_instance.original_message and saga_instance.original_message.no_response_required) then
         tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED] = saga_instance.original_message.no_response_required
     end
-    local data = json.decode(msg.Data)
-    if (data.error) then
-        -- error(data.error)
-        return
-        -- todo handle error
-    end
-    local result = data.result -- NOTE: last step result
 
     local status, result_or_error, commit = pcall((function()
-        local commit = saga.move_saga_instances_forward(saga_id, "", tags, context) --todo set saga instance to completed
-        return {}, commit
+        local commit = saga.complete_saga_instance(saga_id, context) -- NOTE: tags?
+        return {
+            -- NOTE: return result to original requestor?
+        }, commit
     end))
     -- tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
     messaging.handle_response_based_on_tag(status, result_or_error, commit, {
