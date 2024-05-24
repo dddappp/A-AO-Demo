@@ -63,7 +63,7 @@ local in_out_config = config.in_out;
 -- end
 
 
-local function respond_original_requester(saga_instance, status, result_or_error, commit)
+local function respond_original_requester(saga_instance, result_or_error, is_error)
     local original_message_from = saga_instance.original_message and saga_instance.original_message.from or nil
     local tags = {}
     if (saga_instance.original_message and saga_instance.original_message.response_action) then
@@ -72,8 +72,7 @@ local function respond_original_requester(saga_instance, status, result_or_error
     if (saga_instance.original_message and saga_instance.original_message.no_response_required) then
         tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED] = saga_instance.original_message.no_response_required
     end
-    -- tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
-    messaging.handle_response_based_on_tag(status, result_or_error, commit, {
+    messaging.handle_response_based_on_tag(not is_error, result_or_error, function() end, {
         From = original_message_from,
         Tags = tags,
     })
@@ -170,14 +169,13 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     end
     local result = data.result
 
-    local status, result_or_error, commit = pcall((function()
-        local commit = saga.rollback_saga_instance(saga_id, 2 - 1, nil, nil, nil)
-        return {
-            -- NOTE: return result to original requestor?
-        }, commit
-    end))
-
-    respond_original_requester(saga_instance, status, result_or_error, commit)
+    -- local status, result_or_error, commit = pcall((function()
+    local commit = saga.rollback_saga_instance(saga_id, 2 - 1, nil, nil, nil)
+    -- return {
+    -- }, commit
+    --end))
+    commit()
+    respond_original_requester(saga_instance, error, true)
 end
 
 local function process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context,
@@ -344,16 +342,15 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
         return
         -- todo handle error
     end
-    local result = data.result -- NOTE: last step result
+    local result = data.result -- NOTE: last step result?
 
-    local status, result_or_error, commit = pcall((function()
-        local commit = saga.complete_saga_instance(saga_id, context) -- NOTE: tags?
-        return {
-            -- NOTE: return result to original requestor?
-        }, commit
-    end))
-
-    respond_original_requester(saga_instance, status, result_or_error, commit)
+    -- local status, result_or_error, commit = pcall((function()
+    local commit = saga.complete_saga_instance(saga_id, context)
+    --     return {
+    --     }, commit
+    -- end))
+    commit()
+    respond_original_requester(saga_instance, result, false)
 end
 
 return inventory_service
