@@ -249,9 +249,7 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     --]]
 
     -- No more compensations, just rollback
-    local commit = saga.rollback_saga_instance(saga_id, saga_instance.current_step - 1, nil, nil, nil, nil)
-    commit()
-    respond_original_requester(saga_instance, nil, true)
+    rollback_saga_instance_respond_original_requester(saga_instance, nil)
 end
 
 --[[
