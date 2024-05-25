@@ -128,6 +128,14 @@ local function execute_local_compensations_respond_original_requester(
 end
 
 
+local function complete_saga_instance_respond_original_requester(saga_instance, result, context)
+    local saga_id = saga_instance.saga_id
+    local commit = saga.complete_saga_instance(saga_id, context)
+    commit()
+    respond_original_requester(saga_instance, result, false)
+end
+
+
 -- process an inventory surplus or shortage
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
     local cmd = json.decode(msg.Data)
@@ -436,6 +444,7 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
     messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 end
 
+
 function inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback(msg, env, response)
     local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
     local saga_instance = saga.get_saga_instance_copy(saga_id)
@@ -459,13 +468,7 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
     end
     local result = data.result -- NOTE: last step result?
 
-    -- local status, result_or_error, commit = pcall((function()
-    local commit = saga.complete_saga_instance(saga_id, context)
-    --     return {
-    --     }, commit
-    -- end))
-    commit()
-    respond_original_requester(saga_instance, result, false)
+    complete_saga_instance_respond_original_requester(saga_instance, result, context)
 end
 
 return inventory_service
