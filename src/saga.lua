@@ -5,6 +5,7 @@ local saga = {}
 
 local ERRORS = {
     NIL_SAGA_ID_SEQUENCE = "NIL_SAGA_ID_SEQUENCE",
+    INVALID_STEP = "INVALID_STEP",
 }
 
 
@@ -83,6 +84,9 @@ end
 
 --- Move saga instance's current_step forward and record participant information
 function saga.move_saga_instance_forward(saga_id, step, target, tags, context)
+    if (type(step) ~= "number" or step < 1) then
+        error(ERRORS.INVALID_STEP)
+    end
     local s = saga.get_saga_instance_copy(saga_id)
     for _ = 1, step - 1, 1 do
         s.current_step = s.current_step + 1
@@ -100,29 +104,37 @@ function saga.move_saga_instance_forward(saga_id, step, target, tags, context)
     return commit
 end
 
-function saga.rollback_saga_instance(saga_id, step, target, tags, context, error)
-    local s = saga.get_saga_instance_copy(saga_id)
-    s.compensating = true
-    for _ = 1, step - 1, 1 do
-        s.current_step = s.current_step - 1
-        s.compensations[#s.compensations + 1] = {} -- invoke local or empty step
+function saga.rollback_saga_instance(saga_id, step, compensation_target, compensation_tags, context, error)
+    if (type(step) ~= "number" or step < 1) then
+        error(ERRORS.INVALID_STEP)
     end
-    s.current_step = s.current_step - 1
-    s.compensations[#s.compensations + 1] = target and {
-        target = target,
-        tags = tags or {},
-    } or {}
-    if (s.current_step <= 1) then
-        s.completed = true
+    local saga_instance = saga.get_saga_instance_copy(saga_id)
+    saga_instance.compensating = true
+    for _ = 1, step - 1, 1 do
+        saga_instance.current_step = saga_instance.current_step - 1
+        saga_instance.compensations[#saga_instance.compensations + 1] = {} -- "invokeLocal" or empty compensation
+    end
+    if (saga_instance.current_step <= 1) then
+        -- Let current_step stop at 1
+        saga_instance.completed = true
+    else
+        saga_instance.current_step = saga_instance.current_step - 1
+        saga_instance.compensations[#saga_instance.compensations + 1] = compensation_target and {
+            target = compensation_target,
+            tags = compensation_tags or {},
+        } or {}
+        if (saga_instance.current_step <= 1) then
+            saga_instance.completed = true
+        end
     end
     if context then
-        s.context = context
+        saga_instance.context = context
     end
     if error then
-        s.error = tostring(error)
+        saga_instance.error = tostring(error)
     end
     local commit = function()
-        entity_coll.update(saga_instances, saga_id, s)
+        entity_coll.update(saga_instances, saga_id, saga_instance)
     end
     return commit
 end

@@ -81,6 +81,49 @@ local function respond_original_requester(saga_instance, result_or_error, is_err
     })
 end
 
+
+local function execute_local_compensations(local_compensations, context)
+    local step_count = 0
+    local local_commits = {}
+    if (local_compensations) then
+        for i = 1, #local_compensations, 1 do
+            local local_compensation = local_compensations[i]
+            if local_compensation then
+                -- invoke local
+                local local_status, local_result_or_error, local_commit = pcall((function()
+                    return local_compensation(context)
+                end))
+                if (not local_status) then
+                    error(local_result_or_error) -- NOTE: just throw error
+                end
+                local_commits[#local_commits + 1] = local_commit
+            end
+            step_count = step_count + 1
+        end
+    end
+    return step_count, local_commits
+end
+
+
+local function execute_local_compensations_respond_original_requester(
+    saga_instance, context, error,
+    local_compensations
+)
+    local saga_id = saga_instance.saga_id
+    local local_step, local_commits = execute_local_compensations(local_compensations, context)
+    local commit = saga.rollback_saga_instance(saga_id, saga_instance.current_step - local_step - 1, nil, nil, context,
+        error)
+    local total_commit = function()
+        for _, local_commit in ipairs(local_commits) do
+            local_commit()
+        end
+        commit()
+    end
+    total_commit()
+    respond_original_requester(saga_instance, nil, true)
+end
+
+
 -- process an inventory surplus or shortage
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
     local cmd = json.decode(msg.Data)
@@ -132,7 +175,11 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
 
     local data = json.decode(msg.Data)
     if (data.error) then
-        return -- todo handle error, but no need to compensate
+        -- handle error, no need to compensate
+        local commit = saga.rollback_saga_instance(saga_id, saga_instance.current_step - 1, nil, nil, nil, data.error)
+        commit()
+        respond_original_requester(saga_instance, nil, true)
+        return
     end
     local result = data.result
 
@@ -157,8 +204,9 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
     messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 end
 
-function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback(msg, env,
-                                                                                                                 response)
+function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback(
+    msg, env, response
+)
     local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 2 or not saga_instance.compensating) then
@@ -172,45 +220,49 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     end
     local result = data.result
 
-    -- local status, result_or_error, commit = pcall((function()
-    local commit = saga.rollback_saga_instance(saga_id, 2 - 1, nil, nil, nil, nil)
-    -- return {
-    -- }, commit
-    --end))
+    -- If there are only local compensations left, execute them, then respond to the original requester.
+    -- execute_local_compensations_respond_original_requester(saga_instance, context, nil, {
+    --     -- local compensations
+    -- })
+    -- return
+
+
+
+    -- -- Invoke remote compensation
+    -- -- void InOut
+    -- local target = in_out_config.get_target()
+    -- local tags = { Action = in_out_config.get_void_in_out_action() }
+    -- local request = {
+    --     in_out_id = context.in_out_id,
+    --     version = context.in_out_version,
+    -- }
+    -- local status, request_or_error, commit = pcall((function()
+    --     local commit = saga.rollback_saga_instance(saga_id, local_step + 1, target, tags, context, error)
+    --     tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+    --     tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
+    --         .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK
+    --     return request, commit
+    -- end))
+    -- local total_commit = function()
+    --     for _, local_commit in ipairs(local_commits) do
+    --         local_commit()
+    --     end
+    --     commit()
+    -- end
+    -- messaging.commit_send_or_error(status, request_or_error, total_commit, target, tags)
+
+
+
+    -- No more compensations, just rollback
+    local commit = saga.rollback_saga_instance(saga_id, saga_instance.current_step - 1, nil, nil, nil, nil)
     commit()
     respond_original_requester(saga_instance, nil, true)
 end
 
-local function process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context, error,
-                                                                                          local_compensations)
-    local local_step = 0
-    local local_commits = {}
-    if (local_compensations) then
-        for i = 1, #local_compensations, 1 do
-            local local_compensation = local_compensations[i]
-            if local_compensation then
-                -- invoke local
-                local local_status, local_result_or_error, local_commit = pcall((function()
-                    return local_compensation(context)
-                end))
-                if (not local_status) then
-                    error(local_result_or_error) -- NOTE: just throw error
-                end
-                local_commits[#local_commits + 1] = local_commit
-            end
-            local_step = local_step + 1
-        end
-    end
-
-    -- -- If no remote compensations
-    -- local commit = saga.rollback_saga_instance(saga_id, 4 - local_step - 1, nil, nil, nil, error)
-    -- total_commit = (function()
-    --     commit()
-    --     total_commit()
-    -- end)
-    -- total_commit()
-    -- -- return
-
+local function process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(
+    saga_id, context, error, pre_local_step_count, pre_local_commits
+)
+    -- Invoke remote compensation
     -- void InOut
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_void_in_out_action() }
@@ -219,15 +271,17 @@ local function process_inventory_surplus_or_shortage_compensate_create_single_li
         version = context.in_out_version,
     }
     local status, request_or_error, commit = pcall((function()
-        local commit = saga.rollback_saga_instance(saga_id, local_step + 1, target, tags, context, error)
+        local commit = saga.rollback_saga_instance(saga_id, pre_local_step_count + 1, target, tags, context, error)
         tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
             .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK
         return request, commit
     end))
     local total_commit = function()
-        for _, local_commit in ipairs(local_commits) do
-            local_commit()
+        if (pre_local_commits) then
+            for _, local_commit in ipairs(pre_local_commits) do
+                local_commit()
+            end
         end
         commit()
     end
@@ -260,7 +314,11 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
 
     local data = json.decode(msg.Data)
     if (data.error) then
-        return -- todo handle error, but no need to compensate
+        -- handle error, no need to compensate
+        local commit = saga.rollback_saga_instance(saga_id, saga_instance.current_step - 1, nil, nil, nil, data.error)
+        commit()
+        respond_original_requester(saga_instance, nil, true)
+        return
     end
     local result = data.result
 
@@ -309,9 +367,13 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
 
     local data = json.decode(msg.Data)
     if (data.error) then
-        process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context, data.error, {
+        -- handle error, need to compensate
+        local pre_local_compensations = {
             process_inventory_surplus_or_shortage_compensate_do_something_locally
-        })
+        }
+        local pre_local_step_count, pre_local_commits = execute_local_compensations(pre_local_compensations, context)
+        process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context, data.error,
+            pre_local_step_count, pre_local_commits)
         return
     end
     local result = data.result
@@ -344,10 +406,14 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
 
     local data = json.decode(msg.Data)
     if (data.error) then
-        process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context, data.error, {
-            nil, -- no local compensation
+        -- handle error, need to compensate
+        local pre_local_compensations = {
+            nil, -- empty step compensation
             process_inventory_surplus_or_shortage_compensate_do_something_locally
-        })
+        }
+        local pre_local_step_count, pre_local_commits = execute_local_compensations(pre_local_compensations, context)
+        process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context, data.error,
+            pre_local_step_count, pre_local_commits)
         return
     end
     local result = data.result -- NOTE: last step result?
