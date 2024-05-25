@@ -65,7 +65,8 @@ Handlers.add(
     in_out_config.get_complete_in_out_action(),
     Handlers.utils.hasMatchingTag("Action", in_out_config.get_complete_in_out_action()),
     function(msg, env, response)
-        messaging.respond(true, {}, msg) -- success
+        -- messaging.respond(true, {}, msg) -- success
+        messaging.respond(false, "TEST_COMPLETE_IN_OUT_ERROR", msg) -- error
     end
 )
 
