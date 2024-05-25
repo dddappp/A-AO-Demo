@@ -1,8 +1,6 @@
 local entity_coll = require("entity_coll")
 -- local article = require("article")
-
 local article_create_logic = require("article_create_logic")
-
 local article_update_body_logic = require("article_update_body_logic")
 
 local article_aggregate = {}

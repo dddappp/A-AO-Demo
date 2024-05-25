@@ -1,6 +1,6 @@
-local messaging = {}
-
 local json = require("json")
+
+local messaging = {}
 
 local X_TAGS = {
     NO_RESPONSE_REQUIRED = "X-NoResponseRequired",
