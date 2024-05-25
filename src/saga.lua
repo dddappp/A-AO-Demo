@@ -82,13 +82,23 @@ end
 --     return commit
 -- end
 
+function saga.set_instance_compensating(saga_id, steps_upward)
+    local s = saga.get_saga_instance_copy(saga_id)
+    s.current_step = s.current_step + steps_upward
+    s.compensating = true
+    local commit = function()
+        entity_coll.update(saga_instances, saga_id, s)
+    end
+    return commit
+end
+
 --- Move saga instance's current_step forward and record participant information
-function saga.move_saga_instance_forward(saga_id, step, target, tags, context)
-    if (type(step) ~= "number" or step < 1) then
+function saga.move_saga_instance_forward(saga_id, steps, target, tags, context)
+    if (type(steps) ~= "number" or steps < 1) then
         error(ERRORS.INVALID_STEP)
     end
     local s = saga.get_saga_instance_copy(saga_id)
-    for _ = 1, step - 1, 1 do
+    for _ = 1, steps - 1, 1 do
         s.current_step = s.current_step + 1
         s.participants[s.current_step] = {} -- invoke local
     end
@@ -104,13 +114,13 @@ function saga.move_saga_instance_forward(saga_id, step, target, tags, context)
     return commit
 end
 
-function saga.rollback_saga_instance(saga_id, step, compensation_target, compensation_tags, context, error)
-    if (type(step) ~= "number" or step < 1) then
+function saga.rollback_saga_instance(saga_id, steps, compensation_target, compensation_tags, context, error)
+    if (type(steps) ~= "number" or steps < 1) then
         error(ERRORS.INVALID_STEP)
     end
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     saga_instance.compensating = true
-    for _ = 1, step - 1, 1 do
+    for _ = 1, steps - 1, 1 do
         saga_instance.current_step = saga_instance.current_step - 1
         saga_instance.compensations[#saga_instance.compensations + 1] = {} -- "invokeLocal" or empty compensation
     end
