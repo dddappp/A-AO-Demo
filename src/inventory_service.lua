@@ -229,12 +229,19 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     end
     local result = data.result
 
-    -- If there are only local compensations left, execute them, then respond to the original requester.
-    -- execute_local_compensations_respond_original_requester(saga_instance, context, nil, {
-    --     -- local compensations
-    -- })
-    -- return
 
+    -- If there are only local compensations left, execute them, then respond to the original requester.
+    --[[
+
+    execute_local_compensations_respond_original_requester(saga_instance, context, nil, {
+        -- local compensations
+    })
+    return
+
+    ]]
+
+
+    -- Invoke remote compensation.
     --[[
 
     -- If there are local compensations before left remote compensations...
@@ -246,7 +253,7 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     local pre_local_step_count = 0
     local pre_local_commits = {}
 
-    -- Invoke remote compensation.
+    -- invoke remote
     xxx_service_compensate_xxx(
         saga_id, nil, _err, pre_local_step_count, pre_local_commits
     )
