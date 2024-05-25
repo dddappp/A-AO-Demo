@@ -38,28 +38,36 @@ function saga.contains_saga_instance(saga_id)
     return entity_coll.contains(saga_instances, saga_id)
 end
 
-function saga.create_saga_instance(saga_type, target, tags, context, original_message)
+function saga.create_saga_instance(saga_type, target, tags, context, original_message, local_steps)
     local saga_id = next_saga_id()
-    local s = {
+    local saga_instance = {
         saga_id = saga_id,
         saga_type = saga_type,
         current_step = 1,
         compensating = false,
         completed = false,
-        participants = {
-            {
-                target = target,
-                tags = tags,
-            },
-        },
+        participants = {},
         compensations = {},
         context = context,
         original_message = original_message,
     }
-    local commit = function()
-        entity_coll.add(saga_instances, saga_id, s)
+    if (local_steps) then
+        for i = 1, local_steps, 1 do
+            saga_instance.current_step = saga_instance.current_step + 1
+            saga_instance.participants[#saga_instance.participants + 1] = {} -- invoke local
+        end
     end
-    return saga_id, commit
+    saga_instance.participants[#saga_instance.participants + 1] = {
+        {
+            target = target,
+            tags = tags,
+        },
+    }
+
+    local commit = function()
+        entity_coll.add(saga_instances, saga_id, saga_instance)
+    end
+    return saga_instance, commit
 end
 
 -- --- Increase saga instance's current_step
