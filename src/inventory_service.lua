@@ -120,7 +120,7 @@ local function execute_local_compensations_respond_original_requester(
         commit()
     end
     total_commit()
-    respond_original_requester(saga_instance, nil, true)
+    respond_original_requester(saga_instance, error, true)
 end
 
 
@@ -178,9 +178,10 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
         -- handle error, no need to compensate
         local commit = saga.rollback_saga_instance(saga_id, saga_instance.current_step - 1, nil, nil, nil, data.error)
         commit()
-        respond_original_requester(saga_instance, nil, true)
+        respond_original_requester(saga_instance, data.error, true)
         return
     end
+
     local result = data.result
 
     -- NOTE: on reply
@@ -338,7 +339,7 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
         -- handle error, no need to compensate
         local commit = saga.rollback_saga_instance(saga_id, saga_instance.current_step - 1, nil, nil, nil, data.error)
         commit()
-        respond_original_requester(saga_instance, nil, true)
+        respond_original_requester(saga_instance, data.error, true)
         return
     end
     local result = data.result

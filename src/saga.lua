@@ -127,14 +127,18 @@ function saga.rollback_saga_instance(saga_id, steps, compensation_target, compen
     if (saga_instance.current_step <= 1) then
         -- Let current_step stop at 1
         saga_instance.completed = true
-    else
+    else -- if (saga_instance.current_step > 1) then
         saga_instance.current_step = saga_instance.current_step - 1
-        saga_instance.compensations[#saga_instance.compensations + 1] = compensation_target and {
-            target = compensation_target,
-            tags = compensation_tags or {},
-        } or {}
         if (saga_instance.current_step <= 1) then
             saga_instance.completed = true
+        end
+        if (compensation_target) then
+            saga_instance.compensations[#saga_instance.compensations + 1] = {
+                target = compensation_target,
+                tags = compensation_tags or {},
+            }
+        else
+            saga_instance.compensations[#saga_instance.compensations + 1] = {}
         end
     end
     if context then
