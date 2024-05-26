@@ -6,18 +6,18 @@ local ERRORS = {
 local entity_coll = { ERRORS = ERRORS }
 
 
-function entity_coll.deepcopy(orig)
-    local orig_type = type(orig)
+function entity_coll.deepcopy(origin)
+    local orig_type = type(origin)
     local copy
     if orig_type == 'table' then
         copy = {}
-        for orig_key, orig_value in next, orig, nil do
+        for orig_key, orig_value in next, origin, nil do
             copy[entity_coll.deepcopy(orig_key)] = entity_coll.deepcopy(orig_value)
         end
         -- setmetatable(copy, deepcopy(getmetatable(orig)))
-        setmetatable(copy, getmetatable(orig))
+        setmetatable(copy, getmetatable(origin))
     else
-        copy = orig
+        copy = origin
     end
     return copy
 end

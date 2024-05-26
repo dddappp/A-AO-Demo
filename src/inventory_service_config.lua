@@ -1,4 +1,3 @@
--- inventory_service.init(--saga,
 return {
     inventory_item = {
         get_target = function()

@@ -91,11 +91,11 @@ end
 -- end
 
 function saga.set_instance_compensating(saga_id, steps_upward)
-    local s = saga.get_saga_instance_copy(saga_id)
-    s.current_step = s.current_step + steps_upward
-    s.compensating = true
+    local saga_instance = saga.get_saga_instance_copy(saga_id)
+    saga_instance.current_step = saga_instance.current_step + steps_upward
+    saga_instance.compensating = true
     local commit = function()
-        entity_coll.update(saga_instances, saga_id, s)
+        entity_coll.update(saga_instances, saga_id, saga_instance)
     end
     return commit
 end
@@ -105,19 +105,19 @@ function saga.move_saga_instance_forward(saga_id, steps, target, tags, context)
     if (type(steps) ~= "number" or steps < 1) then
         error(ERRORS.INVALID_STEP)
     end
-    local s = saga.get_saga_instance_copy(saga_id)
+    local saga_instance = saga.get_saga_instance_copy(saga_id)
     for _ = 1, steps - 1, 1 do
-        s.current_step = s.current_step + 1
-        s.participants[s.current_step] = {} -- invoke local
+        saga_instance.current_step = saga_instance.current_step + 1
+        saga_instance.participants[saga_instance.current_step] = {} -- invoke local
     end
-    s.current_step = s.current_step + 1
-    s.participants[s.current_step] = {
+    saga_instance.current_step = saga_instance.current_step + 1
+    saga_instance.participants[saga_instance.current_step] = {
         target = target,
         tags = tags,
     }
-    s.context = context
+    saga_instance.context = context
     local commit = function()
-        entity_coll.update(saga_instances, saga_id, s)
+        entity_coll.update(saga_instances, saga_id, saga_instance)
     end
     return commit
 end
@@ -164,12 +164,17 @@ function saga.rollback_saga_instance(saga_id, steps, compensation_target, compen
 end
 
 --- Complete saga instance
-function saga.complete_saga_instance(saga_id, context)
-    local s = saga.get_saga_instance_copy(saga_id)
-    s.completed = true
-    s.context = context
+function saga.complete_saga_instance(saga_id, result, context)
+    local saga_instance = saga.get_saga_instance_copy(saga_id)
+    saga_instance.completed = true
+    if (result) then
+        saga_instance.result = result
+    end
+    if (context) then
+        saga_instance.context = context
+    end
     local commit = function()
-        entity_coll.update(saga_instances, saga_id, s)
+        entity_coll.update(saga_instances, saga_id, saga_instance)
     end
     return commit
 end

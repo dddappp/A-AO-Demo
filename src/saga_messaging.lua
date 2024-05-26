@@ -1,7 +1,7 @@
 local saga = require("saga")
 local messaging = require("messaging")
 
-local saga_messaging_util = {}
+local saga_messaging = {}
 
 
 local function respond_original_requester(saga_instance, result_or_error, is_error)
@@ -22,7 +22,7 @@ local function respond_original_requester(saga_instance, result_or_error, is_err
     })
 end
 
-function saga_messaging_util.execute_local_compensations(local_compensations, context)
+function saga_messaging.execute_local_compensations(local_compensations, context)
     local step_count = 0
     local local_commits = {}
     if (local_compensations) then
@@ -45,19 +45,19 @@ function saga_messaging_util.execute_local_compensations(local_compensations, co
 end
 
 
-function saga_messaging_util.rollback_saga_instance_respond_original_requester(saga_instance, _err)
+function saga_messaging.rollback_saga_instance_respond_original_requester(saga_instance, _err)
     local saga_id = saga_instance.saga_id
     local commit = saga.rollback_saga_instance(saga_id, saga_instance.current_step - 1, nil, nil, nil, _err)
     commit()
     respond_original_requester(saga_instance, _err, true)
 end
 
-function saga_messaging_util.execute_local_compensations_respond_original_requester(
+function saga_messaging.execute_local_compensations_respond_original_requester(
     saga_instance, context, _err,
     local_compensations
 )
     local saga_id = saga_instance.saga_id
-    local _, local_commits = saga_messaging_util.execute_local_compensations(local_compensations, context)
+    local _, local_commits = saga_messaging.execute_local_compensations(local_compensations, context)
     local commit = saga.rollback_saga_instance(saga_id, saga_instance.current_step - 1, nil, nil, context,
         _err)
     local total_commit = function()
@@ -71,11 +71,11 @@ function saga_messaging_util.execute_local_compensations_respond_original_reques
 end
 
 
-function saga_messaging_util.complete_saga_instance_respond_original_requester(saga_instance, result, context)
+function saga_messaging.complete_saga_instance_respond_original_requester(saga_instance, result, context)
     local saga_id = saga_instance.saga_id
-    local commit = saga.complete_saga_instance(saga_id, context)
+    local commit = saga.complete_saga_instance(saga_id, result, context)
     commit()
     respond_original_requester(saga_instance, result, false)
 end
 
-return saga_messaging_util
+return saga_messaging

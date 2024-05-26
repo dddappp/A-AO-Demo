@@ -1,15 +1,15 @@
 local json = require("json")
 local messaging = require("messaging")
 local saga = require("saga")
-local saga_messaging_util = require("saga_messaging_util")
+local saga_messaging = require("saga_messaging")
 
-local execute_local_compensations_respond_original_requester = saga_messaging_util
+local execute_local_compensations_respond_original_requester = saga_messaging
     .execute_local_compensations_respond_original_requester
-local rollback_saga_instance_respond_original_requester = saga_messaging_util
+local rollback_saga_instance_respond_original_requester = saga_messaging
     .rollback_saga_instance_respond_original_requester
-local complete_saga_instance_respond_original_requester = saga_messaging_util
+local complete_saga_instance_respond_original_requester = saga_messaging
     .complete_saga_instance_respond_original_requester
-local execute_local_compensations = saga_messaging_util.execute_local_compensations
+local execute_local_compensations = saga_messaging.execute_local_compensations
 
 --[[
     private SagaDefinition<CreateOrUpdateInventoryItemSagaData> sagaDefinition =
@@ -21,6 +21,7 @@ local execute_local_compensations = saga_messaging_util.execute_local_compensati
             .withCompensation(this::voidInOut)
         .step()
             .invokeLocal(this::doSomethingLocally)
+            .withCompensation()
         .step()
             .invokeParticipant(this::addInventoryItemEntry)
         .step()
@@ -136,12 +137,21 @@ local function process_inventory_surplus_or_shortage_on_get_inventory_item_reply
     context.item_version = result.item_version
     local on_hand_quantity = result.quantity
     local adjusted_quantity = context.quantity
+
+    -- ------------------------------------------
+    if (adjusted_quantity == on_hand_quantity) then -- NOTE: short-circuit if no changed
+        local short_circuited = true
+        local is_error = false
+        -- If the original request requires a result, provide one here if a short circuit occurs.
+        local result_or_error = "adjusted_quantity == on_hand_quantity"
+        return short_circuited, is_error, result_or_error
+    end
+    -- ------------------------------------------
+
     local movement_quantity = adjusted_quantity > on_hand_quantity and
         adjusted_quantity - on_hand_quantity or
         on_hand_quantity - adjusted_quantity
     context.movement_quantity = movement_quantity
-    -- --------------------
-    -- todo handle "adjusted_quantity = on_hand_quantity"
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback(msg, env, response)
@@ -162,8 +172,17 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
 
     local result = data.result
 
-    -- NOTE: on reply
-    process_inventory_surplus_or_shortage_on_get_inventory_item_reply(context, result)
+    -- On-reply
+    local short_circuited, is_error, result_or_error = process_inventory_surplus_or_shortage_on_get_inventory_item_reply(
+        context, result)
+    if (short_circuited) then
+        if (not is_error) then
+            complete_saga_instance_respond_original_requester(saga_instance, result_or_error, context)
+        else
+            rollback_saga_instance_respond_original_requester(saga_instance, result_or_error)
+        end
+        return
+    end
 
     -- create single line inbound or outbound order
     local target = in_out_config.get_target()
@@ -354,9 +373,11 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_add_inventory_item_entry_action() }
 
+    -- Export result variables into context
     context.in_out_id = result.in_out_id
     context.in_out_version = result.version
 
+    -- Construct request from context
     local request = {
         product_id = context.product_id,
         location = context.location,
@@ -441,9 +462,13 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
             pre_local_step_count, pre_local_commits)
         return
     end
-    local result = data.result -- NOTE: last step result?
+    local result = data.result -- the last step result
 
-    complete_saga_instance_respond_original_requester(saga_instance, result, context)
+    -- Extract the result from the context.
+    local completed_result = {
+        -- variant = context.variant,
+    }
+    complete_saga_instance_respond_original_requester(saga_instance, completed_result, context)
 end
 
 return inventory_service
