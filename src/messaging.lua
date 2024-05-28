@@ -35,7 +35,11 @@ function messaging.convert_to_boolean(val)
 end
 
 function messaging.extract_error_code(err)
-    return tostring(err):match("([^ ]+)$") or "INTERNAL_ERROR"
+    if (err == nil or err == '') then
+        return "INTERNAL_ERROR"
+    end
+    local err_msg = tostring(err)
+    return err_msg:match("%s+([%u_]+)[^%s]*$") or err_msg
 end
 
 function messaging.respond(status, result_or_error, request_msg)

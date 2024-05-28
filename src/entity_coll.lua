@@ -45,6 +45,10 @@ function entity_coll.update(table, entity_id, entity)
     end
 end
 
+function entity_coll.add_or_update(table, entity_id, entity)
+    table[entity_id] = entity
+end
+
 function entity_coll.remove(table, entity_id)
     if (table[entity_id]) then
         local removed = table[entity_id]
@@ -68,6 +72,14 @@ function entity_coll.get_copy(table, entity_id)
         return entity_coll.deepcopy(table[entity_id])
     else
         error(ERRORS.ID_NOT_EXISTS)
+    end
+end
+
+function entity_coll.get_copy_or_else_nil(table, entity_id)
+    if (table[entity_id]) then
+        return entity_coll.deepcopy(table[entity_id])
+    else
+        return nil
     end
 end
 

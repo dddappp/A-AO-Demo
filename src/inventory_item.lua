@@ -1,0 +1,21 @@
+local inventory_item = {}
+
+function inventory_item.new(inventory_item_id, quantity)
+    local state = {
+        inventory_item_id = inventory_item_id,
+        version = 0,
+        quantity = quantity,
+    }
+    return state
+end
+
+function inventory_item.inventory_item_entry_added(inventory_item_id, _state, movement_quantity)
+    local event = {}
+    event.event_type = "InventoryItemEntryAdded"
+    event.inventory_item_id = inventory_item_id
+    event.version = _state and _state.version or nil
+    event.movement_quantity = movement_quantity
+    return event
+end
+
+return inventory_item
