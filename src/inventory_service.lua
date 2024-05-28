@@ -198,7 +198,7 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
             product_id = context.product_id,
             location = context.location,
             -- inventory_item_id = context.inventory_item_id,
-            version = context.item_version,
+            -- version = context.item_version,
             movement_quantity = context.movement_quantity,
         }
 

@@ -1,0 +1,85 @@
+valueObjects:
+  InventoryItemId:
+    properties:
+      ProductId:
+        type: number
+      Location:
+        type: string
+      InventoryAttributeSet:
+        type: InventoryAttributeSet
+  InventoryAttributeSet:
+    properties:
+      Foo:
+        type: string
+      Bar:
+        type: string
+
+
+aggregates:
+  Article:
+    id:
+      name: ArticleId
+      type: number
+  
+  InventoryItem:
+    id:
+      name: InventoryItemId
+      type: InventoryItemId
+
+
+services:
+  InOutService:
+    abstract: true
+    methods:
+      CreateSingleLineInOut:
+        parameters:
+          ProductId:
+            type: number
+          Location:
+            type: string
+          MovementQuantity:
+            type: number
+      CompleteInOut:
+        parameters:
+          InOutId:
+            type: number
+      VoidInOut:
+        parameters:
+          InOutId:
+            type: number
+
+  InventoryService:
+    requiredComponents:
+      InventoryItem:
+        type: InventoryItemAggregate
+      InOut:
+        type: InOutService
+    methods:
+      ProcessInventorySurplusOrShortage:        
+        parameters:
+          ProductId:
+            type: number
+          Location:
+            type: string
+          Quantity:
+            type: number
+        steps:
+          GetInventoryItem:
+            prepareRequest:
+              Lua: "-- TODO"
+            invokeParticipant: "InventoryItem.GetInventoryItem" # TODO: rename to InventoryItemService?
+            onReply:
+              Lua: "-- TODO"
+          CreateSingleLineInOut:
+            invokeParticipant: "InOut.CreateSingleLineInOut"
+            withCompensation: "InOut.VoidInOut"
+          DoSomethingLocally:
+            invokeLocal:
+              Lua: "-- TODO"
+            withCompensation:
+              Lua: "-- TODO"
+          AddInventoryItemEntry:
+            invokeParticipant: "InventoryItem.AddInventoryItemEntry"
+          CompleteInOut:
+            invokeParticipant: "InOut.CompleteInOut"
+

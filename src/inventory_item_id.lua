@@ -2,11 +2,11 @@ local inventory_attribute_set = require("inventory_attribute_set")
 
 local inventory_item_id = {}
 
-function inventory_item_id.new(product_id, location, inventory_attribute_set)
+function inventory_item_id.new(product_id, location, _inventory_attribute_set)
     local val = {
         product_id = product_id,
         location = location,
-        inventory_attribute_set = inventory_attribute_set,
+        inventory_attribute_set = _inventory_attribute_set,
     }
     return val
 end
