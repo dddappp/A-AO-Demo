@@ -14,6 +14,7 @@ local execute_local_compensations = saga_messaging.execute_local_compensations
 --[[
     private SagaDefinition<CreateOrUpdateInventoryItemSagaData> sagaDefinition =
         step()
+            .prepareRequest()
             .invokeParticipant(this::getInventoryItem)
             .onReply(InventoryItemStateDto.class, this::on_GetInventoryItem_Reply)
         .step()
@@ -71,7 +72,14 @@ local in_out_config = config.in_out;
 
 
 
-
+local function process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
+    local _inventory_item_id = {
+        product_id = context.product_id,
+        location = context.location,
+    }
+    context.inventory_item_id = _inventory_item_id
+    return _inventory_item_id
+end
 
 -- process an inventory surplus or shortage
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
@@ -80,14 +88,10 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
     -- create or update inventory item
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_get_inventory_item_action() }
-    local request = {
-        product_id = cmd.product_id,
-        location = cmd.location,
-    }
     local status, request_or_error, commit = pcall((function()
         local saga_instance, commit = saga.create_saga_instance(ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE, target,
             tags,
-            cmd,
+            cmd, -- as context
             {
                 from = msg.From,
                 response_action = msg.Tags[messaging.X_TAGS.RESPONSE_ACTION],
@@ -95,6 +99,7 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
             },
             0
         )
+
         local saga_id = saga_instance.saga_id
         local context = saga_instance.context
 
@@ -125,6 +130,7 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
 
         ]]
 
+        local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
         tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
             .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK
@@ -134,7 +140,7 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
 end
 
 local function process_inventory_surplus_or_shortage_on_get_inventory_item_reply(context, result)
-    context.item_version = result.item_version
+    context.item_version = result.version -- NOTE: The name of the field IS "version"!
     local on_hand_quantity = result.quantity
     local adjusted_quantity = context.quantity
 
@@ -187,12 +193,15 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
     -- create single line inbound or outbound order
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_create_single_line_in_out_action() }
-    local request = {
-        product_id = context.product_id,
-        location = context.location,
-        movement_quantity = context.movement_quantity,
-    }
     local status, request_or_error, commit = pcall((function()
+        local request = {
+            product_id = context.product_id,
+            location = context.location,
+            -- inventory_item_id = context.inventory_item_id,
+            version = context.item_version,
+            movement_quantity = context.movement_quantity,
+        }
+
         local commit = saga.move_saga_instance_forward(saga_id, 1, target, tags, context)
         tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
@@ -290,11 +299,12 @@ local function process_inventory_surplus_or_shortage_compensate_create_single_li
     -- void InOut
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_void_in_out_action() }
-    local request = {
-        in_out_id = context.in_out_id,
-        version = context.in_out_version,
-    }
     local status, request_or_error, commit = pcall((function()
+        local request = {
+            in_out_id = context.in_out_id,
+            version = context.in_out_version,
+        }
+
         local commit = saga.rollback_saga_instance(saga_id, pre_local_step_count + 1, target, tags, context, _err)
         tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
@@ -377,14 +387,16 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     context.in_out_id = result.in_out_id
     context.in_out_version = result.version
 
-    -- Construct request from context
-    local request = {
-        product_id = context.product_id,
-        location = context.location,
-        version = context.item_version,
-        movement_quantity = context.movement_quantity,
-    }
     local status, request_or_error, commit = pcall((function()
+        -- Construct request from context
+        local request = {
+            -- product_id = context.product_id,
+            -- location = context.location,
+            inventory_item_id = context.inventory_item_id,
+            version = context.item_version,
+            movement_quantity = context.movement_quantity,
+        }
+
         local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, target, tags, context)
         tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
@@ -426,12 +438,12 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
     -- complete in/out
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_complete_in_out_action() }
-
-    local request = {
-        in_out_id = context.in_out_id,
-        version = context.in_out_version,
-    }
     local status, request_or_error, commit = pcall((function()
+        local request = {
+            in_out_id = context.in_out_id,
+            version = context.in_out_version,
+        }
+
         local commit = saga.move_saga_instance_forward(saga_id, 1, target, tags, context)
         tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS

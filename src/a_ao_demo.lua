@@ -122,6 +122,8 @@ end
 --[[
 Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
 Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }) })
+
+Send({ Target = "ixer2JAwpnIWRDBXQbNZdOYrOs3Ab3kjmIzRUxdY7U4", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
 ]]
 
 Handlers.add(
@@ -133,6 +135,8 @@ Handlers.add(
 --[[
 Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 100, version = 0}) })
 Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }, movement_quantity = 100, version = 0}) })
+
+Send({ Target = "ixer2JAwpnIWRDBXQbNZdOYrOs3Ab3kjmIzRUxdY7U4", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 130, version = 0}) })
 ]]
 
 Handlers.add(

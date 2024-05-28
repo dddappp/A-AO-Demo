@@ -23,9 +23,16 @@ Inbox[#Inbox]
 
 ]]
 
+Handlers.add(
+    inventory_item_config.get_get_inventory_item_action(),
+    Handlers.utils.hasMatchingTag("Action", "X_" .. inventory_item_config.get_get_inventory_item_action()),
+    function ()
+        -- removed
+    end
+)
 
 -- Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = { product_id = 1, location = "x", version = 11, quantity = 110 } }) })
-
+--[[
 Handlers.add(
     inventory_item_config.get_get_inventory_item_action(),
     Handlers.utils.hasMatchingTag("Action", inventory_item_config.get_get_inventory_item_action()),
@@ -33,8 +40,8 @@ Handlers.add(
         messaging.respond(true,
             -- { product_id = 1, location = "x", version = 11, quantity = 110 },
             {
-                product_id = 1,
-                location = "x",
+                -- product_id = 1,
+                -- location = "x",
                 version = 11,
                 quantity = 100, -- Test short-circuited logic, return quantity equal to "quantity" in the original request
             },
@@ -43,6 +50,33 @@ Handlers.add(
         -- messaging.respond(false, "TEST_GET_INVENTORY_ITEM_ERROR", msg) -- error
     end
 )
+]]
+
+Handlers.add(
+    inventory_item_config.get_add_inventory_item_entry_action(),
+    Handlers.utils.hasMatchingTag("Action", "X_" .. inventory_item_config.get_add_inventory_item_entry_action()),
+    function(msg, env, response)
+        -- removed
+    end
+)
+
+-- Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_AddInventoryItemEntry_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = {} }) })
+--[[
+Handlers.add(
+    inventory_item_config.get_add_inventory_item_entry_action(),
+    Handlers.utils.hasMatchingTag("Action", inventory_item_config.get_add_inventory_item_entry_action()),
+    function(msg, env, response)
+        -- success:
+        messaging.respond(true,
+            {
+            },
+            msg
+        )
+        -- error:
+        -- messaging.respond(false, "TEST_ADD_INVENTORY_ITEM_ENTRY_ERROR", msg)
+    end
+)
+]]
 
 
 -- Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = { in_out_id = 1, version = 0 } }) })
@@ -63,22 +97,6 @@ Handlers.add(
 )
 
 
--- Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_AddInventoryItemEntry_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = {} }) })
-
-Handlers.add(
-    inventory_item_config.get_add_inventory_item_entry_action(),
-    Handlers.utils.hasMatchingTag("Action", inventory_item_config.get_add_inventory_item_entry_action()),
-    function(msg, env, response)
-        -- success:
-        messaging.respond(true,
-            {
-            },
-            msg
-        )
-        -- error:
-        -- messaging.respond(false, "TEST_ADD_INVENTORY_ITEM_ENTRY_ERROR", msg)
-    end
-)
 
 -- Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CompleteInOut_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = {} }) })
 
