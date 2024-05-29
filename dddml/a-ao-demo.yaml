@@ -17,15 +17,47 @@ valueObjects:
 
 aggregates:
   Article:
+    metadata:
+      Preprocessors: [ "CRUD_IT" ]
+      CRUD_IT_NO_UPDATE: true
+      CRUD_IT_NO_DELETE: true
     id:
       name: ArticleId
       type: number
+    properties:
+      Title:
+        type: string
+      Body:
+        type: string
+      Owner:
+        type: string
+    methods:
+      UpdateBody:
+        metadata:
+          MessagingCommandName: "UpdateArticleBody"
+        parameters:
+          Body:
+            type: string
+        event:
+          name: "ArticleBodyUpdated"
   
   InventoryItem:
     id:
       name: InventoryItemId
       type: InventoryItemId
-
+    properties:
+      Quantity:
+        type: number
+    methods:
+      AddInventoryItemEntry:
+        shouldCreateOnDemand: true
+        metadata:
+          MessagingCommandName: "AddInventoryItemEntry"
+        parameters:
+          MovementQuantity:
+            type: number
+        event:
+          name: "InventoryItemEntryAdded"
 
 services:
   InOutService:
@@ -43,9 +75,13 @@ services:
         parameters:
           InOutId:
             type: number
+          Version:
+            type: number
       VoidInOut:
         parameters:
           InOutId:
+            type: number
+          Version:
             type: number
 
   InventoryService:
@@ -72,14 +108,28 @@ services:
               Lua: "-- TODO"
           CreateSingleLineInOut:
             invokeParticipant: "InOut.CreateSingleLineInOut"
+            exportVariables:
+              # -- Export result variables into context
+              # context.in_out_id = result.in_out_id
+              # context.in_out_version = result.version
+              InOutId:
+                extractedFrom: ".in_out_id"
+              InOutVersion:
+                extractedFrom: ".version"
             withCompensation: "InOut.VoidInOut"
           DoSomethingLocally:
-            invokeLocal:
-              Lua: "-- TODO"
-            withCompensation:
-              Lua: "-- TODO"
+            invokeLocal: ""
+            withCompensation: ""
           AddInventoryItemEntry:
             invokeParticipant: "InventoryItem.AddInventoryItemEntry"
           CompleteInOut:
             invokeParticipant: "InOut.CompleteInOut"
+            arguments:
+              # local request = {
+              #     in_out_id = context.in_out_id,
+              #     version = context.in_out_version,
+              # }
+              InOutId: "InOutId"
+              Version: "InOutVersion"
+
 
