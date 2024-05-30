@@ -26,7 +26,7 @@ Inbox[#Inbox]
 Handlers.add(
     inventory_item_config.get_get_inventory_item_action(),
     Handlers.utils.hasMatchingTag("Action", "X_" .. inventory_item_config.get_get_inventory_item_action()),
-    function ()
+    function()
         -- removed
     end
 )
@@ -79,40 +79,69 @@ Handlers.add(
 ]]
 
 
+Handlers.add(
+    in_out_config.get_create_single_line_in_out_action(),
+    Handlers.utils.hasMatchingTag("Action", "X_" .. in_out_config.get_create_single_line_in_out_action()),
+    function(msg, env, response)
+        -- removed
+    end
+)
+
+
 -- Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = { in_out_id = 1, version = 0 } }) })
 
 Handlers.add(
-    in_out_config.get_create_single_line_in_out_action(),
+    "create_single_line_in_out",
     Handlers.utils.hasMatchingTag("Action", in_out_config.get_create_single_line_in_out_action()),
     function(msg, env, response)
-        messaging.respond(true,
-            {
-                in_out_id = 1,
-                version = 0,
-            },
-            msg
-        )
+        messaging.respond(true, {
+            in_out_id = 1,
+            version = 0,
+        }, msg)
         -- messaging.respond(false, "TEST_CREATE_SINGLE_LINE_IN_OUT_ERROR", msg) -- error
     end
 )
 
 
 
+Handlers.add(
+    in_out_config.get_complete_in_out_action(),
+    Handlers.utils.hasMatchingTag("Action", "X_" .. in_out_config.get_complete_in_out_action()),
+    function(msg, env, response)
+        -- removed
+    end
+)
+
+
 -- Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CompleteInOut_Callback", ["X-SagaId"] = "24" }, Data = json.encode({ result = {} }) })
 
 Handlers.add(
-    in_out_config.get_complete_in_out_action(),
+    "complete_in_out",
     Handlers.utils.hasMatchingTag("Action", in_out_config.get_complete_in_out_action()),
     function(msg, env, response)
-        messaging.respond(true, {}, msg) -- success
+        messaging.respond(true, {
+            --
+        }, msg) -- success
         -- messaging.respond(false, "TEST_COMPLETE_IN_OUT_ERROR", msg) -- error
     end
 )
 
+
+
 Handlers.add(
     in_out_config.get_void_in_out_action(),
+    Handlers.utils.hasMatchingTag("Action", "X_" .. in_out_config.get_void_in_out_action()),
+    function(msg, env, response)
+        -- removed
+    end
+)
+
+Handlers.add(
+    "void_in_out",
     Handlers.utils.hasMatchingTag("Action", in_out_config.get_void_in_out_action()),
     function(msg, env, response)
-        messaging.respond(true, {}, msg) -- success
+        messaging.respond(true, {
+            --
+        }, msg) -- success
     end
 )
