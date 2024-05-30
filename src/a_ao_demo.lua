@@ -41,10 +41,11 @@ local json = require("json")
 local entity_coll = require("entity_coll")
 local messaging = require("messaging")
 local saga = require("saga")
-local article_aggregate = require("article_aggregate")
-local inventory_service = require("inventory_service")
 local inventory_item_id = require("inventory_item_id")
+local article_aggregate = require("article_aggregate")
 local inventory_item_aggregate = require("inventory_item_aggregate")
+local inventory_service = require("inventory_service")
+
 
 article_aggregate.init(ArticleTable, ArticleIdSequence)
 
