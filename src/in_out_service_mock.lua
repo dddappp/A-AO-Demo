@@ -1,7 +1,3 @@
-local config = require("inventory_service_config")
-local inventory_item_config = config.inventory_item;
-local in_out_config = config.in_out;
-
 local messaging = require("messaging")
 
 
@@ -28,7 +24,7 @@ Inbox[#Inbox]
 
 Handlers.add(
     "create_single_line_in_out",
-    Handlers.utils.hasMatchingTag("Action", in_out_config.get_create_single_line_in_out_action()),
+    Handlers.utils.hasMatchingTag("Action", "CreateSingleLineInOut"),
     function(msg, env, response)
         messaging.respond(true, {
             in_out_id = 1,
@@ -43,7 +39,7 @@ Handlers.add(
 
 Handlers.add(
     "complete_in_out",
-    Handlers.utils.hasMatchingTag("Action", in_out_config.get_complete_in_out_action()),
+    Handlers.utils.hasMatchingTag("Action", "CompleteInOut"),
     function(msg, env, response)
         messaging.respond(true, {
             --
@@ -55,7 +51,7 @@ Handlers.add(
 
 Handlers.add(
     "void_in_out",
-    Handlers.utils.hasMatchingTag("Action", in_out_config.get_void_in_out_action()),
+    Handlers.utils.hasMatchingTag("Action", "VoidInOut"),
     function(msg, env, response)
         messaging.respond(true, {
             --
