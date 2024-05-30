@@ -64,6 +64,13 @@ aggregates:
 
 services:
   InOutService:
+    valueObjects:
+      CreateSingleLineInOutResult:
+        properties:
+          InOutId:
+            type: number
+          Version:
+            type: number
     abstract: true
     methods:
       CreateSingleLineInOut:
@@ -74,6 +81,8 @@ services:
             type: string
           MovementQuantity:
             type: number
+        result:
+          CreateSingleLineInOutResult
       CompleteInOut:
         parameters:
           InOutId:
@@ -116,9 +125,9 @@ services:
               # context.in_out_id = result.in_out_id
               # context.in_out_version = result.version
               InOutId:
-                extractedFrom: ".in_out_id"
+                extractedFrom: ".InOutId"
               InOutVersion:
-                extractedFrom: ".version"
+                extractedFrom: ".Version"
             withCompensation: "InOut.VoidInOut"
           DoSomethingLocally:
             invokeLocal: ""
