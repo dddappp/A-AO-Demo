@@ -2,5 +2,6 @@ configuration:
   sequenceNumber: 1000
   metadata:
     EventTypeDiscriminatorName: "EventType"
+    ServiceMethodMessagingCommandNameFormat: "{0}_{1}" # {ServiceName}_{MethodName}
   ao:
     ObjectVersionPropertyName: version

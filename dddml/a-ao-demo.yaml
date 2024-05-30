@@ -74,6 +74,8 @@ services:
     abstract: true
     methods:
       CreateSingleLineInOut:
+        metadata:
+          MessagingCommandName: "CreateSingleLineInOut"
         parameters:
           ProductId:
             type: number
@@ -82,14 +84,18 @@ services:
           MovementQuantity:
             type: number
         result:
-          CreateSingleLineInOutResult
+          type: CreateSingleLineInOutResult
       CompleteInOut:
+        metadata:
+          MessagingCommandName: "CompleteInOut"
         parameters:
           InOutId:
             type: number
           Version:
             type: number
       VoidInOut:
+        metadata:
+          MessagingCommandName: "VoidInOut"
         parameters:
           InOutId:
             type: number
