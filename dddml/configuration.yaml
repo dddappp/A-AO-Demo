@@ -1,0 +1,6 @@
+configuration:
+  sequenceNumber: 1000
+  metadata:
+    EventTypeDiscriminatorName: "EventType"
+  ao:
+    ObjectVersionPropertyName: version

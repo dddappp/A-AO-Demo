@@ -24,6 +24,9 @@ aggregates:
     id:
       name: ArticleId
       type: number
+      generator:
+        class: sequence
+        structName: ArticleIdSequence
     properties:
       Title:
         type: string

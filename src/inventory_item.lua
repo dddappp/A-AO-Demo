@@ -1,5 +1,11 @@
 local inventory_item = {}
 
+local ERRORS = {
+}
+
+inventory_item.ERRORS = ERRORS
+
+
 function inventory_item.new(inventory_item_id, quantity)
     local state = {
         inventory_item_id = inventory_item_id,
@@ -9,7 +15,7 @@ function inventory_item.new(inventory_item_id, quantity)
     return state
 end
 
-function inventory_item.inventory_item_entry_added(inventory_item_id, _state, movement_quantity)
+function inventory_item.new_inventory_item_entry_added(inventory_item_id, _state, movement_quantity)
     local event = {}
     event.event_type = "InventoryItemEntryAdded"
     event.inventory_item_id = inventory_item_id

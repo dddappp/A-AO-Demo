@@ -1,6 +1,6 @@
 local entity_coll = require("entity_coll")
-local inventory_item_id = require("inventory_item_id")
 local json = require("json")
+local inventory_item_id = require("inventory_item_id")
 local inventory_item_add_inventory_item_entry_logic = require("inventory_item_add_inventory_item_entry_logic")
 
 local inventory_item_aggregate = {}
