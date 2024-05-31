@@ -105,7 +105,7 @@ services:
   InventoryService:
     requiredComponents:
       InventoryItem:
-        type: InventoryItemAggregate
+        type: InventoryItem # Aggregate name
       InOut:
         type: InOutService
     methods:
