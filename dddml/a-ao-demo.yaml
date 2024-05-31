@@ -64,13 +64,6 @@ aggregates:
 
 services:
   InOutService:
-    valueObjects:
-      CreateSingleLineInOutResult:
-        properties:
-          InOutId:
-            type: number
-          Version:
-            type: number
     abstract: true
     methods:
       CreateSingleLineInOut:
@@ -97,6 +90,13 @@ services:
         metadata:
           MessagingCommandName: "VoidInOut"
         parameters:
+          InOutId:
+            type: number
+          Version:
+            type: number
+    valueObjects:
+      CreateSingleLineInOutResult:
+        properties:
           InOutId:
             type: number
           Version:
