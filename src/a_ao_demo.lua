@@ -198,14 +198,12 @@ Handlers.add(
     inventory_service.process_inventory_surplus_or_shortage
 )
 
-
 Handlers.add(
     "inventory_service_process_inventory_surplus_or_shortage_get_inventory_item_callback",
     Handlers.utils.hasMatchingTag("Action",
         inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK),
     inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback
 )
-
 
 Handlers.add(
     "inventory_service_process_inventory_surplus_or_shortage_create_single_line_in_out_callback",
@@ -214,6 +212,12 @@ Handlers.add(
     inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_callback
 )
 
+Handlers.add(
+    "inventory_service_process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback",
+    Handlers.utils.hasMatchingTag("Action",
+        inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK),
+    inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback
+)
 
 Handlers.add(
     "inventory_service_process_inventory_surplus_or_shortage_add_inventory_item_entry_callback",
@@ -222,7 +226,6 @@ Handlers.add(
     inventory_service.process_inventory_surplus_or_shortage_add_inventory_item_entry_callback
 )
 
-
 Handlers.add(
     "inventory_service_process_inventory_surplus_or_shortage_complete_in_out_callback",
     Handlers.utils.hasMatchingTag("Action",
@@ -230,9 +233,3 @@ Handlers.add(
     inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback
 )
 
-Handlers.add(
-    "inventory_service_process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback",
-    Handlers.utils.hasMatchingTag("Action",
-        inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK),
-    inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback
-)
