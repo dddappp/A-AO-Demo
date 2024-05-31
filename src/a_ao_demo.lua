@@ -151,6 +151,20 @@ Handlers.add(
 )
 
 Handlers.add(
+    "get_inventory_item_table_keys",
+    Handlers.utils.hasMatchingTag("Action", "GetInventoryItemTableKeys"),
+    function(msg, env, response)
+        local keys = {}
+        local n = 0
+        for k, v in pairs(InventoryItemTable) do
+            n = n + 1
+            keys[n] = k
+        end
+        messaging.respond(true, keys, msg)
+    end
+)
+
+Handlers.add(
     "add_inventory_item_entry",
     Handlers.utils.hasMatchingTag("Action", "AddInventoryItemEntry"),
     add_inventory_item_entry
