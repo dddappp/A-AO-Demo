@@ -54,11 +54,11 @@ inventory_item_aggregate.init(InventoryItemTable)
 saga.init(SagaInstances, SagaIdSequence)
 
 
-local function get_artilce(msg, env, response)
+local function get_article(msg, env, response)
     local status, result = pcall((function()
         local article_id = json.decode(msg.Data)
-        local state = entity_coll.get(ArticleTable, article_id)
-        return state
+        local _state = entity_coll.get(ArticleTable, article_id)
+        return _state
     end))
     messaging.respond(status, result, msg)
 end
@@ -83,9 +83,9 @@ end
 local function get_inventory_item(msg, env, response)
     local status, result = pcall((function()
         local _inventory_item_id = json.decode(msg.Data)
-        local key = json.encode(inventory_item_id.to_key_array(_inventory_item_id))
-        local state = entity_coll.get(InventoryItemTable, key)
-        return state
+        local _key = json.encode(inventory_item_id.to_key_array(_inventory_item_id))
+        local _state = entity_coll.get(InventoryItemTable, _key)
+        return _state
     end))
     messaging.respond(status, result, msg)
 end
@@ -100,13 +100,13 @@ end
 
 
 Handlers.add(
-    "get_artilce",
+    "get_article",
     Handlers.utils.hasMatchingTag("Action", "GetArticle"),
-    get_artilce
+    get_article
 )
 
 Handlers.add(
-    "get_artilce_count",
+    "get_article_count",
     Handlers.utils.hasMatchingTag("Action", "GetArticleCount"),
     function(msg, env, response)
         local count = 0
