@@ -8,9 +8,6 @@ ArticleTable = ArticleTable and (
 ArticleIdSequence = ArticleIdSequence and (
     function(old_data)
         -- May need to migrate old data
-        if type(old_data) ~= "table" then
-            return { 100000 }
-        end
         return old_data
     end
 )(ArticleIdSequence) or { 0 }
@@ -21,6 +18,7 @@ InventoryItemTable = InventoryItemTable and (
         return old_data
     end
 )(InventoryItemTable) or {}
+
 
 SagaInstances = SagaInstances and (
     function(old_data)
@@ -45,7 +43,6 @@ local inventory_item_id = require("inventory_item_id")
 local article_aggregate = require("article_aggregate")
 local inventory_item_aggregate = require("inventory_item_aggregate")
 local inventory_service = require("inventory_service")
-
 
 article_aggregate.init(ArticleTable, ArticleIdSequence)
 
@@ -79,7 +76,6 @@ local function create_article(msg, env, response)
     messaging.handle_response_based_on_tag(status, result, commit, msg)
 end
 
-
 local function get_inventory_item(msg, env, response)
     local status, result = pcall((function()
         local _inventory_item_id = json.decode(msg.Data)
@@ -97,7 +93,6 @@ local function add_inventory_item_entry(msg, env, response)
     end))
     messaging.handle_response_based_on_tag(status, result, commit, msg)
 end
-
 
 Handlers.add(
     "get_article",
@@ -125,22 +120,17 @@ Handlers.add(
     end
 )
 
-
-
 Handlers.add(
     "update_article_body",
     Handlers.utils.hasMatchingTag("Action", "UpdateArticleBody"),
     update_article_body
 )
 
-
 Handlers.add(
     "create_article",
     Handlers.utils.hasMatchingTag("Action", "CreateArticle"),
     create_article
 )
-
-
 
 Handlers.add(
     "get_inventory_item",
@@ -149,11 +139,22 @@ Handlers.add(
 )
 
 Handlers.add(
+    "get_inventory_item_count",
+    Handlers.utils.hasMatchingTag("Action", "GetInventoryItemCount"),
+    function(msg, env, response)
+        local count = 0
+        for _ in pairs(InventoryItemTable) do
+            count = count + 1
+        end
+        messaging.respond(true, count, msg)
+    end
+)
+
+Handlers.add(
     "add_inventory_item_entry",
     Handlers.utils.hasMatchingTag("Action", "AddInventoryItemEntry"),
     add_inventory_item_entry
 )
-
 
 
 Handlers.add(
