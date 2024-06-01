@@ -2,6 +2,7 @@ local json = require("json")
 local messaging = require("messaging")
 local saga = require("saga")
 local saga_messaging = require("saga_messaging")
+local inventory_service_local = require("inventory_service_local")
 
 local execute_local_compensations_respond_original_requester = saga_messaging
     .execute_local_compensations_respond_original_requester
@@ -11,25 +12,15 @@ local complete_saga_instance_respond_original_requester = saga_messaging
     .complete_saga_instance_respond_original_requester
 local execute_local_compensations = saga_messaging.execute_local_compensations
 
---[[
-    private SagaDefinition<CreateOrUpdateInventoryItemSagaData> sagaDefinition =
-        step()
-            .prepareRequest()
-            .invokeParticipant(this::getInventoryItem)
-            .onReply(InventoryItemStateDto.class, this::on_GetInventoryItem_Reply)
-        .step()
-            .invokeParticipant(this::createSingleLineInOut)
-            .withCompensation(this::voidInOut)
-        .step()
-            .invokeLocal(this::doSomethingLocally)
-            .withCompensation()
-        .step()
-            .invokeParticipant(this::addInventoryItemEntry)
-        .step()
-            .invokeParticipant(this::completeInOut)
-        .build();
+local process_inventory_surplus_or_shortage_prepare_get_inventory_item_request =
+    inventory_service_local.process_inventory_surplus_or_shortage_prepare_get_inventory_item_request
+local process_inventory_surplus_or_shortage_on_get_inventory_item_reply =
+    inventory_service_local.process_inventory_surplus_or_shortage_on_get_inventory_item_reply
+local process_inventory_surplus_or_shortage_do_something_locally =
+    inventory_service_local.process_inventory_surplus_or_shortage_do_something_locally
+local process_inventory_surplus_or_shortage_compensate_do_something_locally =
+    inventory_service_local.process_inventory_surplus_or_shortage_compensate_do_something_locally
 
-]]
 local inventory_service = {}
 
 
@@ -61,25 +52,6 @@ local config = require("inventory_service_config")
 local inventory_item_config = config.inventory_item;
 local in_out_config = config.in_out;
 
--- function inventory_service.init(--_saga,
---     _inventory_item,
---     _in_out
--- )
---     -- saga = _saga;
---     inventory_item = _inventory_item;
---     in_out = _in_out;
--- end
-
-
-
-local function process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
-    local _inventory_item_id = {
-        product_id = context.product_id,
-        location = context.location,
-    }
-    context.inventory_item_id = _inventory_item_id
-    return _inventory_item_id
-end
 
 -- process an inventory surplus or shortage
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
@@ -137,27 +109,6 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
         return request, commit -- or total_commit
     end))
     messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
-end
-
-local function process_inventory_surplus_or_shortage_on_get_inventory_item_reply(context, result)
-    context.item_version = result.version -- NOTE: The name of the field IS "version"!
-    local on_hand_quantity = result.quantity
-    local adjusted_quantity = context.quantity
-
-    -- ------------------------------------------
-    if (adjusted_quantity == on_hand_quantity) then -- NOTE: short-circuit if no changed
-        local short_circuited = true
-        local is_error = false
-        -- If the original request requires a result, provide one here if a short circuit occurs.
-        local result_or_error = "adjusted_quantity == on_hand_quantity"
-        return short_circuited, is_error, result_or_error
-    end
-    -- ------------------------------------------
-
-    local movement_quantity = adjusted_quantity > on_hand_quantity and
-        adjusted_quantity - on_hand_quantity or
-        on_hand_quantity - adjusted_quantity
-    context.movement_quantity = movement_quantity
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback(msg, env, response)
@@ -322,21 +273,6 @@ local function process_inventory_surplus_or_shortage_compensate_create_single_li
     messaging.commit_send_or_error(status, request_or_error, total_commit, target, tags)
 end
 
-
--- NOTE: local processing
-local function process_inventory_surplus_or_shortage_do_something_locally(context)
-    -- error("TEST_INVOKE_LOCAL_ERROR")
-    return {}, function()
-        -- commit
-    end
-end
-
--- NOTE: local compensation
-local function process_inventory_surplus_or_shortage_compensate_do_something_locally(context)
-    return {}, function()
-        -- commit
-    end
-end
 
 function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_callback(msg, env, response)
     local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
