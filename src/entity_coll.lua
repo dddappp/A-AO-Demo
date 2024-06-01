@@ -22,9 +22,6 @@ function entity_coll.deepcopy(origin)
     return copy
 end
 
--- class table
--- local Articles = {}
-
 function entity_coll.contains(table, entity_id)
     return table[entity_id] ~= nil
 end

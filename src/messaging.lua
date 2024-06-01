@@ -81,14 +81,6 @@ local function send(target, data, tags)
     })
 end
 
--- function messaging.commit_send(status, request_or_error, commit, target, tags)
---     if (status) then
---         commit()
---     end
---     send(target, request_or_error, tags)
---     -- NOTE: not throw error(request_or_error)?
--- end
-
 function messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
     if (status) then
         commit()

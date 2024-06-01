@@ -32,7 +32,8 @@ local ERRORS = {
 inventory_service.ERRORS = ERRORS
 
 local ACTIONS = {
-    PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE = "InventoryService_ProcessInventorySurplusOrShortage",
+    PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE =
+    "InventoryService_ProcessInventorySurplusOrShortage",
     PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK =
     "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback",
     PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK =
@@ -57,13 +58,35 @@ local in_out_config = config.in_out;
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
     local cmd = json.decode(msg.Data)
 
+    local context = cmd
+
+    -- If there are invokeLocal steps at the beginning...
+    --[[
+    local local_steps = {
+        --
+    }
+    local local_commits = {}
+    for i = 1, #local_steps, 1 do
+        local local_step = local_steps[i]
+        local local_status, local_result_or_error, local_commit = pcall((function()
+            return local_step(context)
+        end))
+        if (not local_status) then
+            messaging.respond(false, local_result_or_error, msg)
+            error(local_result_or_error) -- Not just throw error?
+        else
+            local_commits[#local_commits + 1] = local_commit
+        end
+    end
+    ]]
+
     -- create or update inventory item
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_get_inventory_item_action() }
     local status, request_or_error, commit = pcall((function()
         local saga_instance, commit = saga.create_saga_instance(ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE, target,
             tags,
-            cmd, -- as context
+            context, -- cmd as context
             {
                 from = msg.From,
                 response_action = msg.Tags[messaging.X_TAGS.RESPONSE_ACTION],
@@ -73,42 +96,26 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
         )
 
         local saga_id = saga_instance.saga_id
-        local context = saga_instance.context
-
-        --[[
-
-        -- If there are invokeLocal steps at the beginning...
-        local local_steps = {
-            --
-        }
-        local local_commits = {}
-        for i = 1, #local_steps, 1 do
-            local local_step = local_steps[i]
-            local local_status, local_result_or_error, local_commit = pcall((function()
-                return local_step(context)
-            end))
-            if (not local_status) then
-                error(local_result_or_error) -- NOTE: Just throw error?
-            else
-                local_commits[#local_commits + 1] = local_commit
-            end
-        end
-        local total_commit = function()
-            for _, local_commit in ipairs(local_commits) do
-                local_commit()
-            end
-            commit()
-        end
-
-        ]]
+        -- local context = saga_instance.context
 
         local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
         tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
             .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK
-        return request, commit -- or total_commit
+        return request, commit
     end))
-    messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
+
+    -- If there are invokeLocal steps at the beginning...
+    --[[
+    local total_commit = function()
+        for _, local_commit in ipairs(local_commits) do
+            local_commit()
+        end
+        commit()
+    end
+    ]]
+
+    messaging.commit_send_or_error(status, request_or_error, commit, target, tags) -- or total_commit
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback(msg, env, response)
@@ -301,7 +308,6 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
             return local_step(context)
         end))
         if (not local_status) then
-            -- error(local_result_or_error) -- NOTE: Just throw error? Or compensate?
             -- Mark saga instance as compensating.
             saga.set_instance_compensating(saga_id, 1)()
             local pre_local_step_count, pre_local_commits = 0, {}

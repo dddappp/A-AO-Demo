@@ -2,12 +2,10 @@ local entity_coll = require("entity_coll")
 
 local saga = {}
 
-
 local ERRORS = {
     NIL_SAGA_ID_SEQUENCE = "NIL_SAGA_ID_SEQUENCE",
     INVALID_STEP = "INVALID_STEP",
 }
-
 
 local saga_instances
 local saga_id_sequence
