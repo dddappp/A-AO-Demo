@@ -68,26 +68,6 @@ function saga.create_saga_instance(saga_type, target, tags, context, original_me
     return saga_instance, commit
 end
 
--- --- Increase saga instance's current_step
--- function saga.increment_saga_instance_current_step(saga_id)
---     local s = saga.get_saga_instance_copy(saga_id)
---     s.current_step = s.current_step + 1
---     local commit = function()
---         entity_coll.update(saga_instances, saga_id, s)
---     end
---     return commit
--- end
-
--- --- Decrease saga instance's current_step
--- function saga.decrement_saga_instance_current_step(saga_id)
---     local s = saga.get_saga_instance_copy(saga_id)
---     s.current_step = s.current_step - 1
---     local commit = function()
---         entity_coll.update(saga_instances, saga_id, s)
---     end
---     return commit
--- end
-
 function saga.set_instance_compensating(saga_id, steps_upward)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     saga_instance.current_step = saga_instance.current_step + steps_upward
