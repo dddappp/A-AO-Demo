@@ -149,5 +149,8 @@ services:
               # }
               InOutId: "InOutId"
               Version: "InOutVersion"
-
+          # Use an Expression to return the result
+          Result:
+            expression:
+              Lua: "{ in_out_id = context.in_out_id }"
 

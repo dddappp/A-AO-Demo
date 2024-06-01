@@ -410,10 +410,11 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
     end
     local result = data.result -- the last step result
 
-    -- Extract the result from the context.
-    local completed_result = {
-        -- variant = context.variant,
-    }
+    -- -- Extract the result from the context.
+    -- local completed_result = {
+    --     -- variant = context.variant,
+    -- }
+    local completed_result = { in_out_id = context.in_out_id }
     complete_saga_instance_respond_original_requester(saga_instance, completed_result, context)
 end
 
