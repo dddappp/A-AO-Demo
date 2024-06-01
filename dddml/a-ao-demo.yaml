@@ -136,8 +136,8 @@ services:
                 extractedFrom: ".Version"
             withCompensation: "InOut.VoidInOut"
           DoSomethingLocally:
-            invokeLocal: ""
-            withCompensation: ""
+            invokeLocal: "" # default function name
+            withCompensation: "" # default compensation function name
           AddInventoryItemEntry:
             invokeParticipant: "InventoryItem.AddInventoryItemEntry"
           CompleteInOut:
