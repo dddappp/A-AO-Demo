@@ -82,8 +82,6 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
     end
     ]]
 
-
-    -- create or update inventory item
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_get_inventory_item_action() }
     local status, request_or_error, commit = pcall((function()
@@ -102,7 +100,7 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
         -- local context = saga_instance.context
 
         local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
-        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id)
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
             .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK
         return request, commit
@@ -151,7 +149,6 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
         return
     end
 
-    -- create single line inbound or outbound order
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_create_single_line_in_out_action() }
     local status, request_or_error, commit = pcall((function()
@@ -162,7 +159,7 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
         }
 
         local commit = saga.move_saga_instance_forward(saga_id, 1, target, tags, context)
-        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id)
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
             .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK
         return request, commit
@@ -185,7 +182,7 @@ local function xxx_service_compensate_xxx(
     }
     local status, request_or_error, commit = pcall((function()
         local commit = saga.rollback_saga_instance(saga_id, pre_local_step_count + 1, target, tags, context, _err)
-        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id)
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
             .XXX_SERVICE_XXX_COMPENSATION_CALLBACK
         return request, commit
@@ -255,7 +252,6 @@ end
 local function process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(
     saga_id, context, _err, pre_local_step_count, pre_local_commits
 )
-    -- void InOut
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_void_in_out_action() }
     local status, request_or_error, commit = pcall((function()
@@ -265,7 +261,7 @@ local function process_inventory_surplus_or_shortage_compensate_create_single_li
         }
 
         local commit = saga.rollback_saga_instance(saga_id, pre_local_step_count + 1, target, tags, context, _err)
-        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id)
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
             .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK
         return request, commit
@@ -321,8 +317,6 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
         end
     end
 
-
-    -- add inventory item entry
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_add_inventory_item_entry_action() }
 
@@ -339,7 +333,7 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
         }
 
         local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, target, tags, context)
-        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id)
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
             .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK
         return request, commit
@@ -376,7 +370,6 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
     end
     local result = data.result
 
-    -- complete in/out
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_complete_in_out_action() }
     local status, request_or_error, commit = pcall((function()
@@ -386,7 +379,7 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
         }
 
         local commit = saga.move_saga_instance_forward(saga_id, 1, target, tags, context)
-        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id) -- NOTE: It must be a string
+        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id)
         tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
             .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK
         return request, commit
