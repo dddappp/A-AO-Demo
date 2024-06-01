@@ -305,7 +305,7 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
             return local_step(context)
         end))
         if (not local_status) then
-            -- Mark saga instance as compensating.
+            -- Mark saga instance as compensating, and commit immediately.
             saga.set_instance_compensating(saga_id, 1)()
             local pre_local_step_count, pre_local_commits = 0, {}
             -- Invoke remote compensation.
@@ -410,11 +410,47 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
     end
     local result = data.result -- the last step result
 
-    -- -- Extract the result from the context.
-    -- local completed_result = {
-    --     -- variant = context.variant,
-    -- }
+    --  If there are "InvokeLocal" steps after
+    --[[
+    -- invoke local steps
+    local local_steps = {
+        -- local steps
+    }
+    local local_commits = {}
+    for i = 1, #local_steps, 1 do
+        local local_step = local_steps[i]
+        local local_status, local_result_or_error, local_commit = pcall((function()
+            return local_step(context)
+        end))
+        if (not local_status) then
+            -- Mark saga instance as compensating, and commit immediately.
+            saga.set_instance_compensating(saga_id, 1)()
+            local pre_local_compensations = {
+                nil, -- empty step compensation
+                process_inventory_surplus_or_shortage_compensate_do_something_locally
+            }
+            local pre_local_step_count, pre_local_commits = execute_local_compensations(pre_local_compensations, context)
+                -- Invoke remote compensation.
+            process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context,
+                local_result_or_error, pre_local_step_count, pre_local_commits)
+            return
+        else
+            local_commits[#local_commits + 1] = local_commit
+        end
+    end
+    ]]
+
     local completed_result = { in_out_id = context.in_out_id }
+    -- Or "completed_result = result"?
+
+    --  If there are "InvokeLocal" steps after
+    --[[
+    if (local_commits ~= nil) then
+        for _, local_commit in ipairs(local_commits) do
+            local_commit()
+        end
+    end
+    ]]
     complete_saga_instance_respond_original_requester(saga_instance, completed_result, context)
 end
 
