@@ -38,20 +38,20 @@ local ACTIONS = {
     "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback",
     PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK =
     "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Callback",
+    PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK =
+    "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Compensation_Callback",
     PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK =
     "InventoryService_ProcessInventorySurplusOrShortage_AddInventoryItemEntry_Callback",
     PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK =
     "InventoryService_ProcessInventorySurplusOrShortage_CompleteInOut_Callback",
-    PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK =
-    "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Compensation_Callback",
 }
 
 inventory_service.ACTIONS = ACTIONS
 
 -- required components
-local config = require("inventory_service_config")
-local inventory_item_config = config.inventory_item;
-local in_out_config = config.in_out;
+local inventory_service_config = require("inventory_service_config")
+local inventory_item_config = inventory_service_config.inventory_item;
+local in_out_config = inventory_service_config.in_out;
 
 
 -- process an inventory surplus or shortage
