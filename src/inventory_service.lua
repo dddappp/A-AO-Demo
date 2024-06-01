@@ -63,7 +63,9 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
     -- If there are invokeLocal steps at the beginning...
     --[[
     local local_steps = {
-        --
+        function(_context)
+            error("TEST_INVOKE_LOCAL_ERROR")
+        end
     }
     local local_commits = {}
     for i = 1, #local_steps, 1 do
@@ -73,12 +75,13 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
         end))
         if (not local_status) then
             messaging.respond(false, local_result_or_error, msg)
-            error(local_result_or_error) -- Not just throw error?
+            return -- error(local_result_or_error) -- Not just throw error?
         else
             local_commits[#local_commits + 1] = local_commit
         end
     end
     ]]
+
 
     -- create or update inventory item
     local target = inventory_item_config.get_target()
@@ -155,8 +158,6 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
         local request = {
             product_id = context.product_id,
             location = context.location,
-            -- inventory_item_id = context.inventory_item_id,
-            -- version = context.item_version,
             movement_quantity = context.movement_quantity,
         }
 
@@ -332,8 +333,6 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     local status, request_or_error, commit = pcall((function()
         -- Construct request from context
         local request = {
-            -- product_id = context.product_id,
-            -- location = context.location,
             inventory_item_id = context.inventory_item_id,
             version = context.item_version,
             movement_quantity = context.movement_quantity,
