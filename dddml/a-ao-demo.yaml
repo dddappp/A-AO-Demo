@@ -131,9 +131,9 @@ services:
               # context.in_out_id = result.in_out_id
               # context.in_out_version = result.version
               InOutId:
-                extractedFrom: ".InOutId"
+                extractionPath: ".InOutId"
               InOutVersion:
-                extractedFrom: ".Version"
+                extractionPath: ".Version"
             withCompensation: "InOut.VoidInOut"
           DoSomethingLocally:
             invokeLocal: "" # default function name
