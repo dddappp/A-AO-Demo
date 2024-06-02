@@ -71,9 +71,19 @@ function saga_messaging.execute_local_compensations_respond_original_requester(
 end
 
 
-function saga_messaging.complete_saga_instance_respond_original_requester(saga_instance, result, context)
+function saga_messaging.complete_saga_instance_respond_original_requester(saga_instance, result, context, pre_local_commits)
     local saga_id = saga_instance.saga_id
-    local commit = saga.complete_saga_instance(saga_id, result, context)
+
+    if (pre_local_commits and type(pre_local_commits) ~= "table") then
+        error("pre_local_commits must be a table")
+    end
+    if (pre_local_commits) then
+        for _, local_commit in ipairs(pre_local_commits) do
+            local_commit()
+        end
+    end
+
+    local commit = saga.complete_saga_instance(saga_id, result, context, pre_local_commits and #pre_local_commits or 0)
     commit()
     respond_original_requester(saga_instance, result, false)
 end

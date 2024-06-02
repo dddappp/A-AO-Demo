@@ -445,11 +445,7 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
 
     --  If there are "InvokeLocal" steps after
     --[[
-    if (local_commits ~= nil) then
-        for _, local_commit in ipairs(local_commits) do
-            local_commit()
-        end
-    end
+    complete_saga_instance_respond_original_requester(saga_instance, completed_result, context, local_commits)
     ]]
     complete_saga_instance_respond_original_requester(saga_instance, completed_result, context)
 end

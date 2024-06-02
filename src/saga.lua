@@ -142,9 +142,12 @@ function saga.rollback_saga_instance(saga_id, steps, compensation_target, compen
 end
 
 --- Complete saga instance
-function saga.complete_saga_instance(saga_id, result, context)
+function saga.complete_saga_instance(saga_id, result, context, steps_upward)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     saga_instance.completed = true
+    if (steps_upward) then
+        saga_instance.current_step = saga_instance.current_step + steps_upward
+    end
     if (result) then
         saga_instance.result = result
     end
