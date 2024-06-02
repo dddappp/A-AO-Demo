@@ -294,6 +294,10 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     end
     local result = data.result
 
+    -- Export result variables into context
+    context.in_out_id = result.in_out_id
+    context.in_out_version = result.version
+
     -- invoke local steps
     local local_steps = {
         process_inventory_surplus_or_shortage_do_something_locally
@@ -319,10 +323,6 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
 
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_add_inventory_item_entry_action() }
-
-    -- Export result variables into context
-    context.in_out_id = result.in_out_id
-    context.in_out_version = result.version
 
     local status, request_or_error, commit = pcall((function()
         -- Construct request from context
