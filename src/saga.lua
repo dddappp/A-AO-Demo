@@ -4,7 +4,7 @@ local saga = {}
 
 local ERRORS = {
     NIL_SAGA_ID_SEQUENCE = "NIL_SAGA_ID_SEQUENCE",
-    INVALID_STEPS = "INVALID_STEPS",
+    INVALID_STEP = "INVALID_STEP",
 }
 
 local saga_instances
@@ -81,7 +81,7 @@ end
 --- Move saga instance's current_step forward and record participant information
 function saga.move_saga_instance_forward(saga_id, steps, target, tags, context)
     if (type(steps) ~= "number" or steps < 1) then
-        error(ERRORS.INVALID_STEPS)
+        error(ERRORS.INVALID_STEP)
     end
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     for _ = 1, steps - 1, 1 do
@@ -102,7 +102,7 @@ end
 
 function saga.rollback_saga_instance(saga_id, steps, compensation_target, compensation_tags, context, _err)
     if (type(steps) ~= "number" or steps < 0) then
-        error(ERRORS.INVALID_STEPS)
+        error(ERRORS.INVALID_STEP)
     end
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     saga_instance.compensating = true
