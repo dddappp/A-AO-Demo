@@ -279,7 +279,7 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
             -- mark saga instance as compensating, and commit immediately
             saga.set_instance_compensating(saga_id, 1)()
             -- handle error, need to compensate
-            local pre_local_compensations = { process_inventory_surplus_or_shortage_compensate_do_something_locally }
+            local pre_local_compensations = { nil, process_inventory_surplus_or_shortage_compensate_do_something_locally }
             local pre_local_step_count, pre_local_commits = execute_local_compensations(pre_local_compensations, context)
             -- invoke remote compensation
             process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context, local_result_or_error,
