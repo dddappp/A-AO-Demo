@@ -2,13 +2,14 @@
 
 我们相信 ao 已经走在正确的道路上。
 
-因为我们相信，大型复杂应用必然需要引入消息通信机制，以实现各个组件之间的解耦，以提高应用的可维护性以及可扩展性。（可能，ao 是目前最佳的 Web3 消息代理实现。：）
+因为我们相信，大型复杂应用必然需要引入消息通信机制，以实现各个组件之间的解耦，提高应用的可维护性以及可扩展性。（我们认为 ao 可能是目前最佳的 Web3 消息代理实现。：）
 
 我们也相信，复杂应用也必然需要引入“最终一致性”模型，以提高应用的可用性以及可扩展性。
 
-然而，令人遗憾的是，基于消息通信机制正确实现“最终一致性”对于很多开发者来说都是一个不小的挑战。
+然而，令人遗憾的是，基于消息通信机制正确实现“最终一致性”对于很多开发者来说都是一个不小的挑战。这对基于 ao 开发 dapp 的开发者来说也是如此。 
 幸运的是，通过使用 dddappp 低代码工具，我们可以将这个任务变得容易很多。
 通过本 demo，我们将向大家证明这一点。
+
 
 ## 背景
 
@@ -21,7 +22,7 @@
 An application that needs to be launched quickly often begins with the use of a total "strong consistency" architecture (Indeed, using "eventual consistency" instead of "strong consistency" can lead to higher application development costs). But as the user base grows and all available options for vertical scaling (e.g. better/more expensive hardware) are exhausted, it eventually becomes necessary for the application to improve its software architecture
 
 
-### 没有 ACID 数据库事务可用，会带来什么麻烦？
+### 没有 ACID 数据库事务，带来什么麻烦？
 
 比如说，假设在一个 WMS 应用的领域模型中，InventoryItem（库存单元）实体（聚合根）表示“某个产品在某个货位上的库存数量”。
 如果我们打算使用“最终一致性”模型来实现一个库存调拨（Inventory Movement）服务，需要考虑到执行这个调拨服务的时候可能发生这样的场景：
@@ -40,7 +41,7 @@ An application that needs to be launched quickly often begins with the use of a 
 
 这里说的 Saga 是什么东西？我们看看 ChatGPT 怎么说的：
 
-> SAGA 是一种设计模式，全称为“分布式事务的saga模式”（Saga Pattern for Distributed Transactions）。它是一种在分布式系统中执行长时间运行的事务的解决方案，可以同时保证数据的一致性和可靠性。
+> SAGA 是一种设计模式，全称为“分布式事务的 saga 模式”（Saga Pattern for Distributed Transactions）。它是一种在分布式系统中执行长时间运行的事务的解决方案，可以同时保证数据的一致性和可靠性。
 > 
 > 在Saga模式中，一个长时间运行的事务被分解为多个步骤，每个步骤都是一个原子操作，并且对应一个事务。每当一个步骤完成时，Saga 都会发出一个事件，触发下一个步骤的执行。如果某个步骤失败，Saga 将会执行补偿行动，来撤销已经完成的步骤，从而保证数据的一致性。
 > 
@@ -101,14 +102,16 @@ Saga Manager 与服务（组件）之间的交互可能使用异步的基于消�
 
 假设，我们在开发一个 WMS 应用，我们在领域模型中创建了两个聚合 InventoryItem 与 InOut。
 
-现在，我们想要一个“硬生生地”直接修改库存单元的“在库数量”的服务方法。我们可能在对库存实物进行盘点后，做“盘盈/盘亏”处理时，使用这个服务方法。
-虽然是“直接”修改库存单元的在库数量，但是我们仍然希望使用 InOut（入库/出库单）来保存库存数量的修改记录，所以这个方法会涉及两个聚合。
+现在，我们想要一个“硬生生地”直接修改库存单元的“在库数量”的领域服务。这个服务可能是一个叫做 `CreateOrUpdateInventoryItem` 的方法。
+我们可能在对库存实物进行盘点后，做“盘盈/盘亏”处理时，使用这个服务方法。
+虽然此时我们是“直接”修改库存单元的在库数量，但是我们仍然希望使用 `InOut`（入库/出库单）来保存库存数量的修改记录，所以这个方法会涉及两个聚合。
 
-假设我们把这两个聚合部署为两个微服务 / Microchains，我们需要使用“最终一致”的策略来实现这个修改在库数量的“业务事务”。
+假设我们把这两个聚合部署为两个微服务，我们需要使用“最终一致”的策略来实现这个修改在库数量的“业务事务”。
 
 首先，我们设计这个业务事务的各个实现步骤，大致如下：
 
-1. 查询库存单元（InventoryItem）信息。我们根据查询的结果，判断到底是需要新建一条库存单元记录还是更新已有的库存单元记录，以及，入库/出库单的行项的 `MovementQuantity`（移动数量）的应该是多少。
+1. 查询库存单元（InventoryItem）信息。
+   我们根据查询的结果，判断到底是需要新建一条库存单元记录还是更新已有的库存单元记录，以及，入库/出库单的行项的 `MovementQuantity`（移动数量）的应该是多少。
 2. 创建一个入库/出库单（InOut）。这个单据只有一行（InOutLine），行项的 `MovementQuantity` 是更新后的在库数量与当前在库数量（我们在上一个步骤看到的在库数量）的差值。
 3. 添加一个库存单元条目（InventoryItemEntry）。我们的库存单元聚合按理说应该使用了账务模式，所以我们需要通过这个方式去间接地更新库存单元的在库数量。
 4. 如果更新库存单元成功，那么将入库/出库单的状态更新为“已完成”。
@@ -118,34 +121,33 @@ Saga Manager 与服务（组件）之间的交互可能使用异步的基于消�
 
 思路想好了，接下来我们需要为以上**步骤**定义相应的“操作聚合的**方法**”。
 
-比如，我们需要编写操作库存单元聚合的几个方法：
+我们需要编写操作库存单元（Inventory Item）聚合的几个方法：
 
-- CreateOrUpdateInventoryItem，这个方法是更新在库数量的服务方法的入口。
-- Get，这个方法是通过聚合根 ID 获取聚合状态的查询方法。
-- AddInventoryItemEntry，这个方法添加一个库存单元条目，这是（间接地）修改库存单元的那些数量属性（账目）的唯一方式。
+- `GetInventoryItem`，这个方法是通过聚合根 ID（库存单元的 ID）来获取库存单元状态的查询方法。
+- `AddInventoryItemEntry`，这个方法添加一个库存单元条目，这是（间接地）修改库存单元的那些数量属性（账目）的唯一方式。
 
-还需要编写操作入库/出库单（InOut）聚合的三个方法：
+还需要编写操作入库/出库单（`InOut`）聚合的三个方法：
 
-- CreateSingleLineInOut，这个方法创建一个入库/出库单（InOut），这个单据只有一行（InOutLine）。
-- Complete，这个方法将入库/出库单的状态更新为“已完成”。
-- Void，这个方法将入库/出库单更新为“已取消”。
+- `CreateSingleLineInOut`，这个方法创建一个入库/出库单（`InOut`），这个单据只有一行（`InOutLine`）。
+- `Complete`，这个方法将入库/出库单的状态更新为“已完成”。
+- `Void`，这个方法将入库/出库单更新为“已取消”。
 
 这些方法是用于实现基于编制的 Saga 的“构造块”。
 
-然后，我们终于可以在这些基础上实现 Saga 的“编排”逻辑了……
+有了上面这些基础组件，我们终于可以在这些基础上编写 Saga 的“编排”逻辑，去实现 `CreateOrUpdateInventoryItem` 了……
 
-可见，如果完全没有 DSL，要实现编制式 Saga 的过程还是挺繁琐的
-（当然，如果要用协作式 Saga 来实现同样的业务逻辑，那只会更繁琐）。
+可见，如果完全没有 DSL，要实现编制式 Saga 的过程还是挺繁琐的——毋庸置疑，如果要用协作式 Saga 来实现同样的业务逻辑，那只会更繁琐。😂
 
 那么，如果要为此设计一个 DSL，大致会是什么样子的呢？
+
 如果你想先睹为快，可以直接先查看我们的 DDDML 模型文件 `./dddml/a-ao-demo.yaml`，
 其中 `InventoryService` 服务的 `ProcessInventorySurplusOrShortage` 方法的定义。
+
 
 ---
 
 下面，我们将展示如何使用 dddappp 低代码工具，来开发一个 ao dapp。
-
-在这个应用中，会包含一个上面所讨论的“更新库存单元的在库数量”的服务的 Saga 实现。
+在这个应用中，当然会包含上面👆所讨论的“更新库存单元的在库数量”的服务的 Saga 实现。
 
 
 ## 前置条件
@@ -153,7 +155,7 @@ Saga Manager 与服务（组件）之间的交互可能使用异步的基于消�
 安装：
 
 * 安装 [aos](https://cookbook_ao.g8way.io/welcome/getting-started.html)
-* Install [Docker](https://docs.docker.com/engine/install/).
+* 安装 [Docker](https://docs.docker.com/engine/install/).
 
 
 启动一个 aos 进程：
@@ -162,7 +164,8 @@ Saga Manager 与服务（组件）之间的交互可能使用异步的基于消�
 aos process_alice
 ```
 
-让我们记下它的进程 ID，比如 `DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q`，我们在下面的示例命令中使用占位符 `__PROGRESS_ALICE__` 表示它。
+让我们记下它的进程 ID，比如 `DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q`，
+我们在下面的示例命令中使用占位符 `__PROGRESS_ALICE__` 表示它。
 
 
 
@@ -189,7 +192,6 @@ wubuku/dddappp-ao:0.0.1 \
 --boundedContextName A.AO.Demo \
 --aoLuaProjectDirectoryPath /myapp/src
 ```
-
 
 The command parameters above are straightforward:
 
@@ -219,6 +221,7 @@ docker pull wubuku/dddappp-ao:0.0.1
 
 ### 填充业务逻辑
 
+#### 修改 `article_update_body_logic`
 
 修改文件 `./src/article_update_body_logic.lua`，在函数体中填充业务逻辑：
 
@@ -233,7 +236,9 @@ function article_update_body_logic.mutate(state, event, msg, env)
 end
 ```
 
-修改文件 `./src/inventory_service_local.lua`，在函数体中填充业务逻辑：
+#### 修改 `inventory_item_add_inventory_item_entry_logic`
+
+修改文件 `./src/inventory_item_add_inventory_item_entry_logic.lua`，在函数体中填充业务逻辑：
 
 ```lua
 function inventory_item_add_inventory_item_entry_logic.verify(_state, inventory_item_id, movement_quantity, cmd, msg, env)
@@ -256,6 +261,8 @@ function inventory_item_add_inventory_item_entry_logic.mutate(state, event, msg,
     return state
 end
 ```
+
+#### 修改 `inventory_service_local`
 
 修改文件 `./src/inventory_service_local.lua`，在函数体中填充业务逻辑：
 
@@ -289,7 +296,12 @@ if (adjusted_quantity == on_hand_quantity) then -- NOTE: short-circuit if no cha
 end
 ```
 
-修改文件 `./src/inventory_service_local.lua`：
+#### 修改 `in_out_service_mock`
+
+你可能已经注意到，我们在模型中将 `InOutService` 生命为“抽象的”（`abstract`），表示我们并不打算自己实现它，而是期望其他组件来实现它。
+所以这里我们使用 `in_out_service_mock.lua` 来模拟 `InOutService` 的行为。
+
+修改文件 `./src/in_out_service_mock.lua`：
 
 ```lua
 Handlers.add(
@@ -305,7 +317,9 @@ Handlers.add(
 )
 ```
 
-修改文件 `./src/inventory_service_config.lua`：
+#### 修改 `inventory_service_config`
+
+修改“配置文件” `./src/inventory_service_config.lua`，填入上面记录的 `__PROGRESS_ALICE__`：
 
 ```lua
 return {
@@ -333,15 +347,17 @@ return {
 aos process_bob
 ```
 
-记录下它的进程 ID，比如 `u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4`，我们在下面的示例命令中可能会使用占位符 `__PROGRESS_BOB__` 表示它。
+记录下它的进程 ID，比如 `u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4`，
+我们在下面的示例命令中可能会使用占位符 `__PROGRESS_BOB__` 表示它。
 
-在这个 aos (`__PROGRESS_BOB__`) 进程中，装载我们的应用（注意将 `{PATH/TO/A-AO-Demo/src}` 替换为实际的路径）：
+
+在这个 aos (`__PROGRESS_BOB__`) 进程中，装载我们的应用代码（注意将 `{PATH/TO/A-AO-Demo/src}` 替换为实际的路径）：
 
 ```lua
 .load {PATH/TO/A-AO-Demo/src}/a_ao_demo.lua
 ```
 
-现在，可以在第一个进程（`__PROGRESS_ALICE__`）中，向 `__PROGRESS_BOB__` 发送消息进行测试。
+现在，可以在第一个进程（`__PROGRESS_ALICE__`）中，向这个 `__PROGRESS_BOB__` 进程发送消息进行测试了。
 
 
 ### “文章”相关的测试
@@ -400,7 +416,7 @@ Inbox[#Inbox]
 
 ### “库存”相关的测试
 
-在进程 `__PROGRESS_ALICE__` 中执行下面的命令，通过“添加库存项目条目”来更新库存项目：
+在进程 `__PROGRESS_ALICE__` 中执行下面的命令，通过“添加库存项目条目”来更新库存项目（Inventory Item）：
 
 ```lua
 Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 100}) })
@@ -422,6 +438,7 @@ Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action =
 -- Inbox[#Inbox]
 ```
 
+
 ### 手动发送消息测试 Saga
 
 我们先通过手动发送消息来逐步测试和观察 Saga 的执行过程。
@@ -440,7 +457,7 @@ Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action =
 Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "x", quantity = 100 }) })
 ```
 
-这会创建一个新的 Saga 实例。如果之前没有执行过下面的命令，那么显然这个 Saga 实例的序号为 `1`。
+这会创建一个新的 Saga 实例。如果之前没有执行过下面的命令，那么显然这个 Saga 实例的序号应该是 `1`。
 
 查看序号为 `__SAGA_ID__` 的 Saga 实例的内容：
 
@@ -454,7 +471,7 @@ Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action =
 ```lua
 Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
 -- Inbox[#Inbox]
-```lua
+```
 
 发送消息，将 Saga 实例推进到下一步（注意替换占位符 `__ITEM_VERSION__` 为上面查询到的库存项目的版本号，以及替换占位符 `__SAGA_ID__` 为上面创建的 Saga 实例的序号）：
 
@@ -501,24 +518,21 @@ Inbox[#Inbox]
 ### 测试 Saga 的跨进程执行
 
 在上面修改 `./src/inventory_service_config.lua` 时，
-我们已经将“库存服务”依赖的两个组件 `inventory_item` 和 `in_out` 的 `target` 指向了 `__PROGRESS_ALICE__` 进程。
+我们已经将“库存服务”所依赖的两个组件 `inventory_item` 和 `in_out` 的 `target` 指向了 `__PROGRESS_ALICE__` 进程。
 
 
-让我们在 `__PROGRESS_ALICE__` 进程中，先这样装载 `inventory_item` 组件：
+让我们在 `__PROGRESS_ALICE__` 进程中，先这样装载 `inventory_item` 组件
+（注意，虽然我们装载了和 `__PROGRESS_BOB__` 进程同样的代码，但其实接下来的测试只使用了其中和 `InventoryItem` 聚合相关的部分）：
 
 ```lua
 .load {PATH/TO/A-AO-Demo/src}/a_ao_demo.lua
 ```
 
-然后再装载 `in_out` mock 组件：
+然后，同样在 `__PROGRESS_ALICE__` 进程中，再装载 `in_out` mock 组件：
 
 ```lua
 .load {PATH/TO/A-AO-Demo/src}/in_out_service_mock.lua
 ```
-
-你可能已经注意到，我们在模型中将 `InOutService` 生命为“抽象的”（`abstract`），表示我们并不打算自己实现它，而是期望其他组件来实现它。
-所以这里我们使用 `in_out_service_mock.lua` 来模拟 `InOutService` 的行为。
-
 
 在 `__PROGRESS_ALICE__` 进程中，查看另外一个进程 `__PROGRESS_BOB__` 中的当前 Saga 实例的序号：
 
@@ -567,8 +581,7 @@ Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action =
 Inbox[#Inbox]
 ```
 
-
-
+---
 
 [^SagaPattern]: [Microservices.io](http://microservices.io/). Pattern: Saga. [https://microservices.io/patterns/data/saga.html](https://microservices.io/patterns/data/saga.html)
 
