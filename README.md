@@ -170,7 +170,7 @@ aos process_alice
 
 ### 编写 DDDML 模型
 
-见 `./dddml/a-ao-demo.yaml`.
+已经编写好的模型文件见 `./dddml/a-ao-demo.yaml`.
 
 > **Tip**
 >
@@ -179,7 +179,7 @@ aos process_alice
 
 ### 生成代码
 
-执行：
+In repository root directory, run:
 
 ```shell
 docker run \
@@ -190,7 +190,35 @@ wubuku/dddappp-ao:0.0.1 \
 --aoLuaProjectDirectoryPath /myapp/src
 ```
 
+
+The command parameters above are straightforward:
+
+* This line `-v .:/myapp \` indicates mounting the local current directory into the `/myapp` directory inside the container.
+* `dddmlDirectoryPath` is the directory where the DDDML model files are located. It should be a directory path that can be read in the container.
+* Understand the value of the `boundedContextName` parameter as the name of the application you want to develop. When the name has multiple parts, separate them with dots and use the PascalCase naming convention for each part. 
+    Bounded-context is a term in Domain-driven design (DDD) that refers to a specific problem domain scope that contains specific business boundaries, constraints, and language. 
+    If you cannot understand this concept for the time being, it is not a big deal.
+* `aoLuaProjectDirectoryPath` is the directory path where the "on-chain contract" code is placed. It should be a readable and writable directory path in the container.
+
+
+#### Update dddappp Docker Image
+
+Since the dddappp v0.0.1 image is updated frequently, 
+if you've run the above command before and run into problems, 
+you may be required to manually delete the image and pull it again before `docker run`.
+
+```shell
+# If you have already run it, you may need to Clean Up Exited Docker Containers first
+docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:0.0.1")
+# remove the image
+docker image rm wubuku/dddappp-ao:0.0.1
+# pull the image
+docker pull wubuku/dddappp-ao:0.0.1
+```
+
+
 ### 填充业务逻辑
+
 
 修改文件 `./src/article_update_body_logic.lua`，在函数体中填充业务逻辑：
 
@@ -295,6 +323,7 @@ return {
     }
 }
 ```
+
 
 ## 测试应用
 
