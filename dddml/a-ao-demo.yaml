@@ -118,6 +118,9 @@ services:
           Quantity:
             type: number
         steps:
+          # StartWithLocalCall:
+          #   invokeLocal: ""
+          #   withCompensation: ""
           GetInventoryItem:
             prepareRequest:
               Lua: "-- TODO"
@@ -128,25 +131,24 @@ services:
             invokeParticipant: "InOut.CreateSingleLineInOut"
             exportVariables:
               # -- Export result variables into context
-              # context.in_out_id = result.in_out_id
-              # context.in_out_version = result.version
               InOutId:
                 extractionPath: ".InOutId"
               InOutVersion:
                 extractionPath: ".Version"
             withCompensation: "InOut.VoidInOut"
+            compensationArguments:
+              InOutId: "InOutId"
+              Version: "InOutVersion"
           DoSomethingLocally:
             invokeLocal: "" # default function name
             withCompensation: "" # default compensation function name
           AddInventoryItemEntry:
             invokeParticipant: "InventoryItem.AddInventoryItemEntry"
+            arguments:
+              Version: "ItemVersion"
           CompleteInOut:
             invokeParticipant: "InOut.CompleteInOut"
             arguments:
-              # local request = {
-              #     in_out_id = context.in_out_id,
-              #     version = context.in_out_version,
-              # }
               InOutId: "InOutId"
               Version: "InOutVersion"
           ReturnResult:
