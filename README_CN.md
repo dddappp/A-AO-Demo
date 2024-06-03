@@ -1,6 +1,32 @@
 # README
 
+## Programming
 
+### Writing DDDML model files
+
+The model files are located in the directory `. /dddml`.
+
+> **Tip**
+>
+> About DDDML, here is an introductory article: ["Introducing DDDML: The Key to Low-Code Development for Decentralized Applications"](https://github.com/wubuku/Dapp-LCDP-Demo/blob/main/IntroducingDDDML.md).
+
+
+### Generating code
+
+
+```shell
+docker run \
+-v .:/myapp \
+wubuku/dddappp-ao:0.0.1 \
+--dddmlDirectoryPath /myapp/dddml \
+--boundedContextName A.AO.Demo \
+--aoLuaProjectDirectoryPath /myapp/src
+```
+
+
+
+
+---
 
 ```lua
 Send({ Target = "WIuQznUy0YKKWhTc16QmgeyutSkLXLc1EfV2Ao_dYK0", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
