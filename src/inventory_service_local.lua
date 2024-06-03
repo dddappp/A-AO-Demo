@@ -93,5 +93,10 @@ function inventory_service_local.process_inventory_surplus_or_shortage_compensat
     end
 end
 
+function inventory_service_local.process_inventory_surplus_or_shortage_do_something_else_locally(context)
+    -- error("TEST_INVOKE_LOCAL_ERROR")
+    return {}, function()
+    end
+end
 
 return inventory_service_local

@@ -104,7 +104,7 @@ services:
 
   InventoryService:
     requiredComponents:
-      InventoryItem:
+      InventoryItem: # Rename to InventoryItemService?
         type: InventoryItem # Aggregate name
       InOut:
         type: InOutService
@@ -124,7 +124,7 @@ services:
           GetInventoryItem:
             prepareRequest:
               Lua: "-- TODO"
-            invokeParticipant: "InventoryItem.GetInventoryItem" # TODO: rename to InventoryItemService?
+            invokeParticipant: "InventoryItem.GetInventoryItem"
             onReply:
               Lua: "-- TODO"
           CreateSingleLineInOut:
@@ -146,6 +146,9 @@ services:
             invokeParticipant: "InventoryItem.AddInventoryItemEntry"
             arguments:
               Version: "ItemVersion"
+          DoSomethingElseLocally:
+            invokeLocal: ""
+            # withCompensation: ""
           CompleteInOut:
             invokeParticipant: "InOut.CompleteInOut"
             arguments:
