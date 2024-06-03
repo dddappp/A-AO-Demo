@@ -30,6 +30,19 @@
 local inventory_service_local = {}
 
 
+-- function inventory_service_local.process_inventory_surplus_or_shortage_start_with_local_call(context)
+--     -- return the result and a "commit" function
+--     return {}, function()
+--     end
+-- end
+
+-- function inventory_service_local.process_inventory_surplus_or_shortage_compensate_start_with_local_call(context)
+--     -- return the result and a "commit" function
+--     return {}, function()
+--     end
+-- end
+
+
 function inventory_service_local.process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
     -- return the request
     local _inventory_item_id = {
