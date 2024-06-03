@@ -99,4 +99,10 @@ function inventory_service_local.process_inventory_surplus_or_shortage_do_someth
     end
 end
 
+function inventory_service_local.process_inventory_surplus_or_shortage_compensate_do_something_else_locally(context)
+    -- returns result and a "commit" function
+    return {}, function()
+    end
+end
+
 return inventory_service_local

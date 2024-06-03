@@ -22,6 +22,8 @@ local process_inventory_surplus_or_shortage_compensate_do_something_locally =
     inventory_service_local.process_inventory_surplus_or_shortage_compensate_do_something_locally
 local process_inventory_surplus_or_shortage_do_something_else_locally =
     inventory_service_local.process_inventory_surplus_or_shortage_do_something_else_locally
+local process_inventory_surplus_or_shortage_compensate_do_something_else_locally =
+    inventory_service_local.process_inventory_surplus_or_shortage_compensate_do_something_else_locally
 
 local inventory_service = {}
 
@@ -325,7 +327,7 @@ function inventory_service.process_inventory_surplus_or_shortage_complete_in_out
     local data = json.decode(msg.Data)
     if (data.error) then
         -- handle error, need to compensate
-        local pre_local_compensations = { nil, nil, process_inventory_surplus_or_shortage_compensate_do_something_locally }
+        local pre_local_compensations = { process_inventory_surplus_or_shortage_compensate_do_something_else_locally, nil, process_inventory_surplus_or_shortage_compensate_do_something_locally }
         local pre_local_step_count, pre_local_commits = execute_local_compensations(pre_local_compensations, context)
         -- invoke remote compensation
         process_inventory_surplus_or_shortage_compensate_create_single_line_in_out(saga_id, context, data.error,

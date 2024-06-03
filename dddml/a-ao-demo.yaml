@@ -148,7 +148,7 @@ services:
               Version: "ItemVersion"
           DoSomethingElseLocally:
             invokeLocal: ""
-            # withCompensation: ""
+            withCompensation: ""
           CompleteInOut:
             invokeParticipant: "InOut.CompleteInOut"
             arguments:
