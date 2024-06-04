@@ -16,7 +16,34 @@ AO 正沿着正确的发展道路前进。
 通过接下来的演示，我们将有力地证明我们的立场。
 
 
-## 背景知识
+
+## 引子
+
+作为一个 AO 开发者，你能看出来下面这样看起来“理所应当”的 Lua 代码可能暗藏着什么“大坑”吗？
+
+```lua
+Handlers.add(
+    "a_multi_step_operation",
+    Handlers.utils.hasMatchingTag("Action", "AMultiStepOperation"),
+    function(msg)
+        local status, result_or_error = pcall((function()
+            local foo = do_a_mutate_memory_state_operation()
+            local bar = do_another_mutate_memory_state_operation()
+            return { foo = foo, bar = bar }
+        end))
+        ao.send({
+            Target = msg.From,
+            Data = json.encode(status and { result = result_or_error } or { error = tostring(result_or_error) }
+            )
+        })
+    end
+)
+```
+
+如果你不是 Lua 开发者，你可以把上面的 `pcall` 函数调用看作是一个 try-catch 操作。它会执行作为参数传入的函数，如果执行成功，`pcall` 返回 `true` 和函数的返回值；如果函数执行失败，`pcall` 返回 `false` 和错误对象。
+
+你发现问题了吗？假设 `do_a_mutate_memory_state_operation` 这一步执行成功，而 `do_another_mutate_memory_state_operation` 这一步执行发生错误，会发生什么？
+
 
 我们觉的有必要先介绍一些背景知识，以便大家更好地理解本 demo 的内容。
 下面的行文我们偶尔用使用到一些 DDD（领域驱动设计）的术语，但我们相信，即使你不熟悉 DDD，应该也不会影响你的整体理解。
@@ -151,7 +178,7 @@ Saga Manager 与服务（组件）之间的交互可能使用异步的基于消�
 
 ---
 
-下面，我们将展示如何使用 dddappp 低代码工具，来开发一个 ao dapp。
+下面，我们将展示如何使用 dddappp 低代码工具来开发一个 AO Dapp。
 在这个应用中，当然会包含上面👆所讨论的“更新库存单元的在库数量”的服务的 Saga 实现。
 
 
