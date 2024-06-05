@@ -5,25 +5,25 @@ English | [中文版](./README_CN.md)
 
 AO is on the right path of development.
 
-We believe that the major obstacle to the widespread adoption of Web3 is the engineering complexity involved in building large-scale decentralized applications (DApps).
-This complexity hinders our ability to develop more diverse, larger-scale, and feature-rich decentralized applications under the constraints of limited resources—a common scenario in the early stages of development.
+We believe that the major obstacle to the widespread adoption of Web3 is the engineering complexity involved in building large-scale decentralized applications (Dapps).
+This complexity hinders our ability to develop more diverse, larger-scale, and often that means more awesome, feature-rich decentralized applications with limited resources -- as is often the case in the initial stages of things.
 
 > Do not be swayed by claims like "Smart contracts/on-chain programs should be simple and not overly complex." Such statements often misrepresent the engineering reality.
 
 Compared to Web2, Web3 still has significant room for improvement in terms of technical infrastructure, tools, and practical experience.
-AO has filled a significant gap in this area. At the very least, AO, as the best decentralized *message broker*[^MsgBrokerWp] in the current Web3 domain, has shown tremendous potential.
+AO has filled a significant gap in this area. We believe that: at the very least, AO, as the best decentralized *message broker*[^MsgBrokerWp] in the current Web3 world, has shown tremendous potential.
 
-> Developers familiar with traditional Web2 applications might consider Kafka for comparison: can you imagine how large-scale internet applications would be written without Kafka or Kafka-like message brokers?
+> Developers of traditional Web2 applications can take Kafka as an analogy to understand the significance of this: without Kafka or Kafka-like message brokers available, can you imagine how to program many of today's large-scale Internet applications?
 
 For instance, traditional large and complex applications rely on messaging mechanisms to achieve decoupling between components, which is crucial for enhancing system maintainability and scalability.
 
-Moreover, these applications often adopt an "eventual consistency" model when necessary to further improve system availability and scalability.
+Moreover, these applications often adopt "eventual consistency" model when necessary to further improve system availability and scalability.
 
-However, even in the more mature engineering environment of Web2, achieving "eventual consistency" through message communication remains a challenge for many developers.
+However, even in the more mature engineering environment of Web2, achieving "eventual consistency" based on messaging remains a challenge for many developers.
 
-> Developing DApps on the nascent AO platform seems to accentuate this challenge even more :).
+> Developing Dapps on the nascent AO platform seems to accentuate this challenge even more :).
 
-For example, consider the following Lua code (for AO DApp) — does it seem "natural" to write it this way?
+For example, consider the following Lua code (for AO Dapp) — does it seem "natural" to write it this way?
 
 ```lua
 Handlers.add(
@@ -51,9 +51,9 @@ If you're not familiar with Lua, think of the `pcall` function as being similar 
 it tries to execute a function, returning `true` and the result of the function if it succeeds, and `false` and an error object if it fails.
 
 Do you see the problem? Suppose the step `do_a_mutate_memory_state_operation` step succeeds and the step `do_another_mutate_memory_state_operation` fails.
-The recipient (`Target`) of the message receives an `error` message. 
+The recipient (`Target`) receives an `error` message. 
 Common sense would dictate that the receiver can safely assume that the operation failed, but that nothing has changed and everything is fine.
-However, in reality, the `do_a_mutate_memory_state_operation` step has already succeeded and the state of the system has changed! 
+However, in reality, the step `do_a_mutate_memory_state_operation` has already succeeded and the state has changed! 
 In other words, the information conveyed by the message is **inconsistent** with the actual state of the system.
 
 In traditional Web2 development environments, we can usually solve this problem by using the *transactional outbox pattern*[^TransactionalOutbox].
@@ -68,7 +68,7 @@ In the next demo, we'll show how dddappp can be used to elegantly solve these pr
 
 We feel it may be necessary to start with some background knowledge so that you can better understand the content of this demo. 
 If you're already familiar with the content, you can skip ahead to the [next section](#Prerequisites).
-We will occasionally use some DDD (Domain Driven Design) terminology in the following lines, but we believe that even if you are not familiar with DDD, it should not affect your overall understanding.
+We will occasionally use some DDD (Domain-Driven Design) terminology in the following lines, but we believe that even if you are not familiar with DDD, it should not affect your overall understanding.
 
 
 ### About "eventual consistency"
@@ -77,7 +77,7 @@ An application that needs to be launched quickly often begins with the use of a 
 (Indeed, using "eventual consistency" instead of "strong consistency" can lead to higher application development costs). 
 But if the app becomes popular, as the user base grows and all available options for vertical scaling 
 (e.g. better and more expensive hardware) are exhausted, 
-it eventually becomes necessary for the application to improve its software architecture - including the use of "eventual consistency".
+it eventually becomes necessary for the application to improve its software architecture -- including the use of "eventual consistency".
 
 
 ### What is the trouble without having ACID database transactions?
@@ -90,7 +90,7 @@ we need to take into account the scenarios that may occur when executing this mo
 - Product A was originally in stock at the source location in quantities of 1,000 units.
 - We start an operation to move 100 units of Product A to the target location.
 - Initially, our inventory movement service deducts the inventory quantity at the source location, and the quantity of Product A in stock at that location becomes 900-a result that is persistent and cannot be "rolled back" through a database transaction, but the inventory quantity at the target location has not yet been increased, and the movement has not yet been finalized.
-- Then, someone else uses up (ships out) 100 units of Product A in the source location for manufacturing purposes, and the quantity on hand becomes 800 - this result is also persistent and cannot be rolled back using a database transaction.
+- Then, someone else uses up (ships out) 100 units of Product A in the source location for manufacturing purposes, and the quantity on hand becomes 800 -- this result is also persistent and cannot be rolled back using a database transaction.
 - Then, for some reason, we can't increase the quantity of Product A in the target bay, so we need to cancel the transfer.
 - At this point, we should change the quantity of Product A in stock at the source location to 900 (this known as a "**compensate**" operation), which means that we add back 100 units to the quantity of 800, rather than changing the quantity back to the quantity (1000 units) that was in stock before the movement operation.
 
@@ -149,12 +149,12 @@ In the execution process of the business flow described above, there is **no** c
 
 
 On the other hand, the Orchestration-based Saga **does** have a central commander, known as the *Saga Manager*.
-The interaction between the Saga Manager and services (components) may use asynchronous message-based communication mechanisms or synchronous RPCs.
+The interaction between the Saga Manager and services (components) may use asynchronous messaging mechanisms or synchronous RPCs.
 
 
-### Event Driven Architecture (EDA) and Saga
+### Event-Driven Architecture (EDA) and Saga
 
-Choreography-based Saga can be thought of as very close to what EDA is supposed to be.
+Choreography-based Saga can be thought a very native design pattern to EDA.
 
 In general, events are published, usually using *asynchronous messaging* mechanisms (of course, more seriously, synchronous RPCs is not out of the question).
 
@@ -165,20 +165,16 @@ In fact, on top of asynchronous messaging, we can also wrap up APIs for synchron
 Specifically, a call named `Xxx` can be decomposed into the process of publishing a pair of events: `XxxRequested` / `XxxResponded`.
 The caller publishes the former and the callee publishes the latter.
 
-Since Orchestration-based Saga's calls to services (components) can be broken down into events, 
-it is not wrong to say that it is a special form of EDA.
-
-
----
-
 In general, asynchronous messaging is used extensively within EDA.
 Asynchronous messaging mechanisms typically make use of *Message Broker* [^MsgBrokerWp].
-(You may notice that in many cases, we do not strictly distinguish between the concepts of *events* and *messages* in our text.)
+
+You may notice that in many cases, we do not strictly distinguish between the concepts of *events* and *messages* in our text.
 
 
 ### How to design a Orchestration-based Saga
 
-Implementing a Saga can be tricky. Choreography-based Saga is more troublesome than Orchestration-based Saga to implement complex features. 
+Implementing a Saga can be tricky. 
+Choreography-based Saga is more troublesome than Orchestration-based Saga to implement complex features. 
 Therefore, it is necessary to consider using DSL to help implement a Orchestration-based Saga.
 
 Here is an example of how to orchestrate a Saga.
@@ -217,7 +213,7 @@ Several methods are required for operating the `InventoryItem` aggregate:
 
 Additionally, we need to write three methods for operating the `InOut` aggregate:
 
-* CreateSingleLineInOut, a method for creating an In/Out document, which contains only one line (`InOutLine`).
+* `CreateSingleLineInOut`, a method for creating an In/Out document, which contains only one line (`InOutLine`).
 * `Complete`, a method for updating the status of the In/Out document to "Completed".
 * `Void`, a method for updating the In/Out document to "Cancelled".
 
@@ -251,7 +247,6 @@ If you want to follow us through the process of the demo, install the tools belo
 * Install [Docker](https://docs.docker.com/engine/install/).
 
 
-
 Then, start an aos process now:
 
 
@@ -272,7 +267,7 @@ The model file that has been written is available at `./dddml/a-ao-demo.yaml`.
 For developers with some experience in OOP (Object-Oriented Programming), what the model expresses should not be difficult to understand.
 
 Let's catch the main thread first. We mainly define two aggregates in the model: `Article` and `InventoryItem`, and the service `InventoryService`.
-And the service `InventoryService` depends on two components: the `InventoryItem` aggregate and an abstract `InOutService` service - you can think of "abstract" here as meaning that we describe what the service "should look like", 
+And the service `InventoryService` depends on two components: the `InventoryItem` aggregate and an abstract `InOutService` service -- you can think of "abstract" here as meaning that we describe what the service "should look like", 
 but we don't intend to implement it ourselves, expecting "others" to implement it.
 
 > **Tip**
