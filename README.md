@@ -3,23 +3,21 @@
 
 AO 正沿着正确的发展道路前进。
 
-我们认为，Web3 的大规模采用之所以遭遇障碍，主要是由于构建大型去中心化应用的工程复杂性所致。与 Web2 相比，Web3 在技术基础设施、工具以及实践经验方面仍有待（**大幅**）提升。
+我们认为，Web3 的大规模采用之所以遭遇障碍，主要是由于构建大型去中心化应用的工程复杂性所致。
+这使得我们无法在资源有限的情况下——在事物发展的初始阶段，通常如此，开发出更多样化的、更大规模、功能更丰富的去中心化应用。
+与 Web2 相比，Web3 在技术基础设施、工具以及实践经验方面仍有待（**大幅**）提升。
+AO 填补了其中一项重大空白。我们认为，AO 作为当前 Web3 领域中的最佳去中心化*消息代理* [^MsgBrokerWpZh]，已经展现出巨大的潜力。
 
-例如，传统的大型复杂应用依赖于消息通信机制来实现组件之间的解耦，这对于提高系统的可维护性和可扩展性至关重要。我们认为，AO 作为当前 Web3 领域中的最佳*消息代理* [^MsgBrokerWpZh]，展现出了巨大的潜力。
+
+> 不要相信那些类似“智能合约/链上程序应该就是很简单的，不需要搞得太复杂”之类倒果为因的鬼话。
+
+例如，传统的大型复杂应用依赖于消息通信机制来实现组件之间的解耦，这对于提高系统的可维护性和可扩展性至关重要。
 
 此外，这些应用在必要时通常会采用“最终一致性”模型，以进一步提高系统的可用性和可扩展性。
 
-然而，基于消息通信来实现“最终一致性”对许多开发者来说仍然是一个挑战，无论是在 Web2 环境中还是在 AO 平台上开发 Dapp。
+然而，即使在工程化更成熟的 Web2 环境中，基于消息通信来实现“最终一致性”也是许多开发者面临的挑战。在新生的 AO 平台上开发 Dapp，这个挑战似乎更显突出。
 
-幸运的是，通过使用 dddappp 低代码工具，我们可以大大简化这一任务。
-
-通过接下来的演示，我们将有力地证明我们的立场。
-
-
-
-## 引子
-
-作为一个 AO 开发者，你能看出来下面这样看起来“理所应当”的 Lua 代码可能暗藏着什么“大坑”吗？
+比如，下面的 Lua 代码（for AO dapp），你会不会觉得这么写是“理所当然”的？
 
 ```lua
 Handlers.add(
@@ -33,38 +31,52 @@ Handlers.add(
         end))
         ao.send({
             Target = msg.From,
-            Data = json.encode(status and { result = result_or_error } or { error = tostring(result_or_error) }
+            Data = json.encode(
+                status and { result = result_or_error } 
+                or { error = tostring(result_or_error) }
             )
         })
     end
 )
 ```
 
-如果你不是 Lua 开发者，你可以把上面的 `pcall` 函数调用看作是一个 try-catch 操作。它会执行作为参数传入的函数，如果执行成功，`pcall` 返回 `true` 和函数的返回值；如果函数执行失败，`pcall` 返回 `false` 和错误对象。
+如果您不熟悉 Lua，可以将 `pcall` 函数视为类似其他语言的 try-catch 结构：它尝试执行一个函数，成功时返回 true 和函数结果，失败时返回 false 和错误对象。
 
-你发现问题了吗？假设 `do_a_mutate_memory_state_operation` 这一步执行成功，而 `do_another_mutate_memory_state_operation` 这一步执行发生错误，会发生什么？
+你发现问题了吗？假设 `do_a_mutate_memory_state_operation` 这一步执行成功，而 `do_another_mutate_memory_state_operation` 这一步执行发生错误，
+消息的接收方（`Target`）会收到一个“错误”消息。按照常理，接收方可以安心地认为这个操作失败了，一切没变，岁月静好。
+但是，实际上，`do_a_mutate_memory_state_operation` 这一步已经执行成功了，系统的状态已经发生了变化！也就是说，消息传递出来的信息和系统的实际状态是“不一致”的。
 
+在传统的 Web2 开发环境中，我们通常可以采用“事务发件箱模式”[^TransactionalOutbox]来解决这一问题。
+但是在 AO 平台上，我们没有发件箱模式所依赖的数据库 ACID 事务可用，事情就变得有点“微妙”了。
+
+幸运的是，通过使用 dddappp 低代码工具，我们可以极大地简化 AO dapp 开发的复杂性。
+在接下来的演示中，我们将展示如何利用 dddappp 来优雅地解决这些问题，并有力地支持我们的观点。
+
+
+## 背景
 
 我们觉的有必要先介绍一些背景知识，以便大家更好地理解本 demo 的内容。
 下面的行文我们偶尔用使用到一些 DDD（领域驱动设计）的术语，但我们相信，即使你不熟悉 DDD，应该也不会影响你的整体理解。
 
 
-### 关于最终一致性
+### 关于“最终一致性”
 
 An application that needs to be launched quickly often begins with the use of a total "strong consistency" architecture (Indeed, using "eventual consistency" instead of "strong consistency" can lead to higher application development costs). But as the user base grows and all available options for vertical scaling (e.g. better/more expensive hardware) are exhausted, it eventually becomes necessary for the application to improve its software architecture
 
 
 ### 没有 ACID 数据库事务，带来什么麻烦？
 
-比如说，假设在一个 WMS 应用的领域模型中，InventoryItem（库存单元）实体（聚合根）表示“某个产品在某个货位上的库存数量”。
+比如说，假设在一个 WMS 应用的领域模型中，InventoryItem（库存单元）实体（这是一个聚合根）表示“某个产品在某个货位上的库存数量”。
 如果我们打算使用“最终一致性”模型来实现一个库存调拨（Inventory Movement）服务，需要考虑到执行这个调拨服务的时候可能发生这样的场景：
 
 - 在源货位上，某产品 A 本来的库存数量是 1000 个。
-- 我们执行了一个调拨操作，打算把 100 个产品 A 转移到目标货位上。
+- 我们开始执行一个调拨操作，打算把 100 个产品 A 转移到目标货位上。
 - 一开始，我们的库存调拨服务扣减了源货位的库存数量，在这个货位上产品 A 的库存数量变成了 900——这个结果是持久的、不能通过数据库事务“回滚”，但此时目标货位的库存数量还没有增加，调拨还没有最终完成。
 - 接着，其他人因为生产加工的需要，用掉（出库）了在源货位上的 100 个产品 A，库存数量变成了 800——这个结果也是持久的、不能使用数据库事务回滚。
 - 然后，因为某些原因，我们没法在目标货位上增加产品 A 的库存数量，所以我们需要取消这次调拨操作。
 - 这时候，我们应该把源货位上产品 A 的库存数量改为 900 个（这个动作被称为“**补偿**”操作），也就是在数量 800 个的基础上加回 100 个，而不能直接将库存数量改回调拨操作发生前的数量（1000 个）。
+
+更别说，在这样的模型中，可能还存在另一个 MovementOrder 实体（聚合根），它表示“库存调拨单”，这会使得整个调拨业务逻辑的“最终一致性”实现更加复杂。
 
 
 ### 使用 Saga 实现最终一致性
@@ -206,6 +218,13 @@ aos process_alice
 ### 编写 DDDML 模型
 
 已经编写好的模型文件见 `./dddml/a-ao-demo.yaml`.
+
+对于稍有 OOP（面向对象编程）经验的开发者来说，模型所表达的内容应该不难理解。
+
+让我们先抓主线。我们在模型中定义了两个聚合：`Article` 与 `InventoryItem`，以及一个服务：`InventoryService`。
+而服务 `InventoryService` 依赖两个组件： `InventoryItem` 聚合以及一个抽象的 `InOutService` 服务
+——你可以把这里的“抽象”理解为：我们描述了这个服务“应有的样子”，但是并不打算自己实现它，而是期望“其他人”来实现它。
+
 
 > **Tip**
 >
@@ -616,6 +635,8 @@ Inbox[#Inbox]
 ---
 
 [^SagaPattern]: [Microservices.io](http://microservices.io/). Pattern: Saga. [https://microservices.io/patterns/data/saga.html](https://microservices.io/patterns/data/saga.html)
+
+[^TransactionalOutbox]: [Microservices.io](http://microservices.io/). Pattern: Transactional Outbox. [https://microservices.io/patterns/data/transactional-outbox.html](https://microservices.io/patterns/data/transactional-outbox.html)
 
 [^MsgBrokerWpZh]: [Wikipedia.org](http://wikipedia.org/). 消息代理. [https://zh.wikipedia.org/zh-hans/消息代理](https://zh.wikipedia.org/zh-hans/%E6%B6%88%E6%81%AF%E4%BB%A3%E7%90%86)
 
