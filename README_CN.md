@@ -200,6 +200,12 @@ Saga Manager 与服务（组件）之间的交互可能使用异步的基于消�
 不过，如果你想先睹为快，可以直接先查看我们的 DDDML 模型文件 `./dddml/a-ao-demo.yaml`，
 其中 `InventoryService` 服务的 `ProcessInventorySurplusOrShortage` 方法的定义。
 
+> **提示**
+> 
+> 你可能没想到，我们用来编制 Saga 的 DSL，
+> 还可以用来[解决 Move Dapp 开发中让大家头大的“依赖注入”问题](https://github.com/dddappp/sui-interface-demo/blob/main/README_CN.md)。
+> 我们设计的 DSL 就是如此多才多艺。
+
 
 ## 前置条件
 

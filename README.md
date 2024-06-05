@@ -21,7 +21,7 @@ Moreover, these applications often adopt an "eventual consistency" model when ne
 
 However, even in the more mature engineering environment of Web2, achieving "eventual consistency" through message communication remains a challenge for many developers.
 
-> Developing DApps on the nascent AO platform seems to accentuate this challenge even more :-).
+> Developing DApps on the nascent AO platform seems to accentuate this challenge even more :).
 
 For example, consider the following Lua code (for AO DApp) — does it seem "natural" to write it this way?
 
@@ -148,8 +148,8 @@ In the execution process of the business flow described above, there is **no** c
 * Deciding which service should continue after one completes its task, or what to do if a service completely fails to proceed.
 
 
-On the other hand, the Orchestration-based Saga [**does**] have a central commander, known as the *Saga Manager*.
-The interaction between the Saga Manager and services (components) may use asynchronous message-based communication mechanisms or synchronous RPC methods.
+On the other hand, the Orchestration-based Saga **does** have a central commander, known as the *Saga Manager*.
+The interaction between the Saga Manager and services (components) may use asynchronous message-based communication mechanisms or synchronous RPCs.
 
 
 ### Event Driven Architecture (EDA) and Saga
@@ -234,6 +234,13 @@ Don't worry, we will soon demonstrate how to develop an AO Dapp using the dddapp
 This application will, of course, include the Saga implementation for the `CreateOrUpdateInventoryItem` service discussed above.
 However, if you're eager for a sneak peek, you can directly check out our [DDDML model file](./dddml/a-ao-demo.yaml),
 where the definition of the `ProcessInventorySurplusOrShortage` method of the `InventoryService` service is provided.
+
+
+> **Tip**
+> 
+> You might not have expected that the DSL we use to orchestrate Sagas
+> can also be used to [solve the vexing "dependency injection" problem in Move Dapp development](https://github.com/dddappp/sui-interface-demo/blob/main/README_CN.md).
+> It's just that versatile.
 
 
 ## Prerequisites
