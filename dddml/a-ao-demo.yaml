@@ -104,7 +104,7 @@ services:
 
   InventoryService:
     requiredComponents:
-      InventoryItem: # Rename to InventoryItemService?
+      InventoryItem:
         type: InventoryItem # Aggregate name
       InOut:
         type: InOutService

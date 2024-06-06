@@ -553,7 +553,7 @@ Inbox[#Inbox]
 
 ### Manually Sending Messages to Test Saga
 
-First, we'll manually send messages to step by step test and observe the execution process of the Saga.
+First, we'll manually send messages to test step by step and observe the execution process of the Saga.
 
 In the `__PROGRESS_ALICE__` process, we check the current Saga instance Id sequence in another process `__PROGRESS_BOB__`:
 
