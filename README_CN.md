@@ -26,8 +26,8 @@ AO 填补了其中一项重大空白。我们认为，最少，AO 作为当前 W
 
 ```lua
 Handlers.add(
-    "a_multi_step_operation",
-    Handlers.utils.hasMatchingTag("Action", "AMultiStepOperation"),
+    "a_multi_step_action",
+    Handlers.utils.hasMatchingTag("Action", "AMultiStepAction"),
     function(msg)
         local status, result_or_error = pcall((function()
             local foo = do_a_mutate_memory_state_operation()
@@ -646,7 +646,46 @@ Inbox[#Inbox]
 
 如果没有什么意外，这个 Saga 实例的执行状态应该是“已完成”。
 
----
+
+##  延伸阅读
+
+### 将 dddappp 作为全链游戏引擎使用
+
+#### 使用 dddappp 开发 Sui 全链游戏
+
+这个一个生产级的实际案例：https://github.com/wubuku/infinite-sea
+
+#### 用于开发 Aptos 全链游戏的示例
+
+原版的 [constantinople](https://github.com/0xobelisk/constantinople) 是一个基于全链游戏引擎 [obelisk](https://obelisk.build) 开发的运行在 Sui 上的游戏。（注：obelisk 不是我们的项目。）
+
+我们这里尝试了使用 dddappp 低代码开发方式，实现这个游戏的 Aptos Move 版本：https://github.com/wubuku/aptos-constantinople/blob/main/README_CN.md
+
+开发者可以按照 README 的介绍，复现整个游戏的合约和 indexer 的开发和测试过程。模型文件写一下，生成代码，在三个文件里面填了下业务逻辑，开发就完成了。
+
+有个地方可能值得一提。Aptos 对发布的 Move 合约包的大小有限制（不能超过60k）。这个问题在 Aptos 上开发稍微大点的应用都会碰到。我们现在可以在模型文件里面声明一些模块信息，然后就可以自动拆分（生成）多个 Move 合约项目。（注：这里说的模块是指领域模型意义上的模块，不是 Move 语言的那个模块。）
+
+
+### Sui 博客示例
+
+Repository: https://github.com/dddappp/sui-blog-example
+
+It only requires 30 or so lines of code (all of which is a description of the domain model) 
+to be written by the developer, 
+and then generates a blog example that emulates [RoR Getting Started](https://guides.rubyonrails.org/getting_started.html) in one click, 
+without requiring the developer to write a single line of other code.
+
+### Sui 众筹 Dapp
+
+一个以教学演示为目的“众筹” Dapp：
+
+https://github.com/dddappp/sui-crowdfunding-example
+
+
+### 复杂的 Sui 演示
+
+如果你有进一步了解的兴趣，可以在这里找到一个更复杂的 Sui 演示：["A Sui Demo"](https://github.com/dddappp/A-Sui-Demo)。
+我们使用了各种“生造”的场景，来展示 dddappp 的各种能力。
 
 [^SagaPattern]: [Microservices.io](http://microservices.io/). Pattern: Saga. [https://microservices.io/patterns/data/saga.html](https://microservices.io/patterns/data/saga.html)
 

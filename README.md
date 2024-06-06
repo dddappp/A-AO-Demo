@@ -27,8 +27,8 @@ For example, consider the following Lua code (for AO Dapp) — does it seem "nat
 
 ```lua
 Handlers.add(
-    "a_multi_step_operation",
-    Handlers.utils.hasMatchingTag("Action", "AMultiStepOperation"),
+    "a_multi_step_action",
+    Handlers.utils.hasMatchingTag("Action", "AMultiStepAction"),
     function(msg)
         local status, result_or_error = pcall((function()
             local foo = do_a_mutate_memory_state_operation()
@@ -690,7 +690,49 @@ Inbox[#Inbox]
 If nothing is wrong, the execution status of the Saga instance should be "Completed".
 
 
----
+## Extended reading
+
+### Using dddappp as a fully on-chain game engine
+
+#### Developing Sui fully on-chain game using dddappp
+
+This is a production-level real-world example: https://github.com/wubuku/infinite-sea
+
+#### Example of developing an Aptos fully on-chain game
+
+The original [constantinople](https://github.com/0xobelisk/constantinople) is a game based on the fully on-chain game engine [obelisk](https://obelisk.build) running on Sui. (Note: obelisk is not a project of ours.)
+
+Here we tried to implement the Aptos Move version of this game using the dddappp low-code tool: https://github.com/wubuku/aptos-constantinople/blob/main/README_CN.md
+
+The developer can follow the README to reproduce the entire development and testing process of the game's contract and indexer. 
+The model file is written, code is generated, business logic is filled in the three files, and the development is done.
+
+One thing that might be worth mentioning is that Aptos has a limit on the size of the Move contract packages that can be published (no more than 60k). 
+This is a common problem for larger applications on Aptos. 
+We can declare some module information in the model file, 
+and then we can automatically generate multiple Move contract packages. 
+(Note: the "module" here means the module concept in the sense of "DDD domain model", not the "module" in the Move language.)
+
+### Sui Blog Example
+
+Repository: https://github.com/dddappp/sui-blog-example
+
+It only requires 30 or so lines of code (all of which is a description of the domain model) 
+to be written by the developer, 
+and then generates a blog example that emulates [RoR Getting Started](https://guides.rubyonrails.org/getting_started.html) in one click, 
+without requiring the developer to write a single line of other code.
+
+### Sui Crowdfunding Example
+
+A crowdfunding dapp for educational demonstration purposes:
+
+https://github.com/dddappp/sui-crowdfunding-example
+
+### A More Complex Sui Demo
+
+If you are interested, you can find a more complex Sui Demo here: ["A Sui Demo"](https://github.com/dddappp/A-Sui-Demo).
+We have used a variety of "made-up" scenarios to demonstrate the versatility of dddappp.
+
 
 [^SagaPattern]: [Microservices.io](http://microservices.io/). Pattern: Saga. [https://microservices.io/patterns/data/saga.html](https://microservices.io/patterns/data/saga.html)
 
