@@ -267,7 +267,7 @@ The model file that has been written is available at `./dddml/a-ao-demo.yaml`.
 For developers with some experience in OOP (Object-Oriented Programming), what the model expresses should not be difficult to understand.
 
 Let's catch the main thread first. We mainly define two aggregates in the model: `Article` and `InventoryItem`, and the service `InventoryService`.
-And the service `InventoryService` depends on two components: the `InventoryItem` aggregate and an abstract `InOutService` service -- you can think of "abstract" here as meaning that we describe what the service "should look like", 
+And the service `InventoryService` depends on two components: the `InventoryItem` aggregate and an abstract `InOutService` -- you can think of "abstract" here as meaning that we describe what the service "should look like", 
 but we don't intend to implement it ourselves, expecting "others" to implement it.
 
 > **Tip**
@@ -298,6 +298,9 @@ The command parameters above are straightforward:
 * `aoLuaProjectDirectoryPath` is the directory path where the "on-chain contract" code is placed. It should be a readable and writable directory path in the container.
 
 
+After executing the above command, you will see a "ton" of code generated for you by the dddappp tool in the `. /src` directory.
+
+
 #### Update dddappp Docker Image
 
 Since the dddappp v0.0.1 image is updated frequently, 
@@ -314,6 +317,15 @@ docker pull wubuku/dddappp-ao:0.0.1
 ```
 
 ### Filling in the business logic
+
+Let's fill in the business operation logic written in Lua code.
+
+> A platform-neutral expression language would be ideal in the future. Of course, we will work in this direction.
+
+You'll notice that in the files you need to fill in below, the signature part of the function is already written.
+
+You only need to fill in the body of the function.
+
 
 #### Modify `article_update_body_logic`
 
@@ -375,7 +387,7 @@ function inventory_service_local.process_inventory_surplus_or_shortage_on_get_in
     local on_hand_quantity = result.quantity
     local adjusted_quantity = context.quantity
 
-if (adjusted_quantity == on_hand_quantity) then -- NOTE: short-circuit if no changed
+    if (adjusted_quantity == on_hand_quantity) then -- NOTE: short-circuit if no changed
         local short_circuited = true
         local is_error = false
         -- If the original request requires a result, provide one here if a short circuit occurs.
@@ -434,9 +446,10 @@ return {
 }
 ```
 
+Just so much for programming. All set, let's start testing the app.
+
 
 ## Testing the Application
-
 
 Start another aos process:
 

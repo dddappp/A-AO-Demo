@@ -264,6 +264,8 @@ wubuku/dddappp-ao:0.0.1 \
     If you cannot understand this concept for the time being, it is not a big deal.
 * `aoLuaProjectDirectoryPath` is the directory path where the "on-chain contract" code is placed. It should be a readable and writable directory path in the container.
 
+执行完上面的命令后，你会在 `./src` 目录下看到 dddappp 工具为你生成的“成吨”的代码。
+
 
 #### 更新 Docker 镜像
 
@@ -280,6 +282,12 @@ docker pull wubuku/dddappp-ao:0.0.1
 
 
 ### 填充业务逻辑
+
+下面让我们填充以 Lua 代码编写的业务操作逻辑。
+
+> 理想情况下，未来应该有一门平台中立的表达式语言，让开发者可以更方便的编写“多链”应用的业务逻辑。当然，我们还在朝这个方向努力。
+
+你会发现，下面很需要填充的文件中，函数的签名部分已经写好了，你只需要填充函数体部分。
 
 #### 修改 `article_update_body_logic`
 
@@ -397,6 +405,8 @@ return {
     }
 }
 ```
+
+关于需要你做的编码部分，就这么多。现在一切准备就绪，让我们开始测试这个应用。
 
 
 ## 测试应用
