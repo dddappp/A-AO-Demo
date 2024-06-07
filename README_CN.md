@@ -233,6 +233,7 @@ aos process_alice
 对于稍有 OOP（面向对象编程）经验的开发者来说，模型所表达的内容应该不难理解。
 
 让我们先抓主线。我们在模型中定义了两个聚合：`Article` 与 `InventoryItem`，以及一个服务：`InventoryService`。
+其中的 `steps` 就是我们所说的 Saga 的定义。
 而服务 `InventoryService` 依赖两个组件： `InventoryItem` 聚合以及一个抽象的 `InOutService` 服务
 ——你可以把这里的“抽象”理解为：我们描述了这个服务“应有的样子”，但是并不打算自己实现它，而是期望“其他人”来实现它。
 

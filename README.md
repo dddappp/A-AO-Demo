@@ -267,8 +267,10 @@ The model file that has been written is available at `./dddml/a-ao-demo.yaml`.
 For developers with some experience in OOP (Object-Oriented Programming), what the model expresses should not be difficult to understand.
 
 Let's catch the main thread first. We mainly define two aggregates in the model: `Article` and `InventoryItem`, and the service `InventoryService`.
+Where `steps` is what we call Saga definition.
 And the service `InventoryService` depends on two components: the `InventoryItem` aggregate and an abstract `InOutService` -- you can think of "abstract" here as meaning that we describe what the service "should look like", 
 but we don't intend to implement it ourselves, expecting "others" to implement it.
+
 
 > **Tip**
 >
