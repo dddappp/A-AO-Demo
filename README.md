@@ -409,7 +409,7 @@ end
 
 As mentioned above, we declare `InOutService` as `abstract` in our model, 
 indicating that we don't intend to implement it ourselves, but expect others to do so.
-So here we use `in_out_service_mock.lua` to mock the behavior of `InOutService` for testing purposes.
+So here we use `in_out_service_mock.lua` to mock the behavior of `InOutService` for tests.
 
 Modify the file `. /src/in_out_service_mock.lua`:
 
@@ -459,7 +459,7 @@ Start another aos process:
 aos process_bob
 ```
 
-Record its process ID, such as `rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A`.
+Record its process ID, such as `0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow`.
 We might use the placeholder `__PROCESS_BOB__` for it in some following example commands.
 
 In this aos (`__PROCESS_BOB__`) process, load our application code (be wary of replacing `{PATH/TO/A-AO-Demo/src}` with the actual path):
@@ -477,7 +477,7 @@ In the first process (`__PROCESS_ALICE__`), check the current "article Id sequen
 
 ```lua
 json = require("json")
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetArticleIdSequence" } })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticleIdSequence" } })
 ```
 
 You'll get a response like this:
@@ -489,7 +489,7 @@ New Message From u37...zs4: Data = {"result":[0]}
 Create a new article:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "CreateArticle" }, Data = json.encode({ title = "title_1", body = "body_1" }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "CreateArticle" }, Data = json.encode({ title = "title_1", body = "body_1" }) })
 ```
 
 After receiving a response, check the content of the last message in the inbox:
@@ -501,26 +501,26 @@ Inbox[#Inbox]
 Check current article Id sequence again:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetArticleIdSequence" } })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticleIdSequence" } })
 ```
 
 View the contents of the article with ID `1` (in the `Data` property of the output message):
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
 Inbox[#Inbox]
 ```
 
 Update the body of the article with ID `1` (note that the value of `version` should match the version of the article seen above):
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, version = 0, body = "new_body_1" }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, version = 0, body = "new_body_1" }) })
 ```
 
 View the contents of the article with ID `1` again:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
 Inbox[#Inbox]
 ```
 
@@ -531,23 +531,23 @@ Send the following messages in the process `__PROCESS_ALICE__`,
 which trigger the execution of the `AddInventoryItemEntry` action in the `__PROCESS_BOB__` process to update the inventory items:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 100}) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 100}) })
 
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 130, version = 0}) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 130, version = 0}) })
 
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }, movement_quantity = 100}) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }, movement_quantity = 100}) })
 
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }, movement_quantity = 101, version = 0}) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }, movement_quantity = 101, version = 0}) })
 ```
 
 View the state of the inventory items:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
 
 Inbox[#Inbox]
 
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }) })
 
 Inbox[#Inbox]
 ```
@@ -560,7 +560,7 @@ First, we'll manually send messages to test step by step and observe the executi
 In the `__PROCESS_ALICE__` process, we check the current Saga instance Id sequence in another process `__PROCESS_BOB__`:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetSagaIdSequence" } })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetSagaIdSequence" } })
 -- New Message From u37...zs4: Data = {"result":[0]}
 ```
 
@@ -568,7 +568,7 @@ Execute the following command to kick off the `InventoryService.ProcessInventory
 
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "x", quantity = 100 }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "x", quantity = 100 }) })
 ```
 
 This creates a new Saga instance. Obviously, the first Saga instance created should have the Id of `1`.
@@ -576,7 +576,7 @@ This creates a new Saga instance. Obviously, the first Saga instance created sho
 View the state of the Saga instance with Id `__SAGA_ID__`:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = __SAGA_ID__ }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = __SAGA_ID__ }) })
 
 Inbox[#Inbox]
 ```
@@ -584,7 +584,7 @@ Inbox[#Inbox]
 Query the version of the inventory item:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
 
 Inbox[#Inbox]
 ```
@@ -592,38 +592,38 @@ Inbox[#Inbox]
 Send a message to advance the Saga instance to the next step (note to replace the placeholder `__ITEM_VERSION__` with the version of the inventory item queried above, and replace the placeholder `__SAGA_ID__` with the Id of the Saga instance created above):
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = { product_id = 1, location = "x", version = __ITEM_VERSION__, quantity = 110 } }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = { product_id = 1, location = "x", version = __ITEM_VERSION__, quantity = 110 } }) })
 ```
 
 Check if the state of the Saga with Id `__SAGA_ID__` has been updated:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = __SAGA_ID__ }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = __SAGA_ID__ }) })
 -- Inbox[#Inbox]
 ```
 
 Continue to send mock messages to advance the Saga instance (note to replace the placeholder `__SAGA_ID__` with actual value):
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = { in_out_id = 1, version = 0 } }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = { in_out_id = 1, version = 0 } }) })
 ```
 
 Continue to send mock messages to advance the Saga instance:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_AddInventoryItemEntry_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = {} }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_AddInventoryItemEntry_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = {} }) })
 ```
 
 Continue to send mock messages to advance the Saga instance:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CompleteInOut_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = {} }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CompleteInOut_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = {} }) })
 ```
 
 Query the state of the Saga instance with Id `__SAGA_ID__`:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = __SAGA_ID__ }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = __SAGA_ID__ }) })
 
 Inbox[#Inbox]
 ```
@@ -655,7 +655,7 @@ Next, also in the `__PROCESS_ALICE__` process, load the mock `InOutService` comp
 In the `__PROCESS_ALICE__` process, check the current Saga instance Id sequence in another `__PROCESS_BOB__` process:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetSagaIdSequence" } })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetSagaIdSequence" } })
 ```
 
 In the `__PROCESS_ALICE__` process, "create a new inventory item" for itself
@@ -669,7 +669,7 @@ Execute the following command to kick off the `InventoryService.ProcessInventory
 
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "y", quantity = 119 }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "y", quantity = 119 }) })
 -- New Message From u37...zs4: Data = {"result":{"in_out_i...
 ```
 
@@ -687,7 +687,7 @@ You should see that the quantity of the inventory item has been updated: `Data =
 Again, check the current Saga instance Id sequence in the `__PROCESS_BOB__` process:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetSagaIdSequence" } })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetSagaIdSequence" } })
 ```
 
 You should see that the number has increased.
@@ -695,7 +695,7 @@ You should see that the number has increased.
 Replace the placeholder `__SAGA_ID__` in the command below with the Id (number) of the latest Saga instance to view the execution process of the Saga instance:
 
 ```lua
-Send({ Target = "rEk9DXFRUHB0EIztcxIfAn_Wa-fUhigbTtFZHkVHt1A", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = __SAGA_ID__ }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = __SAGA_ID__ }) })
 
 Inbox[#Inbox]
 ```
