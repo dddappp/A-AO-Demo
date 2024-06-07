@@ -220,7 +220,7 @@ aos process_alice
 ```
 
 让我们记下它的进程 ID，比如 `DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q`，
-我们在下面的示例命令中使用占位符 `__PROGRESS_ALICE__` 表示它。
+我们在下面的示例命令中使用占位符 `__PROCESS_ALICE__` 表示它。
 
 
 
@@ -388,19 +388,19 @@ Handlers.add(
 
 #### 修改 `inventory_service_config`
 
-修改“配置文件” `./src/inventory_service_config.lua`，填入上面记录的 `__PROGRESS_ALICE__`：
+修改“配置文件” `./src/inventory_service_config.lua`，填入上面记录的 `__PROCESS_ALICE__`：
 
 ```lua
 return {
     inventory_item = {
         get_target = function()
-            return "DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q" -- <- Fill in the __PROGRESS_ALICE__
+            return "DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q" -- <- Fill in the __PROCESS_ALICE__
         end,
         -- ...
     },
     in_out = {
         get_target = function()
-            return "DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q" -- <- Fill in the __PROGRESS_ALICE__
+            return "DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q" -- <- Fill in the __PROCESS_ALICE__
         end,
         -- ...
     }
@@ -419,21 +419,21 @@ aos process_bob
 ```
 
 记录下它的进程 ID，比如 `u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4`，
-我们在下面的示例命令中可能会使用占位符 `__PROGRESS_BOB__` 表示它。
+我们在下面的示例命令中可能会使用占位符 `__PROCESS_BOB__` 表示它。
 
 
-在这个 aos (`__PROGRESS_BOB__`) 进程中，装载我们的应用代码（注意将 `{PATH/TO/A-AO-Demo/src}` 替换为实际的路径）：
+在这个 aos (`__PROCESS_BOB__`) 进程中，装载我们的应用代码（注意将 `{PATH/TO/A-AO-Demo/src}` 替换为实际的路径）：
 
 ```lua
 .load {PATH/TO/A-AO-Demo/src}/a_ao_demo.lua
 ```
 
-现在，可以在第一个进程（`__PROGRESS_ALICE__`）中，向这个 `__PROGRESS_BOB__` 进程发送消息进行测试了。
+现在，可以在第一个进程（`__PROCESS_ALICE__`）中，向这个 `__PROCESS_BOB__` 进程发送消息进行测试了。
 
 
 ### “文章”相关的测试
 
-在第一个进程（`__PROGRESS_ALICE__`）中，查看另外一个进程中的当前“文章的序号”：
+在第一个进程（`__PROCESS_ALICE__`）中，查看另外一个进程中的当前“文章的序号”：
 
 ```lua
 json = require("json")
@@ -487,7 +487,7 @@ Inbox[#Inbox]
 
 ### “库存”相关的测试
 
-在进程 `__PROGRESS_ALICE__` 中执行下面的命令，通过“添加库存项目条目”来更新库存项目（Inventory Item）：
+在进程 `__PROCESS_ALICE__` 中执行下面的命令，通过“添加库存项目条目”来更新库存项目（Inventory Item）：
 
 ```lua
 Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 100}) })
@@ -516,7 +516,7 @@ Inbox[#Inbox]
 
 我们先通过手动发送消息来逐步测试和观察 Saga 的执行过程。
 
-在 `__PROGRESS_ALICE__` 进程中，查看另外一个进程 `__PROGRESS_BOB__` 中的当前 Saga 实例的序号：
+在 `__PROCESS_ALICE__` 进程中，查看另外一个进程 `__PROCESS_BOB__` 中的当前 Saga 实例的序号：
 
 ```lua
 Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action = "GetSagaIdSequence" } })
@@ -592,46 +592,46 @@ Inbox[#Inbox]
 ### 测试 Saga 的跨进程执行
 
 在上面修改 `./src/inventory_service_config.lua` 时，
-我们已经将“库存服务”所依赖的两个组件 `inventory_item` 和 `in_out` 的 `target` 指向了 `__PROGRESS_ALICE__` 进程。
+我们已经将“库存服务”所依赖的两个组件 `inventory_item` 和 `in_out` 的 `target` 指向了 `__PROCESS_ALICE__` 进程。
 
 
-让我们在 `__PROGRESS_ALICE__` 进程中，先这样装载 `inventory_item` 组件
-（注意，虽然我们装载了和 `__PROGRESS_BOB__` 进程同样的代码，但其实接下来的测试只使用了其中和 `InventoryItem` 聚合相关的部分）：
+让我们在 `__PROCESS_ALICE__` 进程中，先这样装载 `inventory_item` 组件
+（注意，虽然我们装载了和 `__PROCESS_BOB__` 进程同样的代码，但其实接下来的测试只使用了其中和 `InventoryItem` 聚合相关的部分）：
 
 ```lua
 .load {PATH/TO/A-AO-Demo/src}/a_ao_demo.lua
 ```
 
-然后，同样在 `__PROGRESS_ALICE__` 进程中，再装载 `in_out_service` 的 mock 代码：
+然后，同样在 `__PROCESS_ALICE__` 进程中，再装载 `in_out_service` 的 mock 代码：
 
 ```lua
 .load {PATH/TO/A-AO-Demo/src}/in_out_service_mock.lua
 ```
 
-在 `__PROGRESS_ALICE__` 进程中，查看另外一个进程 `__PROGRESS_BOB__` 中的当前 Saga 实例的序号：
+在 `__PROCESS_ALICE__` 进程中，查看另外一个进程 `__PROCESS_BOB__` 中的当前 Saga 实例的序号：
 
 ```lua
 Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action = "GetSagaIdSequence" } })
 ```
 
-在 `__PROGRESS_ALICE__` 进程中，给自己“新建一个库存项目”
-（注意替换占位符 `__PROGRESS_ALICE__` 为实际的进程 ID，比如 `DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q`）：
+在 `__PROCESS_ALICE__` 进程中，给自己“新建一个库存项目”
+（注意替换占位符 `__PROCESS_ALICE__` 为实际的进程 ID，比如 `DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q`）：
 
 ```lua
-Send({ Target = "__PROGRESS_ALICE__", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "y" }, movement_quantity = 100}) })
+Send({ Target = "__PROCESS_ALICE__", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "y" }, movement_quantity = 100}) })
 ```
 
-执行下面的命令，“启动”进程 `__PROGRESS_BOB__` 中的 `InventoryService` 的 `ProcessInventorySurplusOrShortage` 方法：
+执行下面的命令，“启动”进程 `__PROCESS_BOB__` 中的 `InventoryService` 的 `ProcessInventorySurplusOrShortage` 方法：
 
 ```lua
 Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "y", quantity = 119 }) })
 -- New Message From u37...zs4: Data = {"result":{"in_out_i...
 ```
 
-查看进程 `__PROGRESS_ALICE__` 中的库存项目：
+查看进程 `__PROCESS_ALICE__` 中的库存项目：
 
 ```lua
-Send({ Target = "__PROGRESS_ALICE__", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "y" }) })
+Send({ Target = "__PROCESS_ALICE__", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "y" }) })
 
 Inbox[#Inbox]
 ```
@@ -639,7 +639,7 @@ Inbox[#Inbox]
 你应该看到该库存项目的 `quantity` 已经更新（`Data = "{"result":{"quantity":119,"version":1...`）。
 
 
-再次查看进程 `__PROGRESS_BOB__` 中的当前 Saga 实例的序号：
+再次查看进程 `__PROCESS_BOB__` 中的当前 Saga 实例的序号：
 
 ```lua
 Send({ Target = "u37NjsXT8pVTm0CzOuEW1gogVFKtYy0UWIwxihoTzs4", Tags = { Action = "GetSagaIdSequence" } })
