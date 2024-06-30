@@ -394,6 +394,56 @@ So, is there an authentic Web3 low-code development platform that doesn't cut co
 
 I am immensely proud to announce that [dddappp](https://www.dddappp.org), developed by my team, is a genuine decentralized application low-code development platform. It is likely the only Web3 low-code development platform to date that employs a "model-driven" approach.
 
+---
+
+那么，dddappp 到底有何独特之处？它为什么可以做到其他平台（最少是暂时）没有做到的事情？
+
+关键是 dddappp 采用的建模范式。我们选择了 DDD 风格的领域模型。
+
+DDD 风格的领域模型是一个相对高层次抽象的 OO（面向对象）模型。
+自动化工具可以很容易地将这样的高层次的领域模型映射到低层次的实现模型，如面向对象编程模型、关系数据模型等。
+
+
+So, what exactly sets dddappp apart? Why can it achieve what other platforms (at least for now) have not?
+
+The key lies in the modeling paradigm adopted by dddappp. We have opted for DDD-style domain models.
+
+DDD-style domain models are object-oriented (OO) models at a relatively high level of abstraction.
+Automated tools can readily map such high-level domain models to lower-level implementation models, such as object-oriented programming models, relational data models, and so on.
+
+---
+
+什么是“高层次抽象”？
+这么说吧，它尽可能多地帮助你表述你对领域的认知“是什么”，而不是技术细节上解决问题要“怎么做”。
+
+
+What is "high-level abstraction"?
+Put it this way, it assist you in articulating the "what" of your domain knowledge as much as possible, rather than the "how" of solving the problem in technical detail.
+
+
+---
+
+
+有经验的开发者马上能理解这是一件说起来容易做起来难的事情。
+我们能做到这一点，完全是因为机缘巧合，我们在这个领域积累了丰富的经验——我们从 2016 年就开始做这个事情了。
+我们甚至写了[一本书](https://item.jd.com/12834017.html)来向开发者们分享我们的经验。
+
+关键在于，我们发明了一种用于领域建模的极具表现力的 DSL，名为 DDDML（“领域驱动设计建模语言”英文的首字母缩写）。
+使用它，不仅可以准确地描述领域知识，还可以轻松地将这些模型映射到软件实现代码中。
+
+对了，与其他 "竞争对手 "相比，我们的 DSL 更贴近问题领域和自然语言，我们相信这使得它能够与人工智能（AI）完美结合。
+
+
+Experienced developers will immediately understand that this is easier said than done.
+We have been able to achieve this because, by a fortunate coincidence, we have amassed extensive experience in this field—we've been at it since 2016.
+We even wrote a [book](https://item.jd.com/12834017.html) to share our insights with other developers.
+
+The key lies in the expressive domain modeling DSL we've invented, named DDDML (Domain-Driven Design Modeling Language).
+With it, you can not only precisely describe domain knowledge but also effortlessly map these models to software implementation code.
+
+Moreover, compared to other "competitors", our DSL is closer to the problem domain and natural language, which we believe allows for seamless integration with artificial intelligence.
+
+
 
 
 ---
@@ -404,7 +454,7 @@ I am immensely proud to announce that [dddappp](https://www.dddappp.org), develo
 那么，dddappp 采用的技术方案能真正帮助到 AO 生态的开发者吗？
 请看我们最近完成的一个[基于 AO 的概念验证](https://github.com/dddappp/A-AO-Demo)。
 
-我相信，大多数经验丰富的应用开发者都会认同这个 PoC 的说服力：模型驱动的低代码方式确实能解决开发者的“痛点”。我们已经一次又一次地证明了这一点。
+我相信，大多数经验丰富的应用开发者都会认同这个 PoC 的说服力：模型驱动的低代码方式确实能解决开发者的“痛点”。我们之前已经一次又一次地证明了这一点。
 
 我们利用 DSL 解决了 Move（一种静态智能合约语言）缺乏“接口”抽象的限制，帮助开发者轻松实现“依赖注入”，
 详情请见[此示例](https://github.com/dddappp/sui-interface-demo)。
@@ -426,6 +476,7 @@ see [this example]((https://github.com/dddappp/sui-interface-demo)).
 
 We can split Move contracts into multiple packages (or "projects") with simple declarations, as shown in [this example](https://github.com/wubuku/aptos-constantinople). 
 It's important to note that most Sui public chains have size limits for each package released.
+
 
 ---
 
@@ -480,13 +531,24 @@ AppCU stands for Application-specific Compute Unit here.
 An analogy with Appchain ([Application-specific blockchain](https://www.coinbase.com/learn/crypto-glossary/what-is-an-application-specific-blockchain-appchain)) may clarify this concept.
 
 
-
 ---
 
-~~我们可以建立一个低代码开发平台，帮助开发人员做到这一点。~~
+从零开始构建一个 AppCU 对大多数开发者来说可能并不容易，构建一个 Appchain 也同样如此。因此，在这种情况下，一个得心应手的工具是必不可少的。
 
-~~We could establish a low-code development platform to facilitate developers in achieving this transition.~~
+我想，不必再强调 [Cosmos SDK](https://docs.cosmos.network)（用于构建 Appchain 的工具）在 [Cosmos](https://cosmos.network) 生态发展中所发挥的重要作用了吧？
 
-~~低代码工具，最少我们自信 dddappp，可以帮你做到这一点。~~
+那些尝试过 Cosmos SDK 的开发者，一定会对这个工具的便利性和强大功能印象深刻。如果 Cosmos SDK 能够做到，那么 AO 生态的开发者社区也没有理由做不到。
 
-~~Low-code tools, and dddappp in particular, we believe, can offer you this capability.~~
+Cosmos SDK 确实是一个“高效率”工具，但严格来说，它并不是一个低代码平台。我们相信低代码平台在提升开发效率方面有着更大的潜力。
+
+
+Building an AppCU from scratch can be a challenging task for most developers, and the same goes for constructing an Appchain. Therefore, having the right tools at hand is indispensable in such endeavors.
+
+I suppose there's no need to reiterate the pivotal role that the [Cosmos SDK](https://docs.cosmos.network) (the tool for building Appchains) has played in the growth of the [Cosmos](https://cosmos.network) ecosystem, is there?
+
+Developers who have experimented with the Cosmos SDK must have been struck by its convenience and power. If the Cosmos SDK can achieve this, then there's no reason the AO ecosystem's developer community can't do the same.
+
+Indeed, the Cosmos SDK is a "high-efficiency" tool, but strictly speaking, it is not a low-code platform. We believe that low-code platforms hold even greater potential for enhancing development efficiency.
+
+
+
