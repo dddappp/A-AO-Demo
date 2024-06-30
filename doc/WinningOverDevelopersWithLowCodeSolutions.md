@@ -1,7 +1,7 @@
 
 # 也许是 AO 生态的胜利之匙：以低代码赢得开发者青睐
 
-# Perhaps the Key to Victory for the AO Ecosystem: Winning Over Developers with Low-Code Solutions
+# Perhaps the Key to Victory for the AO Ecosystem: Winning Over Developers with Low-code Solutions
 
 
 [rough-draft]
@@ -52,17 +52,18 @@ AO stands for Actor Oriented. As the name suggests, this implies that decentrali
 
 事实上，AO 并不是最早将 Actor 模型用于区块链（或者说“去中心化基础设施”）的。
 
-In fact, AO is not the first to apply actor model to blockchain (or "decentralized infrastructure").
-
 比如，[TON](https://docs.ton.org/learn/overviews/ton-blockchain) 的智能合约就是使用 Actor 模型构建的。
-
-For example, smart contracts on [TON](https://docs.ton.org/learn/overviews/ton-blockchain) are built using the Actor model.
 
 说到 TON，我个人觉得它和 AO 在某些方面颇有相似之处。
 
-Speaking of TON, I personally find it quite similar to AO in some ways.
-
 对于尚未深入了解 Web3 的 Web2 开发者来说，想要迅速理解 AO 或 TON 相对其他“单体区块链”的最大特色，一个方便的抓手是：把运行在它们之上的智能合约（链上程序）想成是“[微服务](https://en.wikipedia.org/wiki/Microservices)”。而 AO 或 TON 是支持这些微服务运行的基础设施，比如 Kafka、Kubernetes 等。
+
+
+In fact, AO is not the first to apply actor model to blockchain (or "decentralized infrastructure").
+
+For example, smart contracts on [TON](https://docs.ton.org/learn/overviews/ton-blockchain) are built using the Actor model.
+
+Speaking of TON, I personally find it quite similar to AO in some ways.
 
 For Web2 developers who have not yet delved deeply into Web3, a convenient way to quickly grasp the most distinctive features of AO or TON, compared to other monolithic blockchains, is to think of the smart contracts (on-chain programs) running on them as [microservices](https://en.wikipedia.org/wiki/Microservices). AO or TON is the infrastructures that support these microservices, such as Kafka, Kubernetes, and so on.
 
@@ -198,16 +199,22 @@ Incidentally, decomposing an application into multiple microservices is akin to 
 ---
 
 
-回到微服务的拆分问题。为了更好地践行这门艺术，我们需要掌握一些思维工具的使用。DDD 的 “聚合（Aggregate）”就是这样一件你必须拥有的“大杀器”。
+回到微服务的拆分问题。为了更好地践行这门艺术，我们需要掌握一些思维工具的使用。
+DDD（[领域驱动设计](https://en.wikipedia.org/wiki/Domain-driven_design)）的 “聚合（Aggregate）”就是这样一件你必须拥有的“大杀器”。
+我的意思是，它能帮助你摧毁软件设计中的“核心复杂性”。
 
-我认为聚合是 DDD 在战术层面最为重要的一个概念。它是 DDD 可以在战术设计上应对“软件核心复杂性”的关键。
+
+Returning to the subject of microservice decomposition, to truly master this art, it's crucial to wield certain mental tools adeptly.
+The "Aggregate" concept in DDD ([Domain-Driven Design](https://en.wikipedia.org/wiki/Domain-driven_design)) is akin to a WMD (Weapon of Mass Destruction)—an indispensable weapon in your arsenal.
+I mean, it helps you destroy "core complexity" in software design.
+
+---
+
+我认为聚合是 DDD 在战术层面最为重要的一个概念。
 
 什么是聚合？聚合在对象之间，特别是实体与实体之间划出边界。一个聚合一定包含且仅包含一个*聚合根*实体，以及可能包含不定数量的*聚合内部实体*（或者叫*非聚合根实体*）。
 
-
-Returning to the subject of microservice decomposition, to truly master this art, it's crucial to wield certain mental tools adeptly. In DDD, the "Aggregate" concept is comparable to a WMD (weapon of mass destruction)—an essential tool in your armory.
-
-I regard the Aggregate as one of the most significant concepts at the tactical level in DDD. It's key to tackling "core software complexity" within its tactical design framework.
+I regard the Aggregate as one of the most significant concepts at the tactical level in DDD.
 
 What is an Aggregate? Aggregates establish boundaries among objects, especially between entities. An Aggregate is characterized by a single "Aggregate Root" entity, along with a potentially variable number of "Intra-Aggregate Entities" (or "Non-Aggregate Root Entities").
 
@@ -229,11 +236,6 @@ The most straightforward method is to develop each aggregate as an individual mi
 However, even if you are adept in your craft, there's no guarantee of getting it right on the first try.
 At such times, a tool that enables you to swiftly validate your modeling results—and if necessary, start over—is incredibly precious.
 
---
-
-~~低代码工具，最少我们自信 dddappp，可以帮你做到这一点。~~
-
-~~Low-code tools, and dddappp in particular, we believe, can offer you this capability.~~
 
 ---
 
@@ -266,48 +268,162 @@ However, Lua is not the preferred language for developing large-scale internet a
 
 Some might contend that all these languages can be compiled into WASM bytecode and executed within a WASM virtual machine. Yet, in reality, employing WASM as a backend runtime environment for internet applications is not a prevalent choice at present, despite WASM's strong performance in web frontend development. It's important to note that smart contracts (on-chain programs) represent the "new backend" in the Web3 era.
 
+
+
+
+
 ---
 
 我们都知道，公链之争，其实是争夺应用开发者的战争。
-那么 AO 要如何赢得开发者呢？
 
-We all understand that the competition among public blockchains is essentially a battle to win over application developers.
-So how does AO win over developers?
+我们之前已经讨论了采用微服务架构（或者说 Actor 模型）的优势，以及它为应用开发带来的复杂性。有些复杂性是不可避免的。
+
+比如，即使在工程化更成熟的 Web2 环境中，基于消息通信来实现“最终一致性”对于许多开发者而言已经是不小的挑战。
+在新生的 AO 平台上开发 Dapp，这个挑战似乎还要更加明显——当然这是完全可以理解的。
+[这个链接](https://github.com/dddappp/A-AO-Demo?tab=readme-ov-file#an-ao-dapp-development-demo-with-a-low-code-approach)文章的开篇就展示了一个例子。
+
+那么，在这种情况下 AO 要如何赢得开发者？
+
+当然是继续向已经获得“大规模采用”的 Web2 学习。这不仅包括学习其基础设施，还包括开发方法论、开发工具和软件工程实践等各个方面。
+
+
+We all understand that the competition among public blockchains is essentially a battle for the hearts and minds of application developers.
+
+We have previously discussed the benefits of adopting a microservices architecture, or the Actor model, and the inherent complexities it introduces to application development. Some complexities are simply unavoidable.
+
+Even within the more mature engineering landscape of Web2, implementing "eventual consistency" through messaging poses a significant challenge for many developers. 
+This challenge seems even more daunting when developing Dapps on the nascent AO platform—understandably so.
+The opening of [this linked article](https://github.com/dddappp/A-AO-Demo?tab=readme-ov-file#an-ao-dapp-development-demo-with-a-low-code-approach) provides a case in point.
+
+So, how does AO win over developers in this context?
+
+The answer lies in continuing to learn from Web2, which has already achieved mass adoption. This includes not only its infrastructure but also its development methodologies, tools, and software engineering practices.
 
 ---
 
-即使在工程化更成熟的 Web2 环境中，基于消息通信来实现“最终一致性”，对于许多开发者而言都是不小的挑战。在新生的 AO 平台上开发 Dapp，这个挑战似乎还要更加凸显一些。[这个链接](https://github.com/dddappp/A-AO-Demo?tab=readme-ov-file#an-ao-dapp-development-demo-with-a-low-code-approach)就展示了一个例子。
+低代码开发平台绝对是 Web3 领域值得大力投入的一个方向。
 
-Even within the more mature engineering landscape of Web2, implementing "eventual consistency" through message communication poses a significant challenge for numerous developers. This hurdle appears to be even more pronounced when developing Dapps on the emerging AO platform. The following [link](https://github.com/dddappp/A-AO-Demo?tab=readme-ov-file#an-ao-dapp-development-demo-with-a-low-code-approach) provides an illustrative example.
+我首先想要澄清一下 Low-Code（低代码）和 No-Code（无代码）的区别——当然，这只是我的个人看法：
+
+* 低代码是针对专业开发人员的。
+    业界对低代码平台应具备的核心功能已达成共识（事实上的标准）。
+    底线是它们必须采用 "模型驱动 "的方法。
+
+* 无代码指的是一大类面向 "最终用户 "的工具。
+    对于什么是 No-code 业界没有统一标准。
+    它们允许用户创建简单的应用程序，如产品广告页、在线问卷调查、个人博客等。
+    只要某项工作，以前大家认为需要开发人员才能完成，现在借助某个工具的帮助，可以由普通用户完成了，这个工具就会被称之为 No-code。
+
+
+Low-code development platforms are undoubtedly an area where Web3 should invest heavily.
+
+First, I'd like to clarify the difference between Low-code and No-code—of course, this is just my personal opinion:
+
+* Low-code is intended for professional developers.
+    There is a consensus  (de facto standard)  in the industry on what the core features of a Low-Code platform should have.
+    At a minimum, they must adopt a "model-driven" approach.
+
+* No-code refers to a large category of tools for "end-users".
+    There is no unified standard for what is considered No-code.
+    They allow users to create simple "applications" such as product advertisement pages, online questionnaires, personal blogs, etc.
+    Whenever a task, which was previously thought to require a developer, can now be done by a regular user with the help of a tool, that tool will be called No-code.
+
 
 ---
 
-那么，怎么办呢？当然是向已经获得“大规模采用”的 Web2 学习。学习它的基础设施、开发工具、工程实践，凡此种种。
+那么，我所谈论的低代码平台的“事实上的标准”是什么呢？你可以参考[这里](https://www.dddappp.org/#what-is-a-true-low-code-development-platform)的阐述。
 
-So, what's the next step? Naturally, it's to learn from Web2, which has already seen mass adoption. This includes understanding its infrastructure, development tools, engineering practices, and the like.
+你可能听说过“表单驱动”的低代码平台或者“表格驱动”的低代码平台，但在这里，我特指的是“模型驱动”的低代码平台。你可以将我的描述理解为对“低代码平台”概念的狭义解释。
+
+
+So, what do I refer to as the "de facto standard" for low-code platforms? You can refer to [this detailed explanation](https://www.dddappp.org/#what-is-a-true-low-code-development-platform) for more information.
+
+You might have heard of "form-driven" or "table-driven" low-code platforms, but here, I am specifically referring to "model-driven" low-code platforms. You can consider my description as a narrow interpretation of the "low-code platform" concept.
+
+
+---
+
+
+传统应用的低代码开发平台已经进入了成熟的早期阶段。有人可能会说：“我似乎没有听说过‘模型驱动’的 Web3 低代码开发平台。”
+确实，这是一件相对罕见的事物。让我们来分析一下原因。
+
+首先，为什么传统的低代码平台没有进入 Web3 领域？我认为，主要是因为它们所采用的建模范式并不适用于 Web3。
+
+传统的企业平台使用 E-R 模型和/或关系模型。
+例如，[OutSystems](https://www.outsystems.com/) 同时使用 E-R 模型和关系模型；
+而有些平台则只采用其中一种。E-R 模型和关系模型在概念上是相似的。
+这些平台生成的代码可以在传统的企业软件基础设施（如 SQL 数据库）上运行。
+但它们很难在 Web3 基础设施如区块链上运行，因为区块链上的“去中心化账本”与 SQL 数据库差异太大。
+
+那么，现有的去中心化应用“低代码平台”表现如何呢？
+
+开发一个真正的低代码平台——尤其是采用模型驱动方法——并非易事。有些人可能会试图回避这项艰巨的工作。
+但是，专业低代码平台的核心功能具有其他解决方案无法比拟的独特价值。
+例如，“可配置的智能合约模板”可以帮助开发人员更快地复制“现成的代码”，但对于那些创新应用来说，这些模板并无太大用处。
+对于平台开发人员来说，用不同的语言（如 Solidity、Move 等）编写和维护一个适用于多个链的“智能合约模板”库也是一个巨大的挑战。
+此外，“智能合约”只是应用程序的链上部分，稍微大一些的去中心化应用程序通常还需要链下部分。
+
+
+Traditional low-code development platforms for conventional applications have entered the early stages of maturity. Some might say, "I haven't heard of a 'model-driven' Web3 low-code development platform."
+Indeed, such platforms are relatively rare. Let's delve into the reasons.
+
+
+Firstly, why haven't traditional low-code platforms penetrated the Web3 domain? I believe it's primarily because the modeling paradigms they utilize are not suitable for Web3.
+
+Traditional enterprise platforms employ E-R models and/or relational models.
+For example, [OutSystems](https://www.outsystems.com/) uses both E-R models and relational models; some platforms use only one of them. E-R modeling and relational modeling have similar concepts.
+The code generated by these platforms can operate on conventional enterprise software infrastructures, like SQL databases.
+However, they struggle to function on Web3 infrastructures such as blockchains, where "decentralized ledgers" differ fundamentally from SQL databases.
+
+
+So, how do the existing decentralized application "low-code platforms" perform?
+
+Developing an authentic low-code platform—particularly one that adopts a model-driven approach—is no simple feat. Some may attempt to shirk this arduous task.
+Yet, the core features of a professional low-code platform offer unique values unmatched by other solutions.
+For instance, "configurable smart contract templates" can expedite developers' ability to replicate "ready-made code," but they are of little use for innovative applications.
+For platform developers, composing and maintaining a library of "smart contract templates" in various languages (such as Solidity, Move, etc.) suitable for multiple chains presents a significant challenge. 
+Additionally, the "smart contract" is only the on-chain part of an application; larger decentralized applications usually require an off-chain part.
+
 
 ---
 
 ## 是不是可以搞搞“AppCU”呢？
 
-AppCU，我指的是 Application-specific Compute Unit。
-用 Appchain（[Application-specific blockchain](https://www.coinbase.com/learn/crypto-glossary/what-is-an-application-specific-blockchain-appchain)）做个类比，有助于理解我的意思。
+## Why not "AppCU"?
+
 
 虽然 Lua 和 WASM 的组合很好，但是老实说，短时间内，我无法想象依靠它们能将那些用传统上以 Java、C#、PHP、Python 等语言编写的大型 Web2 互联网应用程序（如亚马逊、淘宝、eBay、Shopee 等）迁移到 AO 上。
 
-正如上面说过的，AO 是个数据协议。理论上，每个人都可以用自己喜欢的语言开发自己的“实现”，接入到 AO 网络，与其他单元进行交互和协作。
+正如之前所述，AO 是一个数据协议。理论上，任何人都可以使用自己喜欢的编程语言开发自己的“实现”，并接入 AO 网络，与其他单元进行交互和协作。
 
-我们可以建立一个低代码开发平台，帮助开发人员做到这一点。
+在 AO 网络中，应用的业务逻辑在计算单元（Compute Units）中执行。
+因此，对于应用开发者而言，他们最希望看到的是计算单元在支持的开发栈方面更加多元化和包容。
+据我所知，AO 开发者社区已经在这个方向上努力，例如支持在 AO 上运行 EVM 智能合约等。
+
+然而，我认为这个问题也许可以从另一个方向取得突破。我相信 AppCU 是一个好主意。
+AppCU，我指的是 Application-specific Compute Unit。
+用 Appchain（[Application-specific blockchain](https://www.coinbase.com/learn/crypto-glossary/what-is-an-application-specific-blockchain-appchain)）做个类比，有助于理解我的意思。
 
 
-## Why not "AppCU"?
-
-AppCU stands for Application-specific Compute Unit here.
-An analogy with Appchain ([Application-specific blockchain](https://www.coinbase.com/learn/crypto-glossary/what-is-an-application-specific-blockchain-appchain)) may clarify this concept.
 
 Although the combination of Lua and WASM is promising, frankly, it's hard to envision migrating large-scale Web2 internet applications—like Amazon, Taobao, eBay, Shopee—traditionally written in languages such as Java, C#, PHP, Python, etc., to AO in the short term.
 
 As previously mentioned, AO is a data protocol. In theory, anyone can develop their own implementation using their preferred programming language to integrate with the AO network, interacting and collaborating with other units.
+
+
+Within the AO network, the business logic of applications is executed in Compute Units.
+Therefore, for application developers, the most desirable aspect is likely the diversity and inclusiveness of the supported development stacks in Compute Units.
+I've heard that the AO developer community is already working in this direction, with things like support for running EVM smart contracts on AO.
+
+However, I think there might be another direction for a breakthrough with this issue. I believe AppCU is a good idea.
+AppCU stands for Application-specific Compute Unit here.
+An analogy with Appchain ([Application-specific blockchain](https://www.coinbase.com/learn/crypto-glossary/what-is-an-application-specific-blockchain-appchain)) may clarify this concept.
+
+
+
+---
+
+我们可以建立一个低代码开发平台，帮助开发人员做到这一点。
 
 We could establish a low-code development platform to facilitate developers in achieving this transition.
 
@@ -322,3 +438,8 @@ The DSL we employ inherently supports the definition of aggregates; this key ter
 ---
 
 
+---
+
+~~低代码工具，最少我们自信 dddappp，可以帮你做到这一点。~~
+
+~~Low-code tools, and dddappp in particular, we believe, can offer you this capability.~~
