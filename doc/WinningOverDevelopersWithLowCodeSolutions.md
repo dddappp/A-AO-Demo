@@ -384,6 +384,66 @@ For instance, "configurable smart contract templates" can expedite developers' a
 For platform developers, composing and maintaining a library of "smart contract templates" in various languages (such as Solidity, Move, etc.) suitable for multiple chains presents a significant challenge. 
 Additionally, the "smart contract" is only the on-chain part of an application; larger decentralized applications usually require an off-chain part.
 
+---
+
+那么，是否存在一个不投机取巧、勇于直面挑战的“真正的”——采用“模型驱动”方法的——Web3 低代码开发平台？
+
+我非常自豪地宣布，我所在的团队开发的 [dddappp](https://www.dddappp.org) 是一个真正的去中心化应用低代码开发平台。它很可能是目前唯一一个采用“模型驱动”方法的 Web3 低代码开发平台。
+
+So, is there an authentic Web3 low-code development platform that doesn't cut corners and bravely faces challenges head-on—a platform that truly adopts a "model-driven" approach?
+
+I am immensely proud to announce that [dddappp](https://www.dddappp.org), developed by my team, is a genuine decentralized application low-code development platform. It is likely the only Web3 low-code development platform to date that employs a "model-driven" approach.
+
+
+
+---
+
+
+还记得我之前提到的 DDD 中的“聚合”概念吗？我们使用的 DSL 从一开始就支持定义聚合，打开任何一个 DDDML 模型文件，你几乎都能看到 `aggregates` 这个关键字。
+
+那么，dddappp 采用的技术方案能真正帮助到 AO 生态的开发者吗？
+请看我们最近完成的一个[基于 AO 的概念验证](https://github.com/dddappp/A-AO-Demo)。
+
+我相信，大多数经验丰富的应用开发者都会认同这个 PoC 的说服力：模型驱动的低代码方式确实能解决开发者的“痛点”。我们已经一次又一次地证明了这一点。
+
+我们利用 DSL 解决了 Move（一种静态智能合约语言）缺乏“接口”抽象的限制，帮助开发者轻松实现“依赖注入”，
+详情请见[此示例](https://github.com/dddappp/sui-interface-demo)。
+
+我们可以通过简单的声明将 Move 合约拆分成多个包（即“项目”），见[此示例](https://github.com/wubuku/aptos-constantinople)。
+需要注意的是，大多数 Move 公链对每次发布的包的大小都有限制。
+
+
+
+Remember the "Aggregate" concept from DDD we mentioned earlier? The DSL we use inherently supports defining aggregates, and the keyword `aggregates` is evident in virtually any DDDML model file you examine.
+
+So, can the technical solution adopted by dddappp genuinely assist developers in the AO ecosystem?
+Take a look at our recent [AO-based Proof of Concept](https://github.com/dddappp/A-AO-Demo).
+
+I believe that most experienced application developers will agree that this PoC is very convincing: the model-driven low-code approach can indeed solve the "pain points" of developers. As we have repeatedly proven.
+
+We have used DSL to overcome the lack of "interface" abstraction in Move, a static smart contract language, facilitating easy "Dependency Injection" for developers;
+see [this example]((https://github.com/dddappp/sui-interface-demo)).
+
+We can split Move contracts into multiple packages (or "projects") with simple declarations, as shown in [this example](https://github.com/wubuku/aptos-constantinople). 
+It's important to note that most Sui public chains have size limits for each package released.
+
+---
+
+如果你认为我们分享的只是一些“示例”，我们可能只是在制作一些玩具，那你就大错特错了。
+
+我们深度参与了一些严肃的商业应用的开发（主要集中在 Move 生态）过程，在这个过程中，我们几乎就是一直在“吃自己的狗粮”。
+我们可以非常自信地说，目前，至少在后端（我指的是链下合约和链下查询服务，后者有时候被称为 indexer）开发领域，我们兑现了 10 倍开发效率的承诺。
+
+如果你联系我们，我们可以向你展示更多生产级的案例。
+
+
+If you think that what we've shared are merely "examples," and we might just be creating toys, then you are greatly mistaken.
+
+We have been deeply involved in the development of some serious commercial applications (primarily within the Move ecosystem), where we have consistently been "eating our own dog food."
+We can say with confidence that, at present, we have fulfilled our promise of a tenfold increase in development efficiency, especially in the backend area (referring to off-chain contracts and off-chain query services, sometimes known as an "indexer").
+
+If you reach out to us, we can show you more production-level cases.
+
 
 ---
 
@@ -423,22 +483,9 @@ An analogy with Appchain ([Application-specific blockchain](https://www.coinbase
 
 ---
 
-我们可以建立一个低代码开发平台，帮助开发人员做到这一点。
+~~我们可以建立一个低代码开发平台，帮助开发人员做到这一点。~~
 
-We could establish a low-code development platform to facilitate developers in achieving this transition.
-
-
-
----
-
-我们使用的 DSL 从一开始就支持定义聚合，几乎是随便打开一个 DDDML 模型文件，你都可以看到这个关键字（aggregates）。
-
-The DSL we employ inherently supports the definition of aggregates; this key term (aggregates) is evident in virtually any DDDML model file you examine.
-
----
-
-
----
+~~We could establish a low-code development platform to facilitate developers in achieving this transition.~~
 
 ~~低代码工具，最少我们自信 dddappp，可以帮你做到这一点。~~
 
