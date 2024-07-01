@@ -67,6 +67,14 @@ Speaking of TON, I personally find it quite similar to AO in some ways.
 
 For Web2 developers who have not yet delved deeply into Web3, a convenient way to quickly grasp the most distinctive features of AO or TON, compared to other monolithic blockchains, is to think of the smart contracts (on-chain programs) running on them as [microservices](https://en.wikipedia.org/wiki/Microservices). AO or TON is the infrastructures that support these microservices, such as Kafka, Kubernetes, and so on.
 
+---
+
+我个人非常期待非单体区块链的发展。下面我想从一个应用开发者的视角，谈谈我对 AO 的看法，可能很多观点还不太成熟。
+但作为一个 20 多年来主要专注于应用开发的一名资深 [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) boy，也许部分应用开发者会心有戚戚焉，那就足矣。
+
+
+Personally, I'm looking forward to the development of non-monolithic blockchains. Below I would like to talk about my views on AO from the perspective of an application developer, and many of my views may be immature.
+But as a senior [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) boy who has been mainly focusing on application development for more than 20 years, maybe some application developers will share my feelings, and then I will be very satisfied.
 
 ---
 
@@ -444,17 +452,82 @@ With it, you can not only precisely describe domain knowledge but also effortles
 Moreover, compared to other "competitors", our DSL is closer to the problem domain and natural language, which we believe allows for seamless integration with artificial intelligence.
 
 
+---
+
+
+我们自己一直把 DDDML 称为“DDD 原生 DSL”。
+
+还记得我之前提到的来自 DDD 的“聚合”概念吗？
+我们使用的 DSL 从一开始就支持定义聚合，打开任何一个 DDDML 模型文件，你几乎都能看到 `aggregates` 这个关键字。
+
+
+We have always referred to DDDML as the "native DSL for DDD".
+
+Remember the "Aggregate" concept from DDD we mentioned earlier? The DSL we use inherently supports defining aggregates, and you can find the keyword `aggregates` in almost any DDDML model file you open.
 
 
 ---
 
 
-还记得我之前提到的 DDD 中的“聚合”概念吗？我们使用的 DSL 从一开始就支持定义聚合，打开任何一个 DDDML 模型文件，你几乎都能看到 `aggregates` 这个关键字。
+如果你熟悉 DDD 的相关概念，会很容易看明白 DDDML 所描述的模型；
+如果你不熟悉，那也不要紧，DDD 既有经典著作的系统性的论述，更有拥趸们与时俱进的实践经验，
+只要你愿意“拿来”，它们几乎是唾手可得。
+
+If you're familiar with DDD concepts, you'll easily grasp the models described by DDDML;
+if you're not, no worries—DDD is well-documented both in classic literature and through the evolving practical experiences of its advocates.
+As long as you're willing to seek them out, they are readily accessible.
+
+
+---
+
+
+DDD 方法论的强大底蕴常常给我们带来惊喜。
+我们在开发传统应用（其后端主要由 Java 或 C# 编写）时，就一直在使用“领域模型驱动”的方法，极大提升了开发效率。
+当我们进入 Web3 的新天地后，我们发现，不用给 DDDML 增加太多的东西，就能够使用它来驱动去中心化应用的开发。
+
+
+The profound foundation of the DDD methodology frequently brings us delightful surprises.
+In developing traditional applications (whose backends are primarily written in Java or C#), we have consistently employed a "domain model-driven" approach, which has greatly enhanced our development efficiency.
+As we stepped into the new realm of Web3, we found that without needing to make many additions to DDDML, it could be effectively used to drive the development of decentralized applications.
+
+
+
+---
 
 那么，dddappp 采用的技术方案能真正帮助到 AO 生态的开发者吗？
 请看我们最近完成的一个[基于 AO 的概念验证](https://github.com/dddappp/A-AO-Demo)。
 
-我相信，大多数经验丰富的应用开发者都会认同这个 PoC 的说服力：模型驱动的低代码方式确实能解决开发者的“痛点”。我们之前已经一次又一次地证明了这一点。
+
+在这篇文章的前半部分，我们谈到了使用 AO 开发应用面临的一些挑战。
+在这个演示里面，我们相信有些问题我们已经提供了非常有吸引力的解决方案。
+我们演示了如何使用 DSL 定义聚合、值对象、服务（这些都是 DDD 的概念），展示了生成代码的大致样貌。你可以想象一下，如果不用工具，开发人员真的愿意手写这些代码？
+特别是，我们还演示了生成的代码如何使用 [SAGA](https://microservices.io/patterns/data/saga.html) 模式优雅地实现“最终一致性”的处理。
+
+我们把这个演示称为 PoC，但是实际上我认为它已经超越了 PoC。因为它现在就可以马上帮助到 AO 生态的开发者。
+AO 生态的开发者现在就可以使用它来理清应用的设计思路、生成代码（这些代码最少可以作为实现参考）、提升效率。
+从某种程度上来说，这个工具你已经可以说它是一个 MVP（最小可行产品）。
+因为 MVP 的定义是，只要能够帮助到最终用户，对最终用户有价值，那就可以称之为 MVP。毕竟，开发者就是低代码工具的最终用户。
+
+
+So, can the technical solution adopted by dddappp genuinely assist developers in the AO ecosystem?
+Take a look at our recent [AO-based Proof of Concept](https://github.com/dddappp/A-AO-Demo).
+
+In the first half of this article, we discussed some of the challenges faced when developing applications with AO.
+In this demonstration, we believe we have provided very compelling solutions to certain issues.
+We showed how to use DSL to define aggregates, value objects, and services (all DDD concepts), and what the generated code generally looks like. Can you imagine, without tools, would developers really be willing to manually write this code?
+Especially, we also demonstrated how the generated code can elegantly handle "eventual consistency" with the [SAGA](https://microservices.io/patterns/data/saga.html) pattern.
+
+We refer to this demonstration as a PoC, but in reality, I think it has surpassed just being a PoC. It is already capable of immediately assisting developers within the AO ecosystem.
+Developers in the AO ecosystem can now use it to clarify their application design ideas, generate code (which at the very least can serve as a reference for implementation), and enhance efficiency.
+To some extent, you could already consider this tool as an MVP (Minimum Viable Product).
+Because an MVP is defined as something that provides value to the end-users, and as long as it helps them, it can be considered an MVP. After all, developers are the end-users of low-code tools.
+
+---
+
+
+我相信，大多数经验丰富的应用开发者都会认同这个 PoC 的说服力：模型驱动的低代码方式确实能解决去中心化应用开发者的“痛点”。
+
+我们之前已经一次又一次地证明了这一点。
 
 我们利用 DSL 解决了 Move（一种静态智能合约语言）缺乏“接口”抽象的限制，帮助开发者轻松实现“依赖注入”，
 详情请见[此示例](https://github.com/dddappp/sui-interface-demo)。
@@ -464,19 +537,13 @@ Moreover, compared to other "competitors", our DSL is closer to the problem doma
 
 
 
-Remember the "Aggregate" concept from DDD we mentioned earlier? The DSL we use inherently supports defining aggregates, and the keyword `aggregates` is evident in virtually any DDDML model file you examine.
-
-So, can the technical solution adopted by dddappp genuinely assist developers in the AO ecosystem?
-Take a look at our recent [AO-based Proof of Concept](https://github.com/dddappp/A-AO-Demo).
-
-I believe that most experienced application developers will agree that this PoC is very convincing: the model-driven low-code approach can indeed solve the "pain points" of developers. As we have repeatedly proven.
+I believe that most experienced application developers will agree that this PoC is very convincing: the model-driven low-code approach can indeed solve the "pain points" of dapp developers. As we have repeatedly proven.
 
 We have used DSL to overcome the lack of "interface" abstraction in Move, a static smart contract language, facilitating easy "Dependency Injection" for developers;
-see [this example]((https://github.com/dddappp/sui-interface-demo)).
+see [this example](https://github.com/dddappp/sui-interface-demo).
 
 We can split Move contracts into multiple packages (or "projects") with simple declarations, as shown in [this example](https://github.com/wubuku/aptos-constantinople). 
 It's important to note that most Sui public chains have size limits for each package released.
-
 
 ---
 
@@ -549,6 +616,9 @@ I suppose there's no need to reiterate the pivotal role that the [Cosmos SDK](ht
 Developers who have experimented with the Cosmos SDK must have been struck by its convenience and power. If the Cosmos SDK can achieve this, then there's no reason the AO ecosystem's developer community can't do the same.
 
 Indeed, the Cosmos SDK is a "high-efficiency" tool, but strictly speaking, it is not a low-code platform. We believe that low-code platforms hold even greater potential for enhancing development efficiency.
+
+
+---
 
 
 
