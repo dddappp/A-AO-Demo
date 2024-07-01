@@ -505,10 +505,11 @@ As we stepped into the new realm of Web3, we found that without needing to make 
 
 ---
 
+在这篇文章的前半部分，我们谈到了使用 AO 开发应用面临的一些挑战。
+
 那么，dddappp 采用的技术方案能真正帮助到 AO 生态的开发者吗？
 请看我们最近完成的一个[基于 AO 的概念验证](https://github.com/dddappp/A-AO-Demo)。
 
-在这篇文章的前半部分，我们谈到了使用 AO 开发应用面临的一些挑战。
 在这个演示里面，我们相信有些问题我们已经提供了非常有吸引力的解决方案。
 我们演示了如何使用 DSL 定义聚合、值对象、服务（这些都是 DDD 的概念），展示了生成代码的大致样貌。你可以想象一下，如果不用工具，开发人员真的愿意手写这些代码？
 特别是，我们还演示了生成的代码如何使用 [SAGA](https://microservices.io/patterns/data/saga.html) 模式优雅地实现“最终一致性”的处理。
@@ -519,10 +520,11 @@ AO 生态的开发者现在就可以使用它来理清应用的设计思路、�
 因为 MVP 的定义是，只要能够帮助到最终用户，对最终用户有价值，那就可以称之为 MVP。毕竟，开发者就是低代码工具的最终用户。
 
 
+In the first half of this article, we discussed some of the challenges faced when developing applications with AO.
+
 So, can the technical solution adopted by dddappp genuinely assist developers in the AO ecosystem?
 Take a look at our recent [AO-based Proof of Concept](https://github.com/dddappp/A-AO-Demo).
 
-In the first half of this article, we discussed some of the challenges faced when developing applications with AO.
 In this demonstration, we believe we have provided very compelling solutions to certain issues.
 We showed how to use DSL to define aggregates, value objects, and services (all DDD concepts), and what the generated code generally looks like. Can you imagine, without tools, would developers really be willing to manually write this code?
 Especially, we also demonstrated how the generated code can elegantly handle "eventual consistency" with the [SAGA](https://microservices.io/patterns/data/saga.html) pattern.
