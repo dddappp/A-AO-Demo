@@ -1,7 +1,7 @@
 # Perhaps the Key to Victory for the AO Ecosystem: Winning Over Developers with Low-code Solutions
 
 
-English | [中文版](./WinningOverDevelopersWithLowCodeSolutions_zh.md)
+English | [中文版](./WinningOverDevelopersWithLowCodeSolutions_CN.md)
 
 
 What's holding back the mass adoption of Web3?
