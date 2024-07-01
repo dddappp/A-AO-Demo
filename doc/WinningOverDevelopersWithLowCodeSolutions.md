@@ -287,14 +287,18 @@ However, Lua is not the preferred language for developing large-scale internet a
 Some might contend that all these languages can be compiled into WASM bytecode and executed within a WASM virtual machine. Yet, in reality, employing WASM as a backend runtime environment for internet applications is not a prevalent choice at present, despite WASM's strong performance in web frontend development. It's important to note that smart contracts (on-chain programs) represent the "new backend" in the Web3 era.
 
 
-
-
+[上半部分]
 
 ---
 
+[下半部分]
+
+
 我们都知道，公链之争，其实是争夺应用开发者的战争。
 
-我们之前已经讨论了采用微服务架构（或者说 Actor 模型）的优势，以及它为应用开发带来的复杂性。有些复杂性是不可避免的。
+我们之前已经讨论了采用微服务架构（或者说 Actor 模型）的优势，以及它为应用开发带来的复杂性。有句话怎么说来着？
+
+> 复杂性不会消失，只会转移。
 
 比如，即使在工程化更成熟的 Web2 环境中，基于消息通信来实现“最终一致性”对于许多开发者而言已经是不小的挑战。
 在新生的 AO 平台上开发 Dapp，这个挑战似乎还要更加明显——当然这是完全可以理解的。
@@ -307,7 +311,9 @@ Some might contend that all these languages can be compiled into WASM bytecode a
 
 We all understand that the competition among public blockchains is essentially a battle for the hearts and minds of application developers.
 
-We have previously discussed the benefits of adopting a microservices architecture, or the Actor model, and the inherent complexities it introduces to application development. Some complexities are simply unavoidable.
+We have previously discussed the benefits of adopting a microservices architecture, or the Actor model, and the inherent complexities it introduces to application development. Some complexities are simply unavoidable. How does the saying go?
+
+> Complexity is not reduced, it is shifted.
 
 Even within the more mature engineering landscape of Web2, implementing "eventual consistency" through messaging poses a significant challenge for many developers. 
 This challenge seems even more daunting when developing Dapps on the nascent AO platform—understandably so.
@@ -319,7 +325,7 @@ The answer lies in continuing to learn from Web2, which has already achieved mas
 
 ---
 
-低代码开发平台绝对是 Web3 领域值得大力投入的一个方向。
+低代码开发平台绝对是 Web3 领域值得大力投入的一个方向。我的意思是，我们可以把应用开发的相当部分的“复杂性”转移给低代码平台。
 
 我首先想要澄清一下 Low-Code（低代码）和 No-Code（无代码）的区别——当然，这只是我的个人看法：
 
@@ -333,7 +339,7 @@ The answer lies in continuing to learn from Web2, which has already achieved mas
     只要某项工作，以前大家认为需要开发人员才能完成，现在借助某个工具的帮助，可以由普通用户完成了，这个工具就会被称之为 No-code。
 
 
-Low-code development platforms are undoubtedly an area where Web3 should invest heavily.
+Low-code development platforms are undoubtedly an area where Web3 should invest heavily. What I mean is that we can shift a significant portion of the "complexity" of application development to low-code platforms.
 
 First, I'd like to clarify the difference between Low-code and No-code—of course, this is just my personal opinion:
 
