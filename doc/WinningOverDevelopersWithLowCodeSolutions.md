@@ -1,6 +1,9 @@
 # Perhaps the Key to Victory for the AO Ecosystem: Winning Over Developers with Low-code Solutions
 
 
+English | [中文版](./WinningOverDevelopersWithLowCodeSolutions_zh.md)
+
+
 What's holding back the mass adoption of Web3?
 
 Simply put, there are too few decentralized applications (dapps) that are worth using.
