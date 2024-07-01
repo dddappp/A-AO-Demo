@@ -69,12 +69,18 @@ For Web2 developers who have not yet delved deeply into Web3, a convenient way t
 
 ---
 
-我个人非常期待非单体区块链的发展。下面我想从一个应用开发者的视角，谈谈我对 AO 的看法，可能很多观点还不太成熟。
-但作为一个 20 多年来主要专注于应用开发的一名资深 [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) boy，也许部分应用开发者会心有戚戚焉，那就足矣。
+
+作为一个 20 多年来主要专注于应用开发的一名资深 [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) boy，
+我个人非常乐见 TON、AO 这样的非单体区块链的出现，并对它们的发展充满期待。
+下面我想从一个应用开发者的视角，谈谈我对 AO 的看法，可能很多观点还不太成熟。
+也许部分应用开发者会心有戚戚焉，那就足矣。
 
 
-Personally, I'm looking forward to the development of non-monolithic blockchains. Below I would like to talk about my views on AO from the perspective of an application developer, and many of my views may be immature.
-But as a senior [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) boy who has been mainly focusing on application development for more than 20 years, maybe some application developers will share my feelings, and then I will be very satisfied.
+But as a seasoned [**CRUD**](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete)  boy who has been primarily focused on application development for over two decades,
+I am personally thrilled by the emergence of non-monolithic blockchains like TON and AO, and I am filled with anticipation for their development.
+From the perspective of an application developer, I'd like to share my thoughts on AO, acknowledging that many of my views may still be nascent.
+If some of my fellow application developers find resonance with these thoughts, that would be gratifying.
+
 
 ---
 
@@ -87,11 +93,10 @@ Is the integration of the Actor model into blockchain technology truly essential
 
 太多的架构师已经知道如何将 Web2 应用“搞大”：微服务架构（MSA）、事件驱动的架构（EDA）、消息通信机制、最终一致性模型、分片……这些东西，不管叫什么，总是与 Actor 模型共生共存的。其中的一些概念，甚至可以说只是一个事物的不同方面。在下面的行文中，我们不对“微服务”和 Actor 做区分，你可以认为它们是同义词。
 
-Numerous architects are already versed in making Web2 applications bigger and bigger through strategies such as Microservice Architecture (MSA), Event-Driven Architecture (EDA), messaging mechanisms, and the Eventual Consistency model, Sharding... These things, whatever they may be called, are always symbiotic with the Actor model.  Some of these concepts can even be described as just different aspects of one thing. In the ensuing discussion, we do not differentiate between "Microservice" and "Actor"; they may be regarded as synonymous.
-
----
-
 今日互联网的繁荣，离不开这些架构师的智慧。他们不断地探索、实践、总结，最终形成了一套完整的工程实践体系。
+
+
+Numerous architects are already versed in making Web2 applications bigger and bigger through strategies such as Microservice Architecture (MSA), Event-Driven Architecture (EDA), messaging mechanisms, and the Eventual Consistency model, Sharding... These things, whatever they may be called, are always symbiotic with the Actor model.  Some of these concepts can even be described as just different aspects of one thing. In the ensuing discussion, we do not differentiate between "Microservice" and "Actor"; they may be regarded as synonymous.
 
 The flourishing state of today's Internet owes much to the ingenuity of its architects. They have persistently explored, experimented, and reflected, culminating in the establishment of a comprehensive framework of engineering practices.
 
@@ -99,17 +104,13 @@ The flourishing state of today's Internet owes much to the ingenuity of its arch
 
 作为 Web3 基础设施，AO 做的很棒。
 最少，AO 作为（我眼中的）当前 Web3 领域的最佳去中心化消息代理，已经展现出巨大的潜力。
-
 我相信传统 Web2 应用的开发者由此可以马上理解其中的重大意义：
-
 倘若没有 [Kafka](https://kafka.apache.org) 或者类 Kafka 的消息代理可用，你能想象现在很多大型的互联网应用“程序要怎么写”吗？
 
 
 As a piece of Web3 infrastructure, AO has been outstanding.
 At the very least, AO has shown great potential as what I consider to be the best decentralized messaging agent in the Web3 space today.
-
 I believe that developers from the traditional Web2 space can immediately grasp the profound implications of this:
-
 Can you imagine how the programming of many of today's large-scale internet applications would be without the availability of [Kafka](https://kafka.apache.org) or Kafka-like message brokers?
 
 
@@ -118,6 +119,7 @@ Can you imagine how the programming of many of today's large-scale internet appl
 虽然 Actor 模型在很多方面具有理论上的优势，但是不管是 Actor 模型也好，微服务架构也好，在我看来，更多是开发者为了开发某些应用（特别是大型应用）所不得不承受之“恶”。
 
 Although the Actor model has theoretical advantages in many respects, whether it's the Actor model or Microservice Architecture (MSA), in my view, they often represent a necessary "evil" that developers must contend with when building certain applications, particularly large-scale ones.
+
 
 --------
 
@@ -141,6 +143,7 @@ Let's use a simple example to illustrate this point to the non-technical reader.
 If any step encounters an issue, such as step 3 where crediting Jane Doe's account fails for some reason, the entire operation would be rolled back, as if nothing had happened.
 By the way, when the program is written this way, we say that it adopts the Strong Consistency model.
 
+
 --------
 
 倘若这个世界计算机是个采用 MSA 的系统呢？那么，管理工商银行账户的那个微服务（或者说 Actor）与管理招商银行账户的那个微服务，几乎不太可能是同一个。我们先假设它们确实不是同一个，前者我们称为 Actor ICBC，后者我们称为 Actor CMB。此时，开发者可能需要这样编写转账的代码：
@@ -150,6 +153,7 @@ By the way, when the program is written this way, we say that it adopts the Stro
 3. Actor ICBC 收到消息，记录好：“张三向李四转账 100 元，已成功”。
 
 上面只是“一切都好”的过程。但是，如果某个步骤，比如说第二个步骤，“在李四的账户上增加 100 元”，出现了问题，怎么办？
+
 
 What if this World Computer were a system using a Microservice Architecture (MSA)? In that case, the microservice managing the ICBC accounts and the one managing the CMB accounts would almost certainly not be the same. Let's assume they are indeed different; the former is called Actor ICBC, and the latter is called Actor CMB. Under these circumstances, a developer might write the code for the transfer process as follows:
 
@@ -178,8 +182,13 @@ For this possible problem, developers need to write such processing logic:
 
 When the program is written in this way, we refer to it as adopting the Eventual Consistency model.
 
+
+---
+
+
 以上，非技术读者应该能直观感受到开发单体架构的应用与开发 MSA 应用之间的巨大差异了吧？
 要知道，上面所说的转账示例只是一个非常简单的应用而已，如果我们把它称之为应用，而不是功能的话。大型应用里面的功能往往比这样的例子要复杂的太多。
+
 
 With the above comparison, non-technical readers should be able to visualize the huge difference between developing monolithic architecture applications and developing MSA applications, right?
 It should be noted that the aforementioned transfer example is merely a very simple application, if we choose to call it an application rather than a feature.
@@ -221,6 +230,7 @@ I mean, it helps you destroy "core complexity" in software design.
 我认为聚合是 DDD 在战术层面最为重要的一个概念。
 
 什么是聚合？聚合在对象之间，特别是实体与实体之间划出边界。一个聚合一定包含且仅包含一个*聚合根*实体，以及可能包含不定数量的*聚合内部实体*（或者叫*非聚合根实体*）。
+
 
 I regard the Aggregate as one of the most significant concepts at the tactical level in DDD.
 
@@ -398,6 +408,7 @@ Additionally, the "smart contract" is only the on-chain part of an application; 
 
 我非常自豪地宣布，我所在的团队开发的 [dddappp](https://www.dddappp.org) 是一个真正的去中心化应用低代码开发平台。它很可能是目前唯一一个采用“模型驱动”方法的 Web3 低代码开发平台。
 
+
 So, is there an authentic Web3 low-code development platform that doesn't cut corners and bravely faces challenges head-on—a platform that truly adopts a "model-driven" approach?
 
 I am immensely proud to announce that [dddappp](https://www.dddappp.org), developed by my team, is a genuine decentralized application low-code development platform. It is likely the only Web3 low-code development platform to date that employs a "model-driven" approach.
@@ -497,7 +508,6 @@ As we stepped into the new realm of Web3, we found that without needing to make 
 那么，dddappp 采用的技术方案能真正帮助到 AO 生态的开发者吗？
 请看我们最近完成的一个[基于 AO 的概念验证](https://github.com/dddappp/A-AO-Demo)。
 
-
 在这篇文章的前半部分，我们谈到了使用 AO 开发应用面临的一些挑战。
 在这个演示里面，我们相信有些问题我们已经提供了非常有吸引力的解决方案。
 我们演示了如何使用 DSL 定义聚合、值对象、服务（这些都是 DDD 的概念），展示了生成代码的大致样貌。你可以想象一下，如果不用工具，开发人员真的愿意手写这些代码？
@@ -525,9 +535,17 @@ Because an MVP is defined as something that provides value to the end-users, and
 ---
 
 
-我相信，大多数经验丰富的应用开发者都会认同这个 PoC 的说服力：模型驱动的低代码方式确实能解决去中心化应用开发者的“痛点”。
+如果有经验的应用开发者仔细研究过这个 PoC，他们就完全有理由不再怀疑低代码方法在提升应用开发效率方面的巨大潜力。
+毕竟，我们在 AO 生态之外已经多次证明了这一点。
+即使不提我们在 Web2 时代使用相同方法开发过的复杂商业应用，单单观察我们在 Move 生态中的实践，也足以让人信服。
 
-我们之前已经一次又一次地证明了这一点。
+
+Experienced application developers who have thoroughly examined this PoC should no longer harbor any doubts about the immense potential of low-code approaches to enhance app development efficiency.
+After all, we have repeatedly validated this point beyond the AO ecosystem.
+Even if we set aside our history of developing complex commercial applications with the same methodology during the Web2 era, our current practices within the Move ecosystem are enough to convince anyone.
+
+---
+
 
 我们利用 DSL 解决了 Move（一种静态智能合约语言）缺乏“接口”抽象的限制，帮助开发者轻松实现“依赖注入”，
 详情请见[此示例](https://github.com/dddappp/sui-interface-demo)。
@@ -535,9 +553,6 @@ Because an MVP is defined as something that provides value to the end-users, and
 我们可以通过简单的声明将 Move 合约拆分成多个包（即“项目”），见[此示例](https://github.com/wubuku/aptos-constantinople)。
 需要注意的是，大多数 Move 公链对每次发布的包的大小都有限制。
 
-
-
-I believe that most experienced application developers will agree that this PoC is very convincing: the model-driven low-code approach can indeed solve the "pain points" of dapp developers. As we have repeatedly proven.
 
 We have used DSL to overcome the lack of "interface" abstraction in Move, a static smart contract language, facilitating easy "Dependency Injection" for developers;
 see [this example](https://github.com/dddappp/sui-interface-demo).
@@ -547,12 +562,11 @@ It's important to note that most Sui public chains have size limits for each pac
 
 ---
 
+
 如果你认为我们分享的只是一些“示例”，我们可能只是在制作一些玩具，那你就大错特错了。
 
 我们深度参与了一些严肃的商业应用的开发（主要集中在 Move 生态）过程，在这个过程中，我们几乎就是一直在“吃自己的狗粮”。
 我们可以非常自信地说，目前，至少在后端（我指的是链下合约和链下查询服务，后者有时候被称为 indexer）开发领域，我们兑现了 10 倍开发效率的承诺。
-
-如果你联系我们，我们可以向你展示更多生产级的案例。
 
 
 If you think that what we've shared are merely "examples," and we might just be creating toys, then you are greatly mistaken.
@@ -560,10 +574,50 @@ If you think that what we've shared are merely "examples," and we might just be 
 We have been deeply involved in the development of some serious commercial applications (primarily within the Move ecosystem), where we have consistently been "eating our own dog food."
 We can say with confidence that, at present, we have fulfilled our promise of a tenfold increase in development efficiency, especially in the backend area (referring to off-chain contracts and off-chain query services, sometimes known as an "indexer").
 
-If you reach out to us, we can show you more production-level cases.
-
 
 ---
+
+
+我们甚至基于“低代码”开发“无代码”应用（再啰嗦一遍：无代码工具是面向最终用户的应用）。
+我们在 Aptos 新加坡黑客松上构建了一个副产品，叫做 Move Forms，获得了当期第二名的好成绩。
+我们会利用“业余时间”持续地构建这个 Web3 原生表单工具。
+
+
+We even develop "No-code" applications based on "Low-code" (to reiterate: no-code tools are designed for end-users).
+At the Aptos Singapore Hackathon, we created a side project named Move Forms, which secured the second place in the competition.
+We plan to continue developing this Web3 native form tool in our "spare time."
+
+---
+
+
+如果你联系我们，我们可以向你展示更多生产级的案例。我们的案例包括了社交，DeFi，全链游戏等。
+
+If you reach out to us, we can show you more production-level cases, which include social, DeFi, fully on-chain games, among others.
+
+---
+
+不少人可能对低代码平台可以开发的去中心化应用的类型有疑问。
+说实话的，我们目前没有发现低代码方式对可开发的应用类型有什么明显的限制。
+我们在应用开发过程中，感受更深的是当前 Web3 基础设施的局限性，而非低代码的局限性。
+
+
+我不知道大家有没有发现一个有趣的现实，就是传统低代码平台，大家会普遍认为它们比较开发企业软件（比如 OA、CRM、ERP 这些），而不适合开发互联网应用；
+但从我们展示的内容看，似乎 dddappp 已经突破了这种限制？你的感觉没错。
+当初我们之所以在 Web2 时代要做这个事情——基于 DDD 领域模型驱动的低代码平台，这在 Web2 时代是一个非常大胆的尝试，
+就是想“让低代码平台可以开发大型互联网应用”。
+
+
+
+Many people may be curious about the types of dapps that can be developed on low-code platforms.
+Frankly, we have not yet encountered any significant limitations on the types of applications that can be developed using the low-code approach.
+During the application development process, what we have felt more acutely is the limitations of the current Web3 infrastructure, not the limitations of low-code itself.
+
+I wonder if you have noticed an interesting phenomenon: traditional low-code platforms are generally considered more suitable for developing enterprise software (such as OA, CRM, ERP, etc.), rather than for developing internet applications;
+However, from what we have demonstrated, it seems that dddappp has indeed broken through this limitation, and your feeling is correct.
+The motivation for doing this in the Web2 era—a DDD domain model-driven low-code platform , which was a very bold attempt in the Web2 era—was to "enable low-code platforms to develop large-scale internet applications".
+
+---
+
 
 ## 是不是可以搞搞“AppCU”呢？
 
@@ -597,6 +651,14 @@ However, I think there might be another direction for a breakthrough with this i
 AppCU stands for Application-specific Compute Unit here.
 An analogy with Appchain ([Application-specific blockchain](https://www.coinbase.com/learn/crypto-glossary/what-is-an-application-specific-blockchain-appchain)) may clarify this concept.
 
+---
+
+如果把计算单元排除在外，AO 的其他部分，从某种程度上来讲，可以看作一个 Web3 版本的 Kafka——一个去中心化的消息代理。
+让传统应用的开发者可以使用他们熟练的语言和工具，基于一个类 Kafka 的消息代理，来开发微服务架构的应用——“哈哈，这一套我熟”。
+
+
+If you exclude the compute unit, the other components of AO can, to some extent, be regarded as a Web3 version of Kafka—a decentralized message broker.
+This setup allows traditional application developers to use their familiar languages and tools to develop MSA applications based on a Kafka-like message broker—“haha, I know this drill.”
 
 ---
 
@@ -605,6 +667,7 @@ An analogy with Appchain ([Application-specific blockchain](https://www.coinbase
 我想，不必再强调 [Cosmos SDK](https://docs.cosmos.network)（用于构建 Appchain 的工具）在 [Cosmos](https://cosmos.network) 生态发展中所发挥的重要作用了吧？
 
 那些尝试过 Cosmos SDK 的开发者，一定会对这个工具的便利性和强大功能印象深刻。如果 Cosmos SDK 能够做到，那么 AO 生态的开发者社区也没有理由做不到。
+不管怎么说，开发一个计算单元比开发一条链总是要简单一些吧？
 
 Cosmos SDK 确实是一个“高效率”工具，但严格来说，它并不是一个低代码平台。我们相信低代码平台在提升开发效率方面有着更大的潜力。
 
@@ -614,11 +677,63 @@ Building an AppCU from scratch can be a challenging task for most developers, an
 I suppose there's no need to reiterate the pivotal role that the [Cosmos SDK](https://docs.cosmos.network) (the tool for building Appchains) has played in the growth of the [Cosmos](https://cosmos.network) ecosystem, is there?
 
 Developers who have experimented with the Cosmos SDK must have been struck by its convenience and power. If the Cosmos SDK can achieve this, then there's no reason the AO ecosystem's developer community can't do the same.
+Anyway, it's always easier to develop a computing unit than a blockchain, right?
 
 Indeed, the Cosmos SDK is a "high-efficiency" tool, but strictly speaking, it is not a low-code platform. We believe that low-code platforms hold even greater potential for enhancing development efficiency.
 
 
 ---
 
+## AI 会干掉低代码平台吗？
+
+## Will AI eliminate low-code platforms?
+
+最后，我想要谈谈一个我回答了无数次的问题：“AI 会干掉低代码平台吗？”
+
+在我看来，AI 近些年取得的巨大进展并没有为复杂软件开发的方法论带来什么本质变化。
+即使 AI 参与到复杂应用的开发过程中，它仍然有必要遵循“正确的”方法——就像人一样。
+
+软件工程中每一个层次的抽象都有它的价值。
+开发复杂软件第一个正确的“姿势”，就是要先做好业务分析、领域建模。
+而使用自然语言无法精确地描述“对领域的认知”，这极大地阻碍了“将其转化为软件代码”的效率。
+
+dddappp 的最独特之处在于它使用的 DSL。正是有了它，dddappp 可以使 AI 可以专注于它最擅长的事情：
+
+* AI 推荐参考模型，并辅助我们迭代模型。
+  * 我们可以通过自然语言和 AI 交流，让 AI 帮助我们分析需求、推荐参考模型。AI 拥有海量的知识，这是它们擅长的。
+  * AI 将领域模型以 DSL 输出，这样的领域模型（最少语法的正确性）可以使用工具来验证。
+  * 如果没有误用 DSL，低代码工具的实现也没有 bug，那么，从模型生成的代码，准确率可以说是 100%。这不是生成式 AI 通过“文字接龙游戏”产生的代码可比的。
+  * 低代码工具直接从模型生成可以执行的应用。这个阶段，建模可以先忽略“对象的方法”（也就是操作业务逻辑的细节）。
+  * 低代码平台先将生成的应用跑起来，用户和开发者先确认“数据模型”。如果有问题，反馈给 AI，让 AI 帮助调整模型，低代码工具重新生成应用。
+* AI 辅助实现“操作业务逻辑”。
+  * 确定模型后，应用开发者在一个个非常特定的上下文里面对业务逻辑进行编码。在这样的一个清晰的上下文，IDE 很容易生成高质量的 prompts 提交给 AI，然后 AI 可以回复准确率很高的代码片段。
+
+
+At last, I'd like to address a question I've answered countless times: "Will AI eliminate low-code platforms?"
+
+In my view, the significant advancements AI has made in recent years haven't fundamentally altered the methodologies for complex software development.
+Even when AI is integrated into the development process of complex applications, adherence to the "right" methodologies is necessary—just as it is for humans.
+
+Each level of abstraction in software engineering holds its value.
+The first correct "stance" in developing complex software is to conduct thorough business analysis and domain modeling.
+The inefficiency of using natural language to accurately describe "domain knowledge" greatly hinders the efficiency of "translating it into software code".
+
+The most distinctive aspect of dddappp lies in its use of DSL. It is this feature that allows dddappp to enable AI to concentrate on what it excels at:
+
+* AI suggests reference models and helps us iterate them.
+  * Chat with AI in natural language and let it analyze requirements and propose models. AI has a lot of knowledge, which is its advantage.
+  * AI produces DSL domain model. The output is validated using the DSL schema.
+  * If DSL and tool are correct, code from model is 100% accurate. No word chain game here!
+  * Low-code tool creates app from model. Skip "object methods" (operation business logic details) for now. 
+  * Run app and verify "data model". If problem, ask AI to modify model and recreate app.
+* AI helps implement "operation business logic".
+  * After modeling, code logic in specific context. IDE provides high-quality prompts to AI, and AI responds with high-accuracy snippets.
+
+---
+
+
+所以，我对这个问题的回答是：不。我们认为两者会相得益彰——最少对于 dddappp 如此。
+
+Therefore, my response to this question is: No. We believe that the two will be mutually beneficial—at least that's the case for dddappp.
 
 
