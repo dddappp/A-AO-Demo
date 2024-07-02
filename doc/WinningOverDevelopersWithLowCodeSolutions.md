@@ -48,7 +48,7 @@ The flourishing state of today's Internet owes much to the ingenuity of its arch
 
 
 As a piece of Web3 infrastructure, AO has been outstanding.
-At the very least, AO has shown great potential as what I consider to be the best decentralized messaging agent in the Web3 space today.
+At the very least, AO has shown great potential as what I consider to be the best decentralized [message broker](https://en.wikipedia.org/wiki/Message_broker) in the Web3 space today.
 I believe that developers from the traditional Web2 space can immediately grasp the profound implications of this:
 Can you imagine how the programming of many of today's large-scale internet applications would be without the availability of [Kafka](https://kafka.apache.org) or Kafka-like message brokers?
 
@@ -58,7 +58,7 @@ Can you imagine how the programming of many of today's large-scale internet appl
 Although the Actor model has theoretical advantages in many respects, whether it's the Actor model or Microservice Architecture (MSA), in my view, they often represent a necessary "evil" that developers must contend with when building certain applications, particularly large-scale ones.
 
 
-Let's use a simple example to illustrate this point to the non-technical reader. Imagine all the banks in the world operated on a "World Computer," a monolithic system. In this scenario, when a customer from ICBC named "John Doe" transfers $100 to "Jane Doe," who has an account at China Merchants Bank, a developer might code the transfer process like this:
+Let's use a simple example to illustrate this point to the non-technical reader. Imagine all the banks in the world operated on a "World Computer," a monolithic system. In this scenario, when a customer from ICBC named "John Doe" transfers $100 to "Jane Doe," who has an account at China Merchants Bank (CMB), a developer might code the transfer process like this:
 
 1. Start a transaction;
 2. Deduct $100 from John Doe's account;
@@ -199,7 +199,7 @@ So, is there an authentic Web3 low-code development platform that doesn't cut co
 I am immensely proud to announce that [dddappp](https://www.dddappp.org), developed by my team, is a genuine decentralized application low-code development platform. It is likely the only Web3 low-code development platform to date that employs a "model-driven" approach.
 
 
-So, what exactly sets dddappp apart? Why can it achieve what other platforms (at least for now) have not?
+So, what exactly sets dddappp apart? Why can it achieve what other platforms have not (at least for now)?
 
 The key lies in the modeling paradigm adopted by dddappp. We have opted for DDD-style domain models.
 
@@ -251,37 +251,31 @@ To some extent, you could already consider this tool as an MVP (Minimum Viable P
 Because an MVP is defined as something that provides value to the end-users, and as long as it helps them, it can be considered an MVP. After all, developers are the end-users of low-code tools.
 
 
-
-
 Experienced application developers who have thoroughly examined this PoC should no longer harbor any doubts about the immense potential of low-code approaches to enhance app development efficiency.
 After all, we have repeatedly validated this point beyond the AO ecosystem.
 Even if we set aside our history of developing complex commercial applications with the same methodology during the Web2 era, our current practices within the Move ecosystem are enough to convince anyone.
-
-
 
 
 We have used DSL to overcome the lack of "interface" abstraction in Move, a static smart contract language, facilitating easy "Dependency Injection" for developers;
 see [this example](https://github.com/dddappp/sui-interface-demo).
 
 We can split Move contracts into multiple packages (or "projects") with simple declarations, as shown in [this example](https://github.com/wubuku/aptos-constantinople). 
-It's important to note that most Sui public chains have size limits for each package released.
+It's important to note that most Move chains have size limits for each package deployed.
 
 
 
 If you think that what we've shared are merely "examples," and we might just be creating toys, then you are greatly mistaken.
 
-We have been deeply involved in the development of some serious commercial applications (primarily within the Move ecosystem), where we have consistently been "eating our own dog food."
-We can say with confidence that, at present, we have fulfilled our promise of a tenfold increase in development efficiency, especially in the backend area (referring to off-chain contracts and off-chain query services, sometimes known as an "indexer").
+We have been deeply involved in the development of some serious commercial dapps (primarily within the Move ecosystem), where we have consistently been "eating our own dog food."
+We can say with confidence that, at present, we have fulfilled our promise of a tenfold increase in development efficiency, especially in the backend area (referring to on-chain contracts and off-chain query services, sometimes known as an "indexer").
 
 
-We even develop "No-code" applications based on "Low-code" (to reiterate: no-code tools are designed for end-users).
-At the Aptos Singapore Hackathon, we created a side project named Move Forms, which secured the second place in the competition.
+We even develop "No-code" app based on "Low-code" (to reiterate: no-code tools are apps designed for end-users).
+At the Aptos Singapore Hackathon, we created a side-project named Move Forms, which secured the second place in the competition.
 We plan to continue developing this Web3 native form tool in our "spare time."
 
 
-
 If you reach out to us, we can show you more production-level cases, which include social, DeFi, fully on-chain games, among others.
-
 
 
 Many people may be curious about the types of dapps that can be developed on low-code platforms.
@@ -290,7 +284,7 @@ During the application development process, what we have felt more acutely is th
 
 I wonder if you have noticed an interesting phenomenon: traditional low-code platforms are generally considered more suitable for developing enterprise software (such as OA, CRM, ERP, etc.), rather than for developing internet applications;
 However, from what we have demonstrated, it seems that dddappp has indeed broken through this limitation, and your feeling is correct.
-The motivation for doing this in the Web2 era—a DDD domain model-driven low-code platform , which was a very bold attempt in the Web2 era—was to "enable low-code platforms to develop large-scale internet applications".
+Our motivation for doing this in the Web2 era—a DDD domain model-driven low-code platform , which was a very bold attempt in the Web2 era—was to "enable low-code platforms to develop large-scale internet applications".
 
 
 ### "Why not 'AppCU'?"
@@ -309,7 +303,7 @@ AppCU stands for Application-specific Compute Unit here.
 An analogy with Appchain ([Application-specific blockchain](https://www.coinbase.com/learn/crypto-glossary/what-is-an-application-specific-blockchain-appchain)) may clarify this concept.
 
 
-If you exclude the compute unit, the other components of AO can, to some extent, be regarded as a Web3 version of Kafka—a decentralized message broker.
+If excluding the compute unit, the other components of AO can, to some extent, be regarded as a Web3 version of Kafka—a decentralized message broker.
 This setup allows traditional application developers to use their familiar languages and tools to develop MSA applications based on a Kafka-like message broker—“haha, I know this drill.”
 
 
@@ -339,9 +333,8 @@ The most distinctive aspect of dddappp lies in its use of DSL. It is this featur
 * AI suggests reference models and helps us iterate them.
   * Chat with AI in natural language and let it analyze requirements and propose models. AI has a lot of knowledge, which is its advantage.
   * AI produces DSL domain model. The output is validated using the DSL schema.
-  * If DSL and tool are correct, code from model is 100% accurate. No word chain game here!
-  * Low-code tool creates app from model. Skip "object methods" (operation business logic details) for now. 
-  * Run app and verify "data model". If problem, ask AI to modify model and recreate app.
+  * If DSL model and tool are correct, code from model is 100% accurate. No word chain game here! At this stage, tool can ignore the "methods of the object" (i.e., the details of operation business logic). The resulting application is ready to run immediately.
+  * Developers and end-users verify "data model". If problem, ask AI to modify model and recreate app.
 * AI helps implement "operation business logic".
   * After modeling, code logic in specific context. IDE provides high-quality prompts to AI, and AI responds with high-accuracy snippets.
 
