@@ -27,7 +27,7 @@ AO，是 Actor Oriented（面向参与者）的简称。顾名思义，这说明
 比如，[TON](https://docs.ton.org/learn/overviews/ton-blockchain) 的智能合约就是使用 Actor 模型构建的。
 
 说到 TON，我个人觉得它和 AO 在某些方面颇有相似之处。
-对于尚未深入了解 Web3 的 Web2 开发者来说，想要迅速理解 AO 或 TON 相对其他“单体区块链”的最大特色，一个方便的抓手是：把运行在它们之上的智能合约（链上程序）想成是“[微服务](https://en.wikipedia.org/wiki/Microservices)”。而 AO 或 TON 是支持这些微服务运行的基础设施，比如 Kafka、Kubernetes 等。
+对于尚未深入了解 Web3 的 Web2 开发者来说，想要迅速理解 AO 或 TON 相对其他“单体区块链（以太坊、Solana、Sui 等）”的最大特色，一个方便的抓手是：把运行在它们之上的智能合约（链上程序）想成是“[微服务](https://en.wikipedia.org/wiki/Microservices)”。而 AO 或 TON 是支持这些微服务运行的基础设施，比如 Kafka、Kubernetes 等。
 
 作为一个 20 多年来主要专注于应用开发的一名资深 [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) boy，
 我个人非常乐见 TON、AO 这样的非单体区块链的出现，并对它们的发展充满期待。

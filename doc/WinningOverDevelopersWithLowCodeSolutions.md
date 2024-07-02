@@ -17,14 +17,14 @@ This complexity prevents us from developing a more diverse array of larger-scale
 Don't fall for the fallacy that "smart contracts/blockchain programs should be simple; there's no need to overcomplicate things!"
 
 Such statements often misrepresent the engineering reality.
-The reality is not "I don't want to" but "I can’t".
+The reality is not "I don't want to" but "I can’t."
 
 
 ## AO Through My Eyes
 
-AO is a computing system running on Arweave, aimed at achieving verifiable infinite computational power.
+[AO](https://ao.arweave.dev/) is a computing system running on [Arweave](https://www.arweave.org/), aimed at achieving verifiable infinite computational power.
 
-AO stands for Actor Oriented. As the name suggests, this implies that decentralized applications running on AO need to adopt design and programming methods based on the [actor model](https://en.wikipedia.org/wiki/Actor_model).
+AO stands for Actor Oriented. As the name suggests, this implies that decentralized applications running on AO need to adopt design and programming methods based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
 
 
 In fact, AO is not the first to apply actor model to blockchain (or "decentralized infrastructure").
@@ -32,7 +32,7 @@ In fact, AO is not the first to apply actor model to blockchain (or "decentraliz
 For example, smart contracts on [TON](https://docs.ton.org/learn/overviews/ton-blockchain) are built using the Actor model.
 
 Speaking of TON, I personally find it quite similar to AO in some ways.
-For Web2 developers who have not yet delved deeply into Web3, a convenient way to quickly grasp the most distinctive features of AO or TON, compared to other monolithic blockchains, is to think of the smart contracts (on-chain programs) running on them as [microservices](https://en.wikipedia.org/wiki/Microservices). AO or TON is the infrastructures that support these microservices, such as Kafka, Kubernetes, and so on.
+For Web2 developers who have not yet delved deeply into Web3, a convenient way to quickly grasp the most distinctive features of AO or TON, compared to other monolithic blockchains (Ethereum, Solana, Sui, etc.), is to think of the smart contracts (on-chain programs) running on them as [microservices](https://en.wikipedia.org/wiki/Microservices). AO or TON is the infrastructures that support these microservices, such as Kafka, Kubernetes, and so on.
 
 As a seasoned [**CRUD**](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete)  boy who has been primarily focused on application development for over two decades,
 I am personally thrilled by the emergence of non-monolithic blockchains like TON and AO, and I am filled with anticipation for their development.
@@ -161,7 +161,7 @@ First, I'd like to clarify the difference between Low-code and No-code—of cour
     There is a consensus  (de facto standard)  in the industry on what the core features of a Low-Code platform should have.
     At a minimum, they must adopt a "model-driven" approach.
 
-* No-code refers to a large category of tools for "end-users".
+* No-code refers to a large category of tools for "end-users."
     There is no unified standard for what is considered No-code.
     They allow users to create simple "applications" such as product advertisement pages, online questionnaires, personal blogs, etc.
     Whenever a task, which was previously thought to require a developer, can now be done by a regular user with the help of a tool, that tool will be called No-code.
@@ -218,9 +218,9 @@ We even wrote a [book](https://item.jd.com/12834017.html) to share our insights 
 The key lies in the expressive domain modeling DSL we've invented, named DDDML (Domain-Driven Design Modeling Language).
 With it, you can not only precisely describe domain knowledge but also effortlessly map these models to software implementation code.
 
-Moreover, compared to other "competitors", our DSL is closer to the problem domain and natural language, which we believe allows for seamless integration with artificial intelligence.
+Moreover, compared to other "competitors," our DSL is closer to the problem domain and natural language, which we believe allows for seamless integration with artificial intelligence.
 
-We have always referred to DDDML as the "native DSL for DDD".
+We have always referred to DDDML as the "native DSL for DDD."
 
 Remember the "Aggregate" concept from DDD we mentioned earlier? The DSL we use inherently supports defining aggregates, and you can find the keyword `aggregates` in almost any DDDML model file you open.
 
@@ -284,7 +284,7 @@ During the application development process, what we have felt more acutely is th
 
 I wonder if you have noticed an interesting phenomenon: traditional low-code platforms are generally considered more suitable for developing enterprise software (such as OA, CRM, ERP, etc.), rather than for developing internet applications;
 However, from what we have demonstrated, it seems that dddappp has indeed broken through this limitation, and your feeling is correct.
-Our motivation for doing this in the Web2 era—a DDD domain model-driven low-code platform , which was a very bold attempt in the Web2 era—was to "enable low-code platforms to develop large-scale internet applications".
+Our motivation for doing this in the Web2 era—a DDD domain model-driven low-code platform , which was a very bold attempt in the Web2 era—was to "enable low-code platforms to develop large-scale internet applications."
 
 
 ### "Why not 'AppCU'?"
@@ -334,8 +334,8 @@ The most distinctive aspect of dddappp lies in its use of DSL. It is this featur
   * Chat with AI in natural language and let it analyze requirements and propose models. AI has a lot of knowledge, which is its advantage.
   * AI produces DSL domain model. The output is validated using the DSL schema.
   * If DSL model and tool are correct, code from model is 100% accurate. No word chain game here! At this stage, tool can ignore the "methods of the object" (i.e., the details of operation business logic). The resulting application is ready to run immediately.
-  * Developers and end-users verify "data model". If problem, ask AI to modify model and recreate app.
-* AI helps implement "operation business logic".
+  * Developers and end-users verify data model. If problem, ask AI to modify model and recreate app.
+* AI helps implement "operation business logic."
   * After modeling, code logic in specific context. IDE provides high-quality prompts to AI, and AI responds with high-accuracy snippets.
 
 Therefore, my response to this question is: No. We believe that the two will be mutually beneficial—at least that's the case for dddappp.
