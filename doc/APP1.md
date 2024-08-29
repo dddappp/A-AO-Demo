@@ -55,6 +55,6 @@ Contact us, and we can show more production-level cases. Our cases include socia
 
 If we have partners familiar with the [aoconnect](https://cookbook_ao.g8way.io/guides/aoconnect/installing-connect.html) implementation joining us, it will greatly help our project.
 
-We will first try to integrate aoconnect into AppCU, likely reusing existing aoconnect functions rather than reimplementing them in other languages (we are relatively familiar with backend "common" languages like Java, C#, etc.). During this process, we may discover areas for improvement in aoconnect. We hope someone can help us fork aoconnect and make modifications; of course, the improvements will also be fed back to the upstream aoconnect codebase.
+We will first try to integrate aoconnect into AppCU, likely reusing existing aoconnect functions rather than reimplementing them in other languages (we are relatively familiar with backend "common" languages like Java, C#, etc.). During this process, we may discover areas for improvement in aoconnect. We hope someone can help us fork the repository and make modifications; of course, the improvements will also be fed back to the upstream aoconnect repository.
 
 Even if we find that integrating aoconnect is not the best solution, we can learn the implementation details of aoconnect more quickly from them and avoid detours.
