@@ -43,7 +43,7 @@ For example, we use DSL to solve the limitation of Move (as a static language) l
 We can split Move contracts into multiple packages (i.e., "projects") through simple declarations, see [this example](https://github.com/wubuku/aptos-constantinople). Note that most Move public chains have restrictions on the size of each published package.
 
 
-Outside the Move ecosystem, we have also implemented [low-code development of Solana applications PoC](https://github.com/dddappp/A-Solana-Demo) and [low-code development of EVM applications PoC](https://github.com/wubuku/hello-mud).
+Outside the Move ecosystem, we have also implemented [PoC for Developing Solana Apps with Low-Code](https://github.com/dddappp/A-Solana-Demo) and [PoC for Developing EVM Apps with Low-Code](https://github.com/wubuku/hello-mud).
 
 We are not just "making some toys." We are deeply involved in the development of some serious commercial applications (mainly focused on the Move ecosystem), during which we have been "eating our own dog food." We can confidently say that at least in the backend (on-chain contracts and off-chain query services, sometimes called indexers) development field, we have delivered on the promise of 10x development efficiency.
 
