@@ -679,12 +679,17 @@ Inbox[#Inbox]
 
 ### Sui 博客示例
 
-Repository: https://github.com/dddappp/sui-blog-example
+代码库：https://github.com/dddappp/sui-blog-example
 
-It only requires 30 or so lines of code (all of which is a description of the domain model) 
-to be written by the developer, 
-and then generates a blog example that emulates [RoR Getting Started](https://guides.rubyonrails.org/getting_started.html) in one click, 
-without requiring the developer to write a single line of other code.
+只需要写 30 行左右的代码（全部是领域模型的描述）——除此以外不需要开发者写一行其他代码——就可以一键生成一个博客；
+类似 [RoR 入门指南](https://guides.rubyonrails.org/getting_started.html) 的开发体验，
+
+特别是，一行代码都不用写，100% 自动生成的链下查询服务（有时候我们称之为 indexer）即具备很多开箱即用的功能。
+
+
+### Aptos 博客示例
+
+上面的博客示例的 [Aptos 版本](https://github.com/dddappp/aptos-blog-example)。
 
 ### Sui 众筹 Dapp
 

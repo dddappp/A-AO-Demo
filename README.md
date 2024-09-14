@@ -735,6 +735,13 @@ to be written by the developer,
 and then generates a blog example that emulates [RoR Getting Started](https://guides.rubyonrails.org/getting_started.html) in one click, 
 without requiring the developer to write a single line of other code.
 
+Especially, without writing a single line of code,
+the 100% automatically generated off-chain query service (sometimes we call it an indexer) has many out-of-the-box features.
+
+### Aptos Blog Example
+
+The [Aptos version](https://github.com/dddappp/aptos-blog-example) of blog sample.
+
 ### Sui Crowdfunding Example
 
 A crowdfunding dapp for educational demonstration purposes:
