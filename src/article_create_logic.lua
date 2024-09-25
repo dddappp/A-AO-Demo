@@ -11,13 +11,8 @@ local article_create_logic = {}
 -- @param msg any The original message
 -- @param env any The environment context
 -- @return table The event, can use `article.new_article_created` to create it
-function article_create_logic.verify(article_id, title, body, cmd, msg, env)
-    return article.new_article_created(
-        article_id,
-        title,
-        body,
-        msg.Owner --owner
-    )
+function article_create_logic.verify(article_id, title, body, owner, cmd, msg, env)
+    return article.new_article_created(article_id, title, body, owner)
 end
 
 --- Create a new article

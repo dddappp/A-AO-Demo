@@ -14,11 +14,10 @@ valueObjects:
       Bar:
         type: string
 
-
 aggregates:
   Article:
     metadata:
-      Preprocessors: [ "CRUD_IT" ]
+      Preprocessors: ["CRUD_IT"]
       CRUD_IT_NO_UPDATE: true
       CRUD_IT_NO_DELETE: true
     id:
@@ -32,14 +31,14 @@ aggregates:
         type: string
       Body:
         type: string
-      #Owner:
-      #  type: string
+      Owner:
+        type: string
       Comments:
         itemType: Comment
     entities:
       Comment:
         metadata:
-          Preprocessors: [ "CRUD_IT" ]
+          Preprocessors: ["CRUD_IT"]
         id:
           name: CommentSeqId
           type: u64
@@ -59,7 +58,7 @@ aggregates:
             type: string
         event:
           name: "ArticleBodyUpdated"
-  
+
   InventoryItem:
     id:
       name: InventoryItemId
@@ -125,7 +124,7 @@ services:
       InOut:
         type: InOutService
     methods:
-      ProcessInventorySurplusOrShortage:        
+      ProcessInventorySurplusOrShortage:
         parameters:
           ProductId:
             type: number
@@ -174,4 +173,3 @@ services:
             # Use an Expression to return the result
             expression:
               Lua: "{ in_out_id = context.in_out_id }"
- 

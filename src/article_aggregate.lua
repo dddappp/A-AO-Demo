@@ -66,7 +66,7 @@ end
 
 function article_aggregate.create(cmd, msg, env)
     local article_id = next_article_id()
-    local _event = article_create_logic.verify(article_id, cmd.title, cmd.body, cmd, msg, env)
+    local _event = article_create_logic.verify(article_id, cmd.title, cmd.body, msg.Owner, cmd, msg, env)
     if (_event.article_id ~= current_article_id()
         or _event.article_id ~= article_id
     ) then
