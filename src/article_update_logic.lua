@@ -4,14 +4,14 @@ local article_update_logic = {}
 
 
 function article_update_logic.verify(_state, title, body, cmd, msg, env)
-    -- TODO return article.new_article_updated( ...
+    return article.new_article_updated(_state, title, body)
 end
 
 function article_update_logic.mutate(state, event, msg, env)
     -- Applies the event to the current state and returns the updated state
-    -- TODO: state. ... = event. ...
-    -- return state
-    -- Or just return article.new( ...
+    state.title = event.title
+    state.body = event.body
+    return state
 end
 
 return article_update_logic
