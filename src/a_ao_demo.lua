@@ -76,6 +76,30 @@ local function create_article(msg, env, response)
     messaging.handle_response_based_on_tag(status, result, commit, msg)
 end
 
+local function add_comment(msg, env, response)
+    local status, result, commit = pcall((function()
+        local cmd = json.decode(msg.Data)
+        return article_aggregate.add_comment(cmd, msg, env)
+    end))
+    messaging.handle_response_based_on_tag(status, result, commit, msg)
+end
+
+local function update_comment(msg, env, response)
+    local status, result, commit = pcall((function()
+        local cmd = json.decode(msg.Data)
+        return article_aggregate.update_comment(cmd, msg, env)
+    end))
+    messaging.handle_response_based_on_tag(status, result, commit, msg)
+end
+
+local function remove_comment(msg, env, response)
+    local status, result, commit = pcall((function()
+        local cmd = json.decode(msg.Data)
+        return article_aggregate.remove_comment(cmd, msg, env)
+    end))
+    messaging.handle_response_based_on_tag(status, result, commit, msg)
+end
+
 local function get_inventory_item(msg, env, response)
     local status, result = pcall((function()
         local _inventory_item_id = json.decode(msg.Data)
@@ -130,6 +154,24 @@ Handlers.add(
     "create_article",
     Handlers.utils.hasMatchingTag("Action", "CreateArticle"),
     create_article
+)
+
+Handlers.add(
+    "add_comment",
+    Handlers.utils.hasMatchingTag("Action", "AddComment"),
+    add_comment
+)
+
+Handlers.add(
+    "update_comment",
+    Handlers.utils.hasMatchingTag("Action", "UpdateComment"),
+    update_comment
+)
+
+Handlers.add(
+    "remove_comment",
+    Handlers.utils.hasMatchingTag("Action", "RemoveComment"),
+    remove_comment
 )
 
 Handlers.add(

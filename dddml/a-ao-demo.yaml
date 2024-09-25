@@ -32,8 +32,24 @@ aggregates:
         type: string
       Body:
         type: string
-      Owner:
-        type: string
+      #Owner:
+      #  type: string
+      Comments:
+        itemType: Comment
+    entities:
+      Comment:
+        metadata:
+          Preprocessors: [ "CRUD_IT" ]
+        id:
+          name: CommentSeqId
+          type: u64
+        properties:
+          Commenter:
+            type: String
+          Body:
+            type: String
+          #Owner:
+          #  type: string
     methods:
       UpdateBody:
         metadata:

@@ -35,4 +35,35 @@ function article.new_article_created(article_id, title, body, owner)
     return event
 end
 
+function article.new_comment_added(_state, comment_seq_id, commenter, body)
+    local event = {}
+    event.event_type = "CommentAdded"
+    event.article_id = _state.article_id
+    event.version = _state.version
+    event.comment_seq_id = comment_seq_id
+    event.commenter = commenter
+    event.body = body
+    return event
+end
+
+function article.new_comment_updated(_state, comment_seq_id, commenter, body)
+    local event = {}
+    event.event_type = "CommentUpdated"
+    event.article_id = _state.article_id
+    event.version = _state.version
+    event.comment_seq_id = comment_seq_id
+    event.commenter = commenter
+    event.body = body
+    return event
+end
+
+function article.new_comment_removed(_state, comment_seq_id)
+    local event = {}
+    event.event_type = "CommentRemoved"
+    event.article_id = _state.article_id
+    event.version = _state.version
+    event.comment_seq_id = comment_seq_id
+    return event
+end
+
 return article
