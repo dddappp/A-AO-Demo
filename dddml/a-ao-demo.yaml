@@ -18,7 +18,7 @@ aggregates:
   Article:
     metadata:
       Preprocessors: ["CRUD_IT"]
-      CRUD_IT_NO_UPDATE: true
+      #CRUD_IT_NO_UPDATE: true
       CRUD_IT_NO_DELETE: true
     id:
       name: ArticleId
@@ -33,6 +33,9 @@ aggregates:
         type: string
       Owner:
         type: string
+        initializationLogic:
+          __CONTEXT_VARIABLE__: MsgSender
+        immutable: true
       Comments:
         itemType: Comment
     entities:

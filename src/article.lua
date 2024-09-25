@@ -35,6 +35,16 @@ function article.new_article_created(article_id, title, body, owner)
     return event
 end
 
+function article.new_article_updated(_state, title, body)
+    local event = {}
+    event.event_type = "ArticleUpdated"
+    event.article_id = _state.article_id
+    event.version = _state.version
+    event.title = title
+    event.body = body
+    return event
+end
+
 function article.new_comment_added(_state, comment_seq_id, commenter, body)
     local event = {}
     event.event_type = "CommentAdded"

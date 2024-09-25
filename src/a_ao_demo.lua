@@ -76,6 +76,14 @@ local function create_article(msg, env, response)
     messaging.handle_response_based_on_tag(status, result, commit, msg)
 end
 
+local function update_article(msg, env, response)
+    local status, result, commit = pcall((function()
+        local cmd = json.decode(msg.Data)
+        return article_aggregate.update(cmd, msg, env)
+    end))
+    messaging.handle_response_based_on_tag(status, result, commit, msg)
+end
+
 local function add_comment(msg, env, response)
     local status, result, commit = pcall((function()
         local cmd = json.decode(msg.Data)
@@ -154,6 +162,12 @@ Handlers.add(
     "create_article",
     Handlers.utils.hasMatchingTag("Action", "CreateArticle"),
     create_article
+)
+
+Handlers.add(
+    "update_article",
+    Handlers.utils.hasMatchingTag("Action", "UpdateArticle"),
+    update_article
 )
 
 Handlers.add(
