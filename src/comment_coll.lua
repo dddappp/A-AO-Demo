@@ -14,9 +14,10 @@ local OPERATIONS = {
 }
 
 -- Create a new comment_coll instance
-function comment_coll.new(data_table)
+function comment_coll.new(data_table, article_id)
     local self = setmetatable({}, comment_coll)
     self.data_table = data_table or {}
+    self.article_id = article_id
     self.operation_cache = {}
     return self
 end
@@ -27,28 +28,28 @@ local function deepcopy(origin)
 end
 
 -- Check if an entity exists
-function comment_coll:contains(article_id, comment_seq_id)
-    local _article_comment_id = article_comment_id.new(article_id, comment_seq_id)
+function comment_coll:contains(comment_seq_id)
+    local _article_comment_id = article_comment_id.new(self.article_id, comment_seq_id)
     return entity_coll.contains(self.data_table, json.encode(article_comment_id.to_key_array(_article_comment_id)))
 end
 
 -- Add an entity
-function comment_coll:add(article_id, comment_seq_id, value)
-    local _article_comment_id = article_comment_id.new(article_id, comment_seq_id)
+function comment_coll:add(comment_seq_id, value)
+    local _article_comment_id = article_comment_id.new(self.article_id, comment_seq_id)
     table.insert(self.operation_cache,
         { op = OPERATIONS.ADD, key = json.encode(article_comment_id.to_key_array(_article_comment_id)), value = value })
 end
 
 -- Update an entity
-function comment_coll:update(article_id, comment_seq_id, value)
-    local _article_comment_id = article_comment_id.new(article_id, comment_seq_id)
+function comment_coll:update(comment_seq_id, value)
+    local _article_comment_id = article_comment_id.new(self.article_id, comment_seq_id)
     table.insert(self.operation_cache,
         { op = OPERATIONS.UPDATE, key = json.encode(article_comment_id.to_key_array(_article_comment_id)), value = value })
 end
 
 -- Add or update an entity
-function comment_coll:add_or_update(article_id, comment_seq_id, value)
-    local _article_comment_id = article_comment_id.new(article_id, comment_seq_id)
+function comment_coll:add_or_update(comment_seq_id, value)
+    local _article_comment_id = article_comment_id.new(self.article_id, comment_seq_id)
     table.insert(self.operation_cache,
         {
             op = OPERATIONS.ADD_OR_UPDATE,
@@ -59,15 +60,15 @@ function comment_coll:add_or_update(article_id, comment_seq_id, value)
 end
 
 -- Remove an entity
-function comment_coll:remove(article_id, comment_seq_id)
-    local _article_comment_id = article_comment_id.new(article_id, comment_seq_id)
+function comment_coll:remove(comment_seq_id)
+    local _article_comment_id = article_comment_id.new(self.article_id, comment_seq_id)
     table.insert(self.operation_cache,
         { op = OPERATIONS.REMOVE, key = json.encode(article_comment_id.to_key_array(_article_comment_id)) })
 end
 
 -- Get a deep copy of an entity
-function comment_coll:get(article_id, comment_seq_id)
-    local _article_comment_id = article_comment_id.new(article_id, comment_seq_id)
+function comment_coll:get(comment_seq_id)
+    local _article_comment_id = article_comment_id.new(self.article_id, comment_seq_id)
     local value = entity_coll.get(self.data_table, json.encode(article_comment_id.to_key_array(_article_comment_id)))
     return deepcopy(value)
 end

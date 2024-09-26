@@ -19,8 +19,8 @@ local ERRORS = {
 article_aggregate.ERRORS = ERRORS
 
 local article_table
-local article_id_sequence
 local comment_table
+local article_id_sequence
 
 local function current_article_id()
     if (article_id_sequence == nil) then
@@ -51,6 +51,7 @@ function article_aggregate.update_body(cmd, msg, env)
     end
     local article_id = _state.article_id
     local version = _state.version
+    _state.comments = comment_coll.new(comment_table, article_id)
     local _event = article_update_body_logic.verify(_state, cmd.body, cmd, msg, env)
     if (_event.article_id ~= article_id) then
         error(ERRORS.ENTITY_ID_MISMATCH)
@@ -63,6 +64,8 @@ function article_aggregate.update_body(cmd, msg, env)
     _new_state.version = (version and version or 0) + 1
     local commit = function()
         entity_coll.update(article_table, article_id, _new_state)
+        _state.comments:commit()
+        _state.comments = nil
     end
 
     return _event, commit
@@ -92,6 +95,7 @@ function article_aggregate.update(cmd, msg, env)
     end
     local article_id = _state.article_id
     local version = _state.version
+    _state.comments = comment_coll.new(comment_table, article_id)
     local _event = article_update_logic.verify(_state, cmd.title, cmd.body, cmd, msg, env)
     if (_event.article_id ~= article_id) then
         error(ERRORS.ENTITY_ID_MISMATCH)
@@ -104,6 +108,8 @@ function article_aggregate.update(cmd, msg, env)
     _new_state.version = (version and version or 0) + 1
     local commit = function()
         entity_coll.update(article_table, article_id, _new_state)
+        _state.comments:commit()
+        _state.comments = nil
     end
 
     return _event, commit
@@ -116,7 +122,7 @@ function article_aggregate.add_comment(cmd, msg, env)
     end
     local article_id = _state.article_id
     local version = _state.version
-    _state.comments = comment_coll.new(comment_table)
+    _state.comments = comment_coll.new(comment_table, article_id)
     local _event = article_add_comment_logic.verify(_state, cmd.commenter, cmd.body, cmd, msg, env)
     if (_event.article_id ~= article_id) then
         error(ERRORS.ENTITY_ID_MISMATCH)
@@ -143,7 +149,7 @@ function article_aggregate.update_comment(cmd, msg, env)
     end
     local article_id = _state.article_id
     local version = _state.version
-    _state.comments = comment_coll.new(comment_table)
+    _state.comments = comment_coll.new(comment_table, article_id)
     local _event = article_update_comment_logic.verify(_state, cmd.comment_seq_id, cmd.commenter, cmd.body, cmd, msg, env)
     if (_event.article_id ~= article_id) then
         error(ERRORS.ENTITY_ID_MISMATCH)
@@ -170,7 +176,7 @@ function article_aggregate.remove_comment(cmd, msg, env)
     end
     local article_id = _state.article_id
     local version = _state.version
-    _state.comments = comment_coll.new(comment_table)
+    _state.comments = comment_coll.new(comment_table, article_id)
     local _event = article_remove_comment_logic.verify(_state, cmd.comment_seq_id, cmd, msg, env)
     if (_event.article_id ~= article_id) then
         error(ERRORS.ENTITY_ID_MISMATCH)

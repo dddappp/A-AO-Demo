@@ -12,11 +12,11 @@ function article_add_comment_logic.mutate(state, event, msg, env)
     if not state.comments then
         error(string.format("COMMENTS_NOT_SET (article_id: %s)", tostring(state.article_id)))
     end
-    if state.comments:contains(event.article_id, event.comment_seq_id) then
+    if state.comments:contains(event.comment_seq_id) then
         error(string.format("COMMENT_ALREADY_EXISTS (article_id: %s, comment_seq_id: %s)",
             tostring(state.article_id), tostring(event.comment_seq_id)))
     end
-    state.comments:add(event.article_id, event.comment_seq_id, {
+    state.comments:add(event.comment_seq_id, {
         commenter = event.commenter,
         body = event.body,
     })
