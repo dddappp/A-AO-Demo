@@ -113,7 +113,7 @@ function article_aggregate.add_comment(cmd, msg, env)
     end
     local article_id = _state.article_id
     local version = _state.version
-    local _event = article_add_comment_logic.verify(_state, cmd.comment_seq_id, cmd.commenter, cmd.body, cmd, msg, env)
+    local _event = article_add_comment_logic.verify(_state, cmd.commenter, cmd.body, cmd, msg, env)
     if (_event.article_id ~= article_id) then
         error(ERRORS.ENTITY_ID_MISMATCH)
     end

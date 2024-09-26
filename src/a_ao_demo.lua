@@ -1,3 +1,10 @@
+InventoryItemTable = InventoryItemTable and (
+    function(old_data)
+        -- May need to migrate old data
+        return old_data
+    end
+)(InventoryItemTable) or {}
+
 ArticleTable = ArticleTable and (
     function(old_data)
         -- May need to migrate old data
@@ -11,13 +18,6 @@ ArticleIdSequence = ArticleIdSequence and (
         return old_data
     end
 )(ArticleIdSequence) or { 0 }
-
-InventoryItemTable = InventoryItemTable and (
-    function(old_data)
-        -- May need to migrate old data
-        return old_data
-    end
-)(InventoryItemTable) or {}
 
 
 SagaInstances = SagaInstances and (
@@ -40,16 +40,34 @@ local entity_coll = require("entity_coll")
 local messaging = require("messaging")
 local saga = require("saga")
 local inventory_item_id = require("inventory_item_id")
-local article_aggregate = require("article_aggregate")
 local inventory_item_aggregate = require("inventory_item_aggregate")
+local article_aggregate = require("article_aggregate")
 local inventory_service = require("inventory_service")
-
-article_aggregate.init(ArticleTable, ArticleIdSequence)
 
 inventory_item_aggregate.init(InventoryItemTable)
 
+article_aggregate.init(ArticleTable, ArticleIdSequence)
+
 saga.init(SagaInstances, SagaIdSequence)
 
+
+local function get_inventory_item(msg, env, response)
+    local status, result = pcall((function()
+        local _inventory_item_id = json.decode(msg.Data)
+        local _key = json.encode(inventory_item_id.to_key_array(_inventory_item_id))
+        local _state = entity_coll.get(InventoryItemTable, _key)
+        return _state
+    end))
+    messaging.respond(status, result, msg)
+end
+
+local function add_inventory_item_entry(msg, env, response)
+    local status, result, commit = pcall((function()
+        local cmd = json.decode(msg.Data)
+        return inventory_item_aggregate.add_inventory_item_entry(cmd, msg, env)
+    end))
+    messaging.handle_response_based_on_tag(status, result, commit, msg)
+end
 
 local function get_article(msg, env, response)
     local status, result = pcall((function()
@@ -108,23 +126,43 @@ local function remove_comment(msg, env, response)
     messaging.handle_response_based_on_tag(status, result, commit, msg)
 end
 
-local function get_inventory_item(msg, env, response)
-    local status, result = pcall((function()
-        local _inventory_item_id = json.decode(msg.Data)
-        local _key = json.encode(inventory_item_id.to_key_array(_inventory_item_id))
-        local _state = entity_coll.get(InventoryItemTable, _key)
-        return _state
-    end))
-    messaging.respond(status, result, msg)
-end
+Handlers.add(
+    "get_inventory_item",
+    Handlers.utils.hasMatchingTag("Action", "GetInventoryItem"),
+    get_inventory_item
+)
 
-local function add_inventory_item_entry(msg, env, response)
-    local status, result, commit = pcall((function()
-        local cmd = json.decode(msg.Data)
-        return inventory_item_aggregate.add_inventory_item_entry(cmd, msg, env)
-    end))
-    messaging.handle_response_based_on_tag(status, result, commit, msg)
-end
+Handlers.add(
+    "get_inventory_item_count",
+    Handlers.utils.hasMatchingTag("Action", "GetInventoryItemCount"),
+    function(msg, env, response)
+        local count = 0
+        for _ in pairs(InventoryItemTable) do
+            count = count + 1
+        end
+        messaging.respond(true, count, msg)
+    end
+)
+
+Handlers.add(
+    "get_inventory_item_table_keys",
+    Handlers.utils.hasMatchingTag("Action", "GetInventoryItemTableKeys"),
+    function(msg, env, response)
+        local keys = {}
+        local n = 0
+        for k, v in pairs(InventoryItemTable) do
+            n = n + 1
+            keys[n] = k
+        end
+        messaging.respond(true, keys, msg)
+    end
+)
+
+Handlers.add(
+    "add_inventory_item_entry",
+    Handlers.utils.hasMatchingTag("Action", "AddInventoryItemEntry"),
+    add_inventory_item_entry
+)
 
 Handlers.add(
     "get_article",
@@ -186,44 +224,6 @@ Handlers.add(
     "remove_comment",
     Handlers.utils.hasMatchingTag("Action", "RemoveComment"),
     remove_comment
-)
-
-Handlers.add(
-    "get_inventory_item",
-    Handlers.utils.hasMatchingTag("Action", "GetInventoryItem"),
-    get_inventory_item
-)
-
-Handlers.add(
-    "get_inventory_item_count",
-    Handlers.utils.hasMatchingTag("Action", "GetInventoryItemCount"),
-    function(msg, env, response)
-        local count = 0
-        for _ in pairs(InventoryItemTable) do
-            count = count + 1
-        end
-        messaging.respond(true, count, msg)
-    end
-)
-
-Handlers.add(
-    "get_inventory_item_table_keys",
-    Handlers.utils.hasMatchingTag("Action", "GetInventoryItemTableKeys"),
-    function(msg, env, response)
-        local keys = {}
-        local n = 0
-        for k, v in pairs(InventoryItemTable) do
-            n = n + 1
-            keys[n] = k
-        end
-        messaging.respond(true, keys, msg)
-    end
-)
-
-Handlers.add(
-    "add_inventory_item_entry",
-    Handlers.utils.hasMatchingTag("Action", "AddInventoryItemEntry"),
-    add_inventory_item_entry
 )
 
 
