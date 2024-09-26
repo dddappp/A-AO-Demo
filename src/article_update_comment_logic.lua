@@ -8,6 +8,7 @@ function article_update_comment_logic.verify(_state, comment_seq_id, commenter, 
 end
 
 function article_update_comment_logic.mutate(state, event, msg, env)
+    -- Applies the event to the current state and returns the updated state
     if not state.comments then
         error(string.format("COMMENTS_NOT_SET (article_id: %s)", tostring(state.article_id)))
     end
@@ -16,6 +17,7 @@ function article_update_comment_logic.mutate(state, event, msg, env)
             tostring(state.article_id), tostring(event.comment_seq_id)))
     end
     state.comments:update(event.comment_seq_id, {
+        comment_seq_id = event.comment_seq_id,
         commenter = event.commenter,
         body = event.body,
     })

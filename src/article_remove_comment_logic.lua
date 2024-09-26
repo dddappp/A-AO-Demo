@@ -8,6 +8,7 @@ function article_remove_comment_logic.verify(_state, comment_seq_id, cmd, msg, e
 end
 
 function article_remove_comment_logic.mutate(state, event, msg, env)
+    -- Applies the event to the current state and returns the updated state
     if not state.comments then
         error(string.format("COMMENTS_NOT_SET (article_id: %s)", tostring(state.article_id)))
     end

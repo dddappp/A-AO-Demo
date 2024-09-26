@@ -5,10 +5,12 @@ local article_add_comment_logic = {}
 
 function article_add_comment_logic.verify(_state, commenter, body, cmd, msg, env)
     _state.comment_seq_id_generator = (_state.comment_seq_id_generator or 0) + 1
-    return article.new_comment_added(_state, _state.comment_seq_id_generator, commenter, body)
+    local comment_seq_id = _state.comment_seq_id_generator
+    return article.new_comment_added(_state, comment_seq_id, commenter, body)
 end
 
 function article_add_comment_logic.mutate(state, event, msg, env)
+    -- Applies the event to the current state and returns the updated state
     if not state.comments then
         error(string.format("COMMENTS_NOT_SET (article_id: %s)", tostring(state.article_id)))
     end
@@ -17,6 +19,7 @@ function article_add_comment_logic.mutate(state, event, msg, env)
             tostring(state.article_id), tostring(event.comment_seq_id)))
     end
     state.comments:add(event.comment_seq_id, {
+        comment_seq_id = event.comment_seq_id,
         commenter = event.commenter,
         body = event.body,
     })
