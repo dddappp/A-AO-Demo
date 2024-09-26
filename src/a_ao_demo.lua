@@ -26,6 +26,7 @@ CommentTable = CommentTable and (
     end
 )(CommentTable) or {}
 
+
 SagaInstances = SagaInstances and (
     function(old_data)
         -- May need to migrate old data
@@ -46,9 +47,9 @@ local entity_coll = require("entity_coll")
 local messaging = require("messaging")
 local saga = require("saga")
 local inventory_item_id = require("inventory_item_id")
+local article_comment_id = require("article_comment_id")
 local inventory_item_aggregate = require("inventory_item_aggregate")
 local article_aggregate = require("article_aggregate")
-local article_comment_id = require("article_comment_id")
 local inventory_service = require("inventory_service")
 
 inventory_item_aggregate.init(InventoryItemTable)
@@ -311,3 +312,4 @@ Handlers.add(
         inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK),
     inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback
 )
+
