@@ -19,6 +19,12 @@ ArticleIdSequence = ArticleIdSequence and (
     end
 )(ArticleIdSequence) or { 0 }
 
+CommentTable = CommentTable and (
+    function(old_data)
+        -- May need to migrate old data
+        return old_data
+    end
+)(CommentTable) or {}
 
 SagaInstances = SagaInstances and (
     function(old_data)
@@ -42,11 +48,12 @@ local saga = require("saga")
 local inventory_item_id = require("inventory_item_id")
 local inventory_item_aggregate = require("inventory_item_aggregate")
 local article_aggregate = require("article_aggregate")
+local article_comment_id = require("article_comment_id")
 local inventory_service = require("inventory_service")
 
 inventory_item_aggregate.init(InventoryItemTable)
 
-article_aggregate.init(ArticleTable, ArticleIdSequence)
+article_aggregate.init(ArticleTable, ArticleIdSequence, CommentTable)
 
 saga.init(SagaInstances, SagaIdSequence)
 
@@ -73,6 +80,16 @@ local function get_article(msg, env, response)
     local status, result = pcall((function()
         local article_id = json.decode(msg.Data)
         local _state = entity_coll.get(ArticleTable, article_id)
+        return _state
+    end))
+    messaging.respond(status, result, msg)
+end
+
+local function get_comment(msg, env, response)
+    local status, result = pcall((function()
+        local _article_comment_id = json.decode(msg.Data)
+        local _key = json.encode(article_comment_id.to_key_array(_article_comment_id))
+        local _state = entity_coll.get(CommentTable, _key)
         return _state
     end))
     messaging.respond(status, result, msg)
@@ -168,6 +185,12 @@ Handlers.add(
     "get_article",
     Handlers.utils.hasMatchingTag("Action", "GetArticle"),
     get_article
+)
+
+Handlers.add(
+    "get_comment",
+    Handlers.utils.hasMatchingTag("Action", "GetComment"),
+    get_comment
 )
 
 Handlers.add(
@@ -288,4 +311,3 @@ Handlers.add(
         inventory_service.ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK),
     inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback
 )
-
