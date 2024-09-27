@@ -5,7 +5,7 @@ local article_update_logic = require("article_update_logic")
 local article_add_comment_logic = require("article_add_comment_logic")
 local article_update_comment_logic = require("article_update_comment_logic")
 local article_remove_comment_logic = require("article_remove_comment_logic")
-local comment_coll = require("comment_coll_alt")
+local comment_coll = require("comment_coll")
 
 local article_aggregate = {}
 
