@@ -15,6 +15,11 @@ function inventory_item.new(inventory_item_id, quantity)
     return state
 end
 
+--- 
+-- @param inventory_item_id InventoryItemId 
+-- @param _state table 
+-- @param movement_quantity number 
+-- @return table
 function inventory_item.new_inventory_item_entry_added(inventory_item_id, _state, movement_quantity)
     local event = {}
     event.event_type = "InventoryItemEntryAdded"

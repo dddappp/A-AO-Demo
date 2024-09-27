@@ -16,6 +16,10 @@ function article.new(title, body, owner)
     return state
 end
 
+--- 
+-- @param _state table 
+-- @param body string 
+-- @return table
 function article.new_article_body_updated(_state, body)
     local event = {}
     event.event_type = "ArticleBodyUpdated"
@@ -25,6 +29,12 @@ function article.new_article_body_updated(_state, body)
     return event
 end
 
+--- 
+-- @param article_id number 
+-- @param title string 
+-- @param body string 
+-- @param owner string 
+-- @return table
 function article.new_article_created(article_id, title, body, owner)
     local event = {}
     event.event_type = "ArticleCreated"
@@ -35,6 +45,11 @@ function article.new_article_created(article_id, title, body, owner)
     return event
 end
 
+--- 
+-- @param _state table 
+-- @param title string 
+-- @param body string 
+-- @return table
 function article.new_article_updated(_state, title, body)
     local event = {}
     event.event_type = "ArticleUpdated"
@@ -45,6 +60,12 @@ function article.new_article_updated(_state, title, body)
     return event
 end
 
+--- 
+-- @param _state table 
+-- @param comment_seq_id number 
+-- @param commenter string 
+-- @param body string 
+-- @return table
 function article.new_comment_added(_state, comment_seq_id, commenter, body)
     local event = {}
     event.event_type = "CommentAdded"
@@ -56,6 +77,12 @@ function article.new_comment_added(_state, comment_seq_id, commenter, body)
     return event
 end
 
+--- 
+-- @param _state table 
+-- @param comment_seq_id number 
+-- @param commenter string 
+-- @param body string 
+-- @return table
 function article.new_comment_updated(_state, comment_seq_id, commenter, body)
     local event = {}
     event.event_type = "CommentUpdated"
@@ -67,6 +94,10 @@ function article.new_comment_updated(_state, comment_seq_id, commenter, body)
     return event
 end
 
+--- 
+-- @param _state table 
+-- @param comment_seq_id number 
+-- @return table
 function article.new_comment_removed(_state, comment_seq_id)
     local event = {}
     event.event_type = "CommentRemoved"
