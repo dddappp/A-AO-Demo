@@ -89,8 +89,7 @@ end
 local function get_comment(msg, env, response)
     local status, result = pcall((function()
         local _article_comment_id = json.decode(msg.Data)
-        local _key = json.encode(article_comment_id.to_key_array(_article_comment_id))
-        local _state = entity_coll.get(CommentTable, _key)
+        local _state = entity_coll.get(CommentTable, _article_comment_id.article_id)[_article_comment_id.comment_seq_id]
         return _state
     end))
     messaging.respond(status, result, msg)

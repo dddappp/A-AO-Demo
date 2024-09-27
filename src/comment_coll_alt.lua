@@ -23,9 +23,10 @@ local OPERATIONS = {
 }
 
 -- Create a new comment_coll instance
-function comment_coll.new(data_table)
+function comment_coll.new(data_table, article_id)
     local self = setmetatable({}, comment_coll)
     self.data_table = data_table or {}
+    self.article_id = article_id
     self.operation_cache = {}
     return self
 end
@@ -36,8 +37,8 @@ local function deepcopy(origin)
 end
 
 -- Check if an entity exists
-function comment_coll:contains(article_id, comment_seq_id)
-    local article_comments = self.data_table[article_id]
+function comment_coll:contains(comment_seq_id)
+    local article_comments = self.data_table[self.article_id]
     if not article_comments then
         return false
     end
@@ -45,32 +46,32 @@ function comment_coll:contains(article_id, comment_seq_id)
 end
 
 -- Add an entity
-function comment_coll:add(article_id, comment_seq_id, value)
+function comment_coll:add(comment_seq_id, value)
     table.insert(self.operation_cache,
-        { op = OPERATIONS.ADD, article_id = article_id, comment_seq_id = comment_seq_id, value = value })
+        { op = OPERATIONS.ADD, article_id = self.article_id, comment_seq_id = comment_seq_id, value = value })
 end
 
 -- Update an entity
-function comment_coll:update(article_id, comment_seq_id, value)
+function comment_coll:update(comment_seq_id, value)
     table.insert(self.operation_cache,
-        { op = OPERATIONS.UPDATE, article_id = article_id, comment_seq_id = comment_seq_id, value = value })
+        { op = OPERATIONS.UPDATE, article_id = self.article_id, comment_seq_id = comment_seq_id, value = value })
 end
 
 -- Add or update an entity
-function comment_coll:add_or_update(article_id, comment_seq_id, value)
+function comment_coll:add_or_update(comment_seq_id, value)
     table.insert(self.operation_cache,
-        { op = OPERATIONS.ADD_OR_UPDATE, article_id = article_id, comment_seq_id = comment_seq_id, value = value })
+        { op = OPERATIONS.ADD_OR_UPDATE, article_id = self.article_id, comment_seq_id = comment_seq_id, value = value })
 end
 
 -- Remove an entity
-function comment_coll:remove(article_id, comment_seq_id)
+function comment_coll:remove(comment_seq_id)
     table.insert(self.operation_cache,
-        { op = OPERATIONS.REMOVE, article_id = article_id, comment_seq_id = comment_seq_id })
+        { op = OPERATIONS.REMOVE, article_id = self.article_id, comment_seq_id = comment_seq_id })
 end
 
 -- Get a deep copy of an entity
-function comment_coll:get(article_id, comment_seq_id)
-    local article_comments = self.data_table[article_id]
+function comment_coll:get(comment_seq_id)
+    local article_comments = self.data_table[self.article_id]
     if not article_comments then
         return nil
     end

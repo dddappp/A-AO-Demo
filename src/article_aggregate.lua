@@ -5,7 +5,7 @@ local article_update_logic = require("article_update_logic")
 local article_add_comment_logic = require("article_add_comment_logic")
 local article_update_comment_logic = require("article_update_comment_logic")
 local article_remove_comment_logic = require("article_remove_comment_logic")
-local comment_coll = require("comment_coll")
+local comment_coll = require("comment_coll_alt")
 
 local article_aggregate = {}
 
@@ -83,6 +83,10 @@ function article_aggregate.create(cmd, msg, env)
     _state.article_id = _event.article_id
     local commit = function()
         entity_coll.add(article_table, article_id, _state)
+        if (_state.comments) then
+            _state.comments:commit()
+            _state.comments = nil
+        end
     end
 
     return _event, commit
