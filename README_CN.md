@@ -232,15 +232,18 @@ aos process_alice
 
 对于稍有 OOP（面向对象编程）经验的开发者来说，模型所表达的内容应该不难理解。
 
-让我们先抓主线。我们在模型中定义了两个聚合：`Article` 与 `InventoryItem`，以及一个服务：`InventoryService`。
+让我们先抓主线。我们在模型中定义了聚合 `InventoryItem`，以及一个服务：`InventoryService`。
 其中的 `steps` 就是我们所说的 Saga 的定义。
 而服务 `InventoryService` 依赖两个组件： `InventoryItem` 聚合以及一个抽象的 `InOutService` 服务
 ——你可以把这里的“抽象”理解为：我们描述了这个服务“应有的样子”，但是并不打算自己实现它，而是期望“其他人”来实现它。
 
-
 > **提示**
 >
 > 关于 DDDML，这里有个介绍文章：["Introducing DDDML: The Key to Low-Code Development for Decentralized Applications"](https://github.com/wubuku/Dapp-LCDP-Demo/blob/main/IntroducingDDDML.md).
+>
+> 在本代码库中，还包含了一个博客示例的模型文件 `./dddml/blog.yaml`，
+> 你可以参考[这个文档](./doc/BlogExample_CN.md)来填充这个示例的业务逻辑实现代码，以及进行测试。
+> 在下文的讨论中我们会忽略这个博客示例。
 
 
 ### 生成代码
@@ -289,21 +292,6 @@ docker pull wubuku/dddappp-ao:0.0.1
 > 理想情况下，未来应该有一门平台中立的表达式语言，让开发者可以更方便的编写“多链”应用的业务逻辑。当然，我们还在朝这个方向努力。
 
 你会发现，下面很需要填充的文件中，函数的签名部分已经写好了，你只需要填充函数体部分。
-
-#### 修改 `article_update_body_logic`
-
-修改文件 `./src/article_update_body_logic.lua`，在函数体中填充业务逻辑：
-
-```lua
-function article_update_body_logic.verify(_state, body, cmd, msg, env)
-    return article.new_article_body_updated(_state, body)
-end
-
-function article_update_body_logic.mutate(state, event, msg, env)
-    state.body = event.body
-    return state
-end
-```
 
 #### 修改 `inventory_item_add_inventory_item_entry_logic`
 
@@ -430,60 +418,6 @@ aos process_bob
 
 现在，可以在第一个进程（`__PROCESS_ALICE__`）中，向这个 `__PROCESS_BOB__` 进程发送消息进行测试了。
 
-
-### “文章”相关的测试
-
-在第一个进程（`__PROCESS_ALICE__`）中，查看另外一个进程中的当前“文章的序号”：
-
-```lua
-json = require("json")
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticleIdSequence" } })
-```
-
-你会收到类似这样的回复：
-
-```text
-New Message From u37...zs4: Data = {"result":[0]}
-```
-
-创建一篇新文章：
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "CreateArticle" }, Data = json.encode({ title = "title_1", body = "body_1" }) })
-```
-
-在收到回复后，查看最后一条收件箱消息的内容：
-
-```lua
-Inbox[#Inbox]
-```
-
-再次查看当前“文章的序号”：
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticleIdSequence" } })
-```
-
-查看序号为 `1` 的文章的内容（在输出消息的 `Data` 属性中）：
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
-Inbox[#Inbox]
-```
-
-更新序号为 `1` 的文章的内容（注意 `version` 的值应该与上面看到的当前文章的版本号一致）：
-
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, version = 0, body = "new_body_1" }) })
-```
-
-再次查看序号为 `1` 的文章的内容：
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
-Inbox[#Inbox]
-```
 
 ### “库存”相关的测试
 

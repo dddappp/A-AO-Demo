@@ -237,7 +237,10 @@ where the definition of the `ProcessInventorySurplusOrShortage` method of the `I
 > You might not have expected that the DSL we use to orchestrate Sagas
 > can also be used to [solve the vexing "dependency injection" problem in Move Dapp development](https://github.com/dddappp/sui-interface-demo/blob/main/README_CN.md).
 > It's just that versatile.
-
+>
+> This repository also includes a blog example model file `./dddml/blog.yaml`. 
+> You can refer to [this document](./doc/BlogExample.md) to fill in the business logic implementation code for this example and perform testing. 
+> In the following discussion, we will ignore this blog example.
 
 ## Prerequisites
 
@@ -266,8 +269,8 @@ The model file that has been written is available at `./dddml/a-ao-demo.yaml`.
 
 For developers with some experience in OOP (Object-Oriented Programming), what the model expresses should not be difficult to understand.
 
-Let's catch the main thread first. We mainly define two aggregates in the model: `Article` and `InventoryItem`, and the service `InventoryService`.
-Where `steps` is what we call Saga definition.
+Let's catch the main thread first. We mainly define the aggregate `InventoryItem` in the model;
+and the service `InventoryService`, where `steps` is what we call Saga definition.
 And the service `InventoryService` depends on two components: the `InventoryItem` aggregate and an abstract `InOutService` -- you can think of "abstract" here as meaning that we describe what the service "should look like", 
 but we don't intend to implement it ourselves, expecting "others" to implement it.
 
@@ -328,21 +331,6 @@ You'll notice that in the files you need to fill in below, the signature part of
 
 You only need to fill in the body of the function.
 
-
-#### Modify `article_update_body_logic`
-
-Modify the file `. /src/article_update_body_logic.lua` to fill the function body with business logic:
-
-```lua
-function article_update_body_logic.verify(_state, body, cmd, msg, env)
-    return article.new_article_body_updated(_state, body)
-end
-
-function article_update_body_logic.mutate(state, event, msg, env)
-    state.body = event.body
-    return state
-end
-```
 
 #### Modify `inventory_item_add_inventory_item_entry_logic`
 
@@ -470,59 +458,6 @@ In this aos (`__PROCESS_BOB__`) process, load our application code (be wary of r
 
 It is now ready to be tested in the first process (`__PROCESS_ALICE__`) by sending messages to this `__PROCESS_BOB__` process.
 
-
-### "Article" aggregate tests
-
-In the first process (`__PROCESS_ALICE__`), check the current "article Id sequence" in the other process:
-
-```lua
-json = require("json")
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticleIdSequence" } })
-```
-
-You'll get a response like this:
-
-```text
-New Message From u37...zs4: Data = {"result":[0]}
-```
-
-Create a new article:
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "CreateArticle" }, Data = json.encode({ title = "title_1", body = "body_1" }) })
-```
-
-After receiving a response, check the content of the last message in the inbox:
-
-```lua
-Inbox[#Inbox]
-```
-
-Check current article Id sequence again:
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticleIdSequence" } })
-```
-
-View the contents of the article with ID `1` (in the `Data` property of the output message):
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
-Inbox[#Inbox]
-```
-
-Update the body of the article with ID `1` (note that the value of `version` should match the version of the article seen above):
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, version = 0, body = "new_body_1" }) })
-```
-
-View the contents of the article with ID `1` again:
-
-```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
-Inbox[#Inbox]
-```
 
 ### "Inventory Item" aggregate tests
 

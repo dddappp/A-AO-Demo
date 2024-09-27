@@ -32,7 +32,7 @@ aggregates:
           type: number
           generator:
             class: sequence
-            #structName: CommentSeqIdSequence
+            #structName: CommentSeqIdGenerator # Default name
         properties:
           Commenter:
             type: String
