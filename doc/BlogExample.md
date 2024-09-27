@@ -134,6 +134,7 @@ View the contents of the article with ID `1` (in the `Data` property of the outp
 
 ```lua
 Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+
 Inbox[#Inbox]
 ```
 
@@ -147,5 +148,6 @@ View the contents of the article with ID `1` again:
 
 ```lua
 Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+
 Inbox[#Inbox]
 ```

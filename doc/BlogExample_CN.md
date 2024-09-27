@@ -59,22 +59,29 @@ function article_update_body_logic.mutate(state, event, msg, env)
 end
 ```
 
+
 ## 测试应用
 
-
-启动另一个 aos 进程：
+启动一个 aos 进程：
 
 ```shell
 aos process_bob
 ```
 
+让我们把这个进程称为 `PROCESS_BOB`。
 在这个 aos 进程中，装载我们的应用代码（注意将 `{PATH/TO/A-AO-Demo/src}` 替换为实际的路径）：
 
 ```lua
 .load {PATH/TO/A-AO-Demo/src}/a_ao_demo.lua
 ```
 
+
 ### “文章”相关的测试
+
+你可以在 `PROCESS_BOB` 进程中执行以下测试代码。
+其实，你还可以启动另外一个 aos 进程，比如 `aos process_alice`，然后在这个 `PROCESS_ALICE` 进程中执行下面的测试。
+不过，需要注意的是，在 `PROCESS_ALICE` 进程中执行测试时，需要将 `Send` 函数中的 `Target` 参数的值替换为 `PROCESS_BOB` 的进程 ID。
+
 
 查看当前“文章的序号”：
 
@@ -111,6 +118,7 @@ Send({ Target = ao.id, Tags = { Action = "GetArticleIdSequence" } })
 
 ```lua
 Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+
 Inbox[#Inbox]
 ```
 
@@ -125,6 +133,7 @@ Send({ Target = ao.id, Tags = { Action = "UpdateArticle" }, Data = json.encode({
 
 ```lua
 Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+
 Inbox[#Inbox]
 ```
 
@@ -140,5 +149,13 @@ Send({ Target = ao.id, Tags = { Action = "UpdateArticleBody" }, Data = json.enco
 
 ```lua
 Send({ Target = ao.id, Tags = { Action = "AddComment" }, Data = json.encode({ article_id = 1, commenter = "alice", body = "comment_body_1" }) })
+```
+
+查看评论信息：
+
+```lua
+Send({ Target = ao.id, Tags = { Action = "GetComment" }, Data = json.encode({ article_id = 1, comment_seq_id = 1 }) })
+
+Inbox[#Inbox]
 ```
 
