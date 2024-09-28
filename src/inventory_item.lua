@@ -16,8 +16,8 @@ function inventory_item.new(inventory_item_id, quantity)
 end
 
 --- 
--- @param inventory_item_id InventoryItemId 
--- @param _state table 
+-- @param inventory_item_id table The InventoryItemId of the InventoryItem
+-- @param _state table The current state of the InventoryItem
 -- @param movement_quantity number 
 -- @return table
 function inventory_item.new_inventory_item_entry_added(inventory_item_id, _state, movement_quantity)

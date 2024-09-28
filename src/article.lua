@@ -17,7 +17,7 @@ function article.new(title, body, owner)
 end
 
 --- 
--- @param _state table 
+-- @param _state table The current state of the Article
 -- @param body string 
 -- @return table
 function article.new_article_body_updated(_state, body)
@@ -30,7 +30,7 @@ function article.new_article_body_updated(_state, body)
 end
 
 --- 
--- @param article_id number 
+-- @param article_id number The ArticleId of the Article
 -- @param title string 
 -- @param body string 
 -- @param owner string 
@@ -46,7 +46,7 @@ function article.new_article_created(article_id, title, body, owner)
 end
 
 --- 
--- @param _state table 
+-- @param _state table The current state of the Article
 -- @param title string 
 -- @param body string 
 -- @return table
@@ -61,7 +61,7 @@ function article.new_article_updated(_state, title, body)
 end
 
 --- 
--- @param _state table 
+-- @param _state table The current state of the Article
 -- @param comment_seq_id number 
 -- @param commenter string 
 -- @param body string 
@@ -78,7 +78,7 @@ function article.new_comment_added(_state, comment_seq_id, commenter, body)
 end
 
 --- 
--- @param _state table 
+-- @param _state table The current state of the Article
 -- @param comment_seq_id number 
 -- @param commenter string 
 -- @param body string 
@@ -95,7 +95,7 @@ function article.new_comment_updated(_state, comment_seq_id, commenter, body)
 end
 
 --- 
--- @param _state table 
+-- @param _state table The current state of the Article
 -- @param comment_seq_id number 
 -- @return table
 function article.new_comment_removed(_state, comment_seq_id)
