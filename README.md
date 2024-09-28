@@ -287,7 +287,7 @@ In repository root directory, run:
 ```shell
 docker run \
 -v .:/myapp \
-wubuku/dddappp-ao:0.0.1 \
+wubuku/dddappp-ao:master \
 --dddmlDirectoryPath /myapp/dddml \
 --boundedContextName A.AO.Demo \
 --aoLuaProjectDirectoryPath /myapp/src
@@ -314,11 +314,11 @@ you may be required to manually delete the image and pull it again before `docke
 
 ```shell
 # If you have already run it, you may need to Clean Up Exited Docker Containers first
-docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:0.0.1")
+docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:master")
 # remove the image
-docker image rm wubuku/dddappp-ao:0.0.1
+docker image rm wubuku/dddappp-ao:master
 # pull the image
-docker pull wubuku/dddappp-ao:0.0.1
+docker pull wubuku/dddappp-ao:master
 ```
 
 ### Filling in the business logic

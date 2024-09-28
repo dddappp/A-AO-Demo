@@ -32,7 +32,7 @@ In repository root directory, run:
 ```shell
 docker run \
 -v .:/myapp \
-wubuku/dddappp-ao:0.0.1 \
+wubuku/dddappp-ao:master \
 --dddmlDirectoryPath /myapp/dddml \
 --boundedContextName A.AO.Demo \
 --aoLuaProjectDirectoryPath /myapp/src
