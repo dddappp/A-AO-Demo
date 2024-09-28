@@ -44,6 +44,7 @@ aggregates:
       UpdateBody:
         metadata:
           MessagingCommandName: "UpdateArticleBody"
+        description: "Updates the body of an article"
         parameters:
           Body:
             type: string
