@@ -18,14 +18,13 @@ function article_remove_comment_logic.verify(_state, comment_seq_id, cmd, msg, e
     return article.new_comment_removed(_state, comment_seq_id)
 end
 
---- 
+--- Applies the event to the current state and returns the updated state.
 -- @param state table The current state of the Article
 -- @param event table The event
 -- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env any The environment context
 -- @return table The updated state of the Article
 function article_remove_comment_logic.mutate(state, event, msg, env)
-    -- Applies the event to the current state and returns the updated state
     if not state.comments then
         error(string.format("COMMENTS_NOT_SET (article_id: %s)", tostring(state.article_id)))
     end
