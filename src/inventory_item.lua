@@ -8,7 +8,7 @@ inventory_item.ERRORS = ERRORS
 
 --- Creates a new InventoryItem state.
 --
--- @param inventory_item_id table 
+-- @param inventory_item_id table (value object: InventoryItemId). 
 -- @param quantity number 
 -- @param entries table (InventoryItemEntry list). The history of movements of the inventory item
 -- @return table A new state table representing the InventoryItem.
