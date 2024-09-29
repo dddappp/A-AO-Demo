@@ -1,15 +1,19 @@
+--- Implements the Article.UpdateComment method.
+--
+-- @module article_update_comment_logic
+
 local article = require("article")
 
 local article_update_comment_logic = {}
 
 
---- Verify Article.UpdateComment command
+--- Verifies the Article.UpdateComment command.
 -- @param _state table The current state of the Article
 -- @param comment_seq_id number 
 -- @param commenter string 
 -- @param body string 
 -- @param cmd table The command
--- @param msg any The original message
+-- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env table The environment context
 -- @return table The event, can use `article.new_comment_updated` to create it
 function article_update_comment_logic.verify(_state, comment_seq_id, commenter, body, cmd, msg, env)
@@ -19,7 +23,7 @@ end
 --- 
 -- @param state table The current state of the Article
 -- @param event table The event
--- @param msg any The original message
+-- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env any The environment context
 -- @return table The updated state of the Article
 function article_update_comment_logic.mutate(state, event, msg, env)

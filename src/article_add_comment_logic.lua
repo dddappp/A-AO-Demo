@@ -1,14 +1,18 @@
+--- Implements the Article.AddComment method.
+--
+-- @module article_add_comment_logic
+
 local article = require("article")
 
 local article_add_comment_logic = {}
 
 
---- Verify Article.AddComment command
+--- Verifies the Article.AddComment command.
 -- @param _state table The current state of the Article
 -- @param commenter string 
 -- @param body string 
 -- @param cmd table The command
--- @param msg any The original message
+-- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env table The environment context
 -- @return table The event, can use `article.new_comment_added` to create it
 function article_add_comment_logic.verify(_state, commenter, body, cmd, msg, env)
@@ -20,7 +24,7 @@ end
 --- 
 -- @param state table The current state of the Article
 -- @param event table The event
--- @param msg any The original message
+-- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env any The environment context
 -- @return table The updated state of the Article
 function article_add_comment_logic.mutate(state, event, msg, env)

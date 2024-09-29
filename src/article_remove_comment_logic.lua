@@ -1,13 +1,17 @@
+--- Implements the Article.RemoveComment method.
+--
+-- @module article_remove_comment_logic
+
 local article = require("article")
 
 local article_remove_comment_logic = {}
 
 
---- Verify Article.RemoveComment command
+--- Verifies the Article.RemoveComment command.
 -- @param _state table The current state of the Article
 -- @param comment_seq_id number 
 -- @param cmd table The command
--- @param msg any The original message
+-- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env table The environment context
 -- @return table The event, can use `article.new_comment_removed` to create it
 function article_remove_comment_logic.verify(_state, comment_seq_id, cmd, msg, env)
@@ -17,7 +21,7 @@ end
 --- 
 -- @param state table The current state of the Article
 -- @param event table The event
--- @param msg any The original message
+-- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env any The environment context
 -- @return table The updated state of the Article
 function article_remove_comment_logic.mutate(state, event, msg, env)
