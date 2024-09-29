@@ -1,3 +1,9 @@
+--- Module for ArticleCommentId
+-- The module includes functions for creating new ArticleCommentId objects, 
+-- converting them to and from key arrays for storage or transmission purposes.
+--
+-- @module article_comment_id
+
 local article_comment_id = {}
 
 function article_comment_id.new(article_id, comment_seq_id)

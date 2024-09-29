@@ -14,6 +14,13 @@ valueObjects:
       Bar:
         type: string
 
+  InventoryItemEntry:
+    properties:
+      MovementQuantity:
+        type: number
+      Timestamp:
+        type: number
+
 aggregates:
 
   InventoryItem:
@@ -23,6 +30,10 @@ aggregates:
     properties:
       Quantity:
         type: number
+      Entries:
+        itemType: InventoryItemEntry
+        isList: true
+        description: "The history of movements of the inventory item"
     methods:
       AddInventoryItemEntry:
         shouldCreateOnDemand: true

@@ -1,3 +1,10 @@
+--- Module for InventoryItemId
+-- The module includes functions for creating new InventoryItemId objects, 
+-- converting them to and from key arrays for storage or transmission purposes.
+--
+-- @module inventory_item_id
+-- @see inventory_attribute_set
+
 local inventory_attribute_set = require("inventory_attribute_set")
 
 local inventory_item_id = {}

@@ -1,3 +1,9 @@
+--- Module for InventoryAttributeSet
+-- The module includes functions for creating new InventoryAttributeSet objects, 
+-- converting them to and from key arrays for storage or transmission purposes.
+--
+-- @module inventory_attribute_set
+
 local inventory_attribute_set = {}
 
 function inventory_attribute_set.new(foo, bar)
