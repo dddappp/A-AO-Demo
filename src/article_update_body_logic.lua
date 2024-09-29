@@ -1,29 +1,43 @@
+--- Updates the body of an article
+--
+-- @module article_update_body_logic
+
 local article = require("article")
 
 local article_update_body_logic = {}
 
---- Verify article create command
--- @param _state table The current state of the article
--- @param body string The content body of the article
+
+--- Verifies the Article.UpdateBody command.
+-- @param _state table The current state of the Article
+-- @param body string 
 -- @param cmd table The command
--- @param msg any The original message
--- @param env any The environment context
+-- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
+-- @param env table The environment context
 -- @return table The event, can use `article.new_article_body_updated` to create it
 function article_update_body_logic.verify(_state, body, cmd, msg, env)
-    return article.new_article_body_updated(_state, body)
+    if type(body) ~= "string" or body == "" then
+        error("Invalid body: must be a non-empty string")
+    end
+    
+    if not _state or type(_state) ~= "table" then
+        error("Invalid state: must be a table")
+    end
+    
+    return article.new_article_body_updated(
+        _state, -- type: table
+        body -- type: string
+    )
 end
 
---- Update the body of an article
--- @param state table The current state of the article
+--- Applies the event to the current state and returns the updated state.
+-- @param state table The current state of the Article
 -- @param event table The event
--- @param msg any The original message
+-- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env any The environment context
--- @return table The updated state of the article
+-- @return table The updated state of the Article
 function article_update_body_logic.mutate(state, event, msg, env)
-    -- Applies the event to the current state and returns the updated state
     state.body = event.body
     return state
-    -- Or just return article.new(event.title, event.body, event.owner)
 end
 
 return article_update_body_logic

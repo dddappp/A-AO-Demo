@@ -16,7 +16,7 @@ aggregates:
         type: string
       Body:
         type: string
-      Owner:
+      Author:
         type: string
         initializationLogic:
           __CONTEXT_VARIABLE__: MsgSender
@@ -36,6 +36,7 @@ aggregates:
         properties:
           Commenter:
             type: String
+            # Maybe let the commenters leave their names
           Body:
             type: String
           #Owner:
@@ -44,6 +45,7 @@ aggregates:
       UpdateBody:
         metadata:
           MessagingCommandName: "UpdateArticleBody"
+          # We set this "global" name to prevent naming conflicts between methods of different objects.
         description: "Updates the body of an article"
         parameters:
           Body:

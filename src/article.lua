@@ -10,14 +10,14 @@ article.ERRORS = ERRORS
 --
 -- @param title string 
 -- @param body string 
--- @param owner string 
+-- @param author string 
 -- @return table A new state table representing the Article.
-function article.new(title, body, owner)
+function article.new(title, body, author)
     local state = {
         version = 0,
         title = title,
         body = body,
-        owner = owner,
+        author = author,
     }
     return state
 end
@@ -39,15 +39,15 @@ end
 -- @param article_id number The ArticleId of the Article
 -- @param title string 
 -- @param body string 
--- @param owner string 
+-- @param author string 
 -- @return table
-function article.new_article_created(article_id, title, body, owner)
+function article.new_article_created(article_id, title, body, author)
     local event = {}
     event.event_type = "ArticleCreated"
     event.article_id = article_id
     event.title = title
     event.body = body
-    event.owner = owner
+    event.author = author
     return event
 end
 

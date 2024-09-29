@@ -25,7 +25,7 @@ end
 -- @param env any The environment context
 -- @return table The state of the Article
 function article_create_logic.new(event, msg, env)
-    return article.new(event.title, event.body, event.owner)
+    return article.new(event.title, event.body, event.author)
 end
 
 return article_create_logic
