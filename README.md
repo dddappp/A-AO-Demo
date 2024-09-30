@@ -3,6 +3,10 @@
 English | [中文版](./README_CN.md)
 
 
+> For some developers, the content discussed in this article and the examples in the current repository may already be quite a bit of complexity.
+> [Here](https://github.com/dddappp/AI-Assisted-AO-Dapp-Example) are some simpler examples for reference.
+
+
 AO is on the right path of development.
 
 We believe that the major obstacle to the widespread adoption of Web3 is the engineering complexity involved in building large-scale decentralized applications (Dapps).
