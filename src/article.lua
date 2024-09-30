@@ -11,13 +11,15 @@ article.ERRORS = ERRORS
 -- @param title string 
 -- @param body string 
 -- @param author string 
+-- @param tags table (string collection). 
 -- @return table A new state table representing the Article.
-function article.new(title, body, author)
+function article.new(title, body, author, tags)
     local state = {
         version = 0,
         title = title,
         body = body,
         author = author,
+        tags = tags,
     }
     return state
 end
@@ -39,14 +41,16 @@ end
 -- @param article_id number The ArticleId of the Article
 -- @param title string 
 -- @param body string 
+-- @param tags table 
 -- @param author string 
 -- @return table
-function article.new_article_created(article_id, title, body, author)
+function article.new_article_created(article_id, title, body, tags, author)
     local event = {}
     event.event_type = "ArticleCreated"
     event.article_id = article_id
     event.title = title
     event.body = body
+    event.tags = tags
     event.author = author
     return event
 end
@@ -55,14 +59,16 @@ end
 -- @param _state table The current state of the Article
 -- @param title string 
 -- @param body string 
+-- @param tags table 
 -- @return table
-function article.new_article_updated(_state, title, body)
+function article.new_article_updated(_state, title, body, tags)
     local event = {}
     event.event_type = "ArticleUpdated"
     event.article_id = _state.article_id
     event.version = _state.version
     event.title = title
     event.body = body
+    event.tags = tags
     return event
 end
 

@@ -23,6 +23,8 @@ aggregates:
         immutable: true
       Comments:
         itemType: Comment
+      Tags:
+        itemType: string
     entities:
       Comment:
         metadata:

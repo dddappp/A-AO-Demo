@@ -11,12 +11,13 @@ local article_update_logic = {}
 -- @param _state table The current state of the Article
 -- @param title string 
 -- @param body string 
+-- @param tags table 
 -- @param cmd table The command
 -- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env table The environment context
 -- @return table The event, can use `article.new_article_updated` to create it
-function article_update_logic.verify(_state, title, body, cmd, msg, env)
-    return article.new_article_updated(_state, title, body)
+function article_update_logic.verify(_state, title, body, tags, cmd, msg, env)
+    return article.new_article_updated(_state, title, body, tags)
 end
 
 --- Applies the event to the current state and returns the updated state.
@@ -28,6 +29,7 @@ end
 function article_update_logic.mutate(state, event, msg, env)
     state.title = event.title
     state.body = event.body
+    state.tags = event.tags
     return state
 end
 

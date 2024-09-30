@@ -73,7 +73,7 @@ end
 
 function article_aggregate.create(cmd, msg, env)
     local article_id = next_article_id()
-    local _event = article_create_logic.verify(article_id, cmd.title, cmd.body, cmd, msg, env)
+    local _event = article_create_logic.verify(article_id, cmd.title, cmd.body, cmd.tags, cmd, msg, env)
     if (_event.article_id ~= current_article_id()
         or _event.article_id ~= article_id
     ) then
@@ -100,7 +100,7 @@ function article_aggregate.update(cmd, msg, env)
     local article_id = _state.article_id
     local version = _state.version
     _state.comments = comment_coll.new(comment_table, article_id)
-    local _event = article_update_logic.verify(_state, cmd.title, cmd.body, cmd, msg, env)
+    local _event = article_update_logic.verify(_state, cmd.title, cmd.body, cmd.tags, cmd, msg, env)
     if (_event.article_id ~= article_id) then
         error(ERRORS.ENTITY_ID_MISMATCH)
     end
