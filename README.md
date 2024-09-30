@@ -327,7 +327,7 @@ Let's fill in the business operation logic written in Lua code.
 
 > A platform-neutral expression language would be ideal in the future. Of course, we will work in this direction.
 
-You'll notice that in the files you need to fill in below, the signature part of the function is already written.
+You'll notice that in the files with the suffix `_logic.lua` you need to fill in below, the signature part of the function is already written.
 
 You only need to fill in the body of the function.
 
