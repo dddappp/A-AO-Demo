@@ -312,9 +312,10 @@ After executing the above command, you will see a "ton" of code generated for yo
 
 #### Update dddappp Docker Image
 
-Since the dddappp v0.0.1 image is updated frequently, 
+Since the dddappp-ao:master image is updated frequently, 
 if you've run the above command before and run into problems, 
-you may be required to manually delete the image and pull it again before `docker run`.
+you may be required to manually delete the image and pull it again before `docker run`,
+making sure you use the latest version of the image.
 
 ```shell
 # If you have already run it, you may need to Clean Up Exited Docker Containers first
