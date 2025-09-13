@@ -243,7 +243,7 @@ where the definition of the `ProcessInventorySurplusOrShortage` method of the `I
 > It's just that versatile.
 >
 > This repository also includes a blog example model file `./dddml/blog.yaml`. 
-> You can refer to [this document](./doc/BlogExample.md) to fill in the business logic implementation code for this example and perform testing. 
+> You can refer to [this document](./docs/BlogExample.md) to fill in the business logic implementation code for this example and perform testing. 
 > In the following discussion, we will ignore this blog example.
 
 ## Prerequisites

@@ -15,7 +15,7 @@ AO 生态的繁荣取决于开发者的参与；而开发者的参与取决于�
 我们相信 AppCU 为解决这些问题提供了一个全新的思路。
 
 关于 AppCU，可以与 Appchain（应用特定区块链）做个类比来理解这一概念。
-更详细的阐述可见[这里](https://github.com/dddappp/A-AO-Demo/blob/main/doc/WinningOverDevelopersWithLowCodeSolutions.md#why-not-appcu)。
+更详细的阐述可见[这里](https://github.com/dddappp/A-AO-Demo/blob/main/docs/WinningOverDevelopersWithLowCodeSolutions.md#why-not-appcu)。
 
 
 # 原理及可实行性

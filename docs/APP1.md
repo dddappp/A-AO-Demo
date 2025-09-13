@@ -11,7 +11,7 @@ Our low-code development platform allows developers to use familiar general-purp
 
 The prosperity of the AO ecosystem depends on developer participation, which in turn depends on the diversity and development efficiency of applications that can be built on AO. We believe AppCU offers a new approach to solving these issues.
 
-To understand AppCU, you can compare it to Appchain (Application-Specific Blockchain). More detailed explanations can be found [here](https://github.com/dddappp/A-AO-Demo/blob/main/doc/WinningOverDevelopersWithLowCodeSolutions.md#why-not-appcu).
+To understand AppCU, you can compare it to Appchain (Application-Specific Blockchain). More detailed explanations can be found [here](https://github.com/dddappp/A-AO-Demo/blob/main/docs/WinningOverDevelopersWithLowCodeSolutions.md#why-not-appcu).
 
 
 # Principles and Feasibility

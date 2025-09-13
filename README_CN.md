@@ -245,7 +245,7 @@ aos process_alice
 > 关于 DDDML，这里有个介绍文章：["Introducing DDDML: The Key to Low-Code Development for Decentralized Applications"](https://github.com/wubuku/Dapp-LCDP-Demo/blob/main/IntroducingDDDML.md).
 >
 > 在本代码库中，还包含了一个博客示例的模型文件 `./dddml/blog.yaml`，
-> 你可以参考[这个文档](./doc/BlogExample_CN.md)来填充这个示例的业务逻辑实现代码，以及进行测试。
+> 你可以参考[这个文档](./docs/BlogExample_CN.md)来填充这个示例的业务逻辑实现代码，以及进行测试。
 > 在下文的讨论中我们会忽略这个博客示例。
 
 
