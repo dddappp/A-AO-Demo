@@ -37,37 +37,77 @@ AO（Actor-Oriented Computer）是基于 Arweave 永久存储网络构建的超�
 
 ### 2.3 官方代币合约示例代码
 ```lua
-Handlers.add('Transfer', Handlers.utils.hasMatchingTag('Action', 'Transfer'), function(msg)
-  assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
-  assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
+Handlers.add('transfer', Handlers.utils.hasMatchingTag("Action", "Transfer"), function(msg)
+  assert(type(msg.Recipient) == 'string', 'Recipient is required!')
+  assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+  assert(bint.__lt(0, bint(msg.Quantity)), 'Quantity must be greater than 0')
 
-  local qty = tonumber(msg.Tags.Quantity)
+  if not Balances[msg.From] then Balances[msg.From] = "0" end
+  if not Balances[msg.Recipient] then Balances[msg.Recipient] = "0" end
 
-  if Balances[msg.From] >= qty then
-    Balances[msg.From] = Balances[msg.From] - qty
-    Balances[msg.Tags.Recipient] = Balances[msg.Tags.Recipient] + qty
+  if bint(msg.Quantity) <= bint(Balances[msg.From]) then
+    Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Quantity)
+    Balances[msg.Recipient] = utils.add(Balances[msg.Recipient], msg.Quantity)
 
-    -- 发送借记通知（Debit-Notice）给转账发起方
-    msg.reply({
-      Action = 'Debit-Notice',
-      Recipient = msg.Tags.Recipient,
-      Quantity = msg.Tags.Quantity,
-      Balance = tostring(Balances[msg.From])
-    })
+    --[[
+         Only send the notifications to the Sender and Recipient
+         if the Cast tag is not set on the Transfer message
+       ]]
+    --
+    if not msg.Cast then
+      -- Debit-Notice message template, that is sent to the Sender of the transfer
+      local debitNotice = {
+        Action = 'Debit-Notice',
+        Recipient = msg.Recipient,
+        Quantity = msg.Quantity,
+        Data = Colors.gray ..
+            "You transferred " ..
+            Colors.blue .. msg.Quantity .. Colors.gray .. " to " .. Colors.green .. msg.Recipient .. Colors.reset
+      }
+      -- Credit-Notice message template, that is sent to the Recipient of the transfer
+      local creditNotice = {
+        Target = msg.Recipient,
+        Action = 'Credit-Notice',
+        Sender = msg.From,
+        Quantity = msg.Quantity,
+        Data = Colors.gray ..
+            "You received " ..
+            Colors.blue .. msg.Quantity .. Colors.gray .. " from " .. Colors.green .. msg.From .. Colors.reset
+      }
 
-    -- 发送贷记通知（Credit-Notice）给接收方
-    Send({
-      Target = msg.Tags.Recipient,
-      Action = 'Credit-Notice',
-      Sender = msg.From,
-      Quantity = msg.Tags.Quantity,
-      Balance = tostring(Balances[msg.Tags.Recipient])
-    })
+      -- Add forwarded tags to the credit and debit notice messages
+      for tagName, tagValue in pairs(msg) do
+        -- Tags beginning with "X-" are forwarded
+        if string.sub(tagName, 1, 2) == "X-" then
+          debitNotice[tagName] = tagValue
+          creditNotice[tagName] = tagValue
+        end
+      end
+
+      -- Send Debit-Notice and Credit-Notice
+      if msg.reply then
+        msg.reply(debitNotice)
+      else
+        debitNotice.Target = msg.From
+        Send(debitNotice)
+      end
+      Send(creditNotice)
+    end
   else
-    msg.reply({
-      Action = 'Transfer-Error',
-      Error = 'Insufficient Balance!'
-    })
+    if msg.reply then
+      msg.reply({
+        Action = 'Transfer-Error',
+        ['Message-Id'] = msg.Id,
+        Error = 'Insufficient Balance!'
+      })
+    else
+      Send({
+        Target = msg.From,
+        Action = 'Transfer-Error',
+        ['Message-Id'] = msg.Id,
+        Error = 'Insufficient Balance!'
+      })
+    end
   end
 end)
 ```
@@ -176,6 +216,11 @@ Logo = Logo or 'SBCCXwwecBlDqRLUjb8dYABExTJXLieawf7m2aBJ-KY'
 local bint = require('.bint')(256)
 local json = require('json')
 
+-- 注意：AO 消息格式说明
+-- 1. 直接属性（如 msg.Recipient, msg.Quantity）：用于核心协议参数，是 AO 标准做法
+-- 2. Tags 格式（如 msg.Tags.Name）：用于自定义参数或元数据
+-- 两种格式在 AO 中都有其用途，NFT 实现选择 Tags 格式是为了灵活性
+
 -- NFT Blueprint 核心状态
 NFTs = NFTs or {}
 Owners = Owners or {}
@@ -238,8 +283,8 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
     name = msg.Tags.Name,
     description = msg.Tags.Description,
     image = msg.Tags.Image,
-    attributes = msg.Tags.Attributes or {},
-    transferable = msg.Tags.Transferable ~= nil and msg.Tags.Transferable or true,
+    attributes = json.decode(msg.Data or '{}').attributes or {},
+    transferable = msg.Tags.Transferable == 'true',
     createdAt = msg.Tags.Timestamp or tostring(os.time()),
     creator = msg.From
   }
@@ -247,16 +292,13 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
   Owners[tokenId] = msg.From
 
   -- 发送铸造确认（与 Wander 钱包兼容）
-  local mintConfirmation = {
-    Action = 'Mint-Confirmation',
-    TokenId = tokenId,
-    Name = msg.Tags.Name,
-    Data = "NFT '" .. msg.Tags.Name .. "' minted successfully with ID: " .. tokenId
-  }
-
-  -- 添加必要的标签以便 Wander 钱包发现
   if msg.reply then
-    msg.reply(mintConfirmation)
+    msg.reply({
+      Action = 'Mint-Confirmation',
+      TokenId = tokenId,
+      Name = msg.Tags.Name,
+      Data = "NFT '" .. msg.Tags.Name .. "' minted successfully with ID: " .. tokenId
+    })
   else
     Send({
       Target = msg.From,
@@ -400,7 +442,7 @@ end)
 
 -- 查询用户拥有的 NFTs
 Handlers.add('get_user_nfts', Handlers.utils.hasMatchingTag("Action", "Get-User-NFTs"), function(msg)
-  local userAddress = msg.Tags.Target or msg.From
+  local userAddress = msg.Tags.Address or msg.From
   local userNFTs = {}
 
   for tokenId, owner in pairs(Owners) do
@@ -448,7 +490,7 @@ Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Se
   assert(type(msg.Tags.Transferable) == 'string', 'Transferable is required!')
 
   local tokenId = msg.Tags.TokenId
-  local transferable = msg.Tags.Transferable == "true"
+  local transferable = msg.Tags.Transferable == 'true'
 
   assert(Owners[tokenId] == msg.From, 'You do not own this NFT!')
 
@@ -485,7 +527,7 @@ end)
 
 #### NFT 使用示例（与 Wander 钱包完全兼容）
 ```lua
--- 铸造 NFT（正确的 AO 消息格式）
+-- 铸造 NFT（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
   Tags = {
@@ -503,7 +545,7 @@ Send({
   })
 })
 
--- 转让 NFT（正确的 AO 消息格式）
+-- 转让 NFT（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
   Tags = {
@@ -513,7 +555,7 @@ Send({
   }
 })
 
--- 查询 NFT 信息（正确的 AO 消息格式）
+-- 查询 NFT 信息（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
   Tags = {
@@ -522,16 +564,16 @@ Send({
   }
 })
 
--- 查询用户的所有 NFT（正确的 AO 消息格式）
+-- 查询用户的所有 NFT（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
   Tags = {
     { name = "Action", value = "Get-User-NFTs" },
-    { name = "Target", value = "USER_ADDRESS" }
+    { name = "Address", value = "USER_ADDRESS" }
   }
 })
 
--- 设置 NFT 可转让性（正确的 AO 消息格式）
+-- 设置 NFT 可转让性（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
   Tags = {
@@ -855,12 +897,13 @@ Wander 钱包实现了完整的代币验证流程：
 - ✅ **NFT 功能验证完成**: 通过 Wander 钱包源码验证了完整的 NFT 支持功能，包括 Transferable 属性分类、collectible 类型识别、NFT 详情页面和外部链接集成
 - ✅ **官方 Blueprint 源码发现**: 成功定位并分析了 AO 官方 Token Blueprint 的完整源代码 (`https://github.com/permaweb/aos/blob/main/blueprints/token.lua`)
 - ✅ **NFT 示例实现完成**: 基于官方 Blueprint 源代码创建了完整的 NFT 实现示例，包含铸造、转让、查询等核心功能
-- ✅ **Wander 钱包兼容性验证**: 反复检查并修复了所有消息格式、标签格式，确保与 Wander 钱包完全兼容
+- ✅ **Wander 钱包兼容性验证**: 反复检查并修复了所有消息格式错误，确保使用标准的 AO Tags 格式与 Wander 钱包完全兼容
 - ✅ **Bint 大整数库来源确认**: 确定 AO 使用的 bint 库来自 `https://github.com/edubart/lua-bint` (v0.5.1)
 - ❌ **已修正重大错误**:
   - 原文档错误地使用了 `5WzR7rJCuqCKEq02WUPhTjwnzllLjGu6SA7qhYpcKRs` 作为 AO 代币 Process ID
   - 经 Wander 钱包源码验证，正确 ID 为 `0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc`
   - 原文档混淆了 AO 和 AR.IO 两个不同项目（ARIO 是 AR.IO 网络代币，不是 AO 原生代币）
+  - 原文档错误地认为 `msg.Recipient` 是 `msg.Tags.Recipient` 的快捷方式，经 AO 官方源码验证，两者是不同用途的格式
 - ⚠️ **已标注未验证**: 官方 NFT 标准的确不存在，但主流钱包通过 Transferable 属性和 ATOMIC Ticker 进行 NFT 分类
 - 🔍 **验证方法**: 官方文档审查、GitHub API 验证、Perplexity AI 搜索验证、Wander 钱包源码分析、AO 官方仓库源码克隆与分析
 
