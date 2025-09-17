@@ -25,7 +25,7 @@ Moreover, these applications often adopt "eventual consistency" model when neces
 
 However, even in the more mature engineering environment of Web2, achieving "eventual consistency" based on messaging remains a challenge for many developers.
 
-> Developing Dapps on the nascent AO platform seems to accentuate this challenge even more :).
+Developing Dapps on the nascent AO platform seems to accentuate this challenge even more :).
 
 For example, consider the following Lua code (for AO Dapp) — does it seem "natural" to write it this way?
 
