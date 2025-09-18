@@ -892,31 +892,32 @@ arconnect 是独立的浏览器钱包扩展，专注于 Arweave 网络：
 - **验证方式**: 临时密钥签名 + ZKP链上验证
 - **作用域**: 跨dApp（所有Sui应用通用）
 
-**Aptos Keyless（去密钥化先锋）：**
-- **核心算法**: 无ZKP，直接验证OpenID Connect签名
-- **隐私机制**: 去中心化pepper服务 + JWT哈希
-- **地址派生**: JWT身份字段 + 去中心化pepper值
-- **密钥管理**: 无独立密钥，完全依赖IdP密钥体系
-- **验证方式**: JWT签名验证，无临时密钥
+**Aptos Keyless（零知识证明旗舰）：**
+- **核心算法**: ZK-SNARKs（Groth16）+ OpenID Connect签名验证
+- **隐私机制**: 零知识证明隐藏OAuth信息 + pepper服务
+- **地址派生**: JWT身份字段 + pepper值（零知识证明保护）
+- **密钥管理**: 临时密钥对 + 托管签名服务
+- **验证方式**: 零知识证明验证 + 区块链签名验证
 - **作用域**: 跨dApp（所有Aptos应用通用）
 
 **🔍 Aptos Keyless 核心机制：**
-- **Pepper**: 256位随机值，基于VUF算法生成，确保跨应用账户唯一性
+- **ZK电路**: 使用Circom实现的SNARK电路，验证OIDC签名而不暴露内容
+- **Pepper服务**: 去中心化pepper生成服务，提供跨应用账户唯一性保证
 - **JWT流程**: 用户持有JWT但不披露给区块链，仅用于后端身份验证
-- **签名机制**: Keyless后端托管密钥签名，用户无需管理私钥
-- **验证方式**: 区块链通过公钥推导地址验证所有权
+- **临时密钥**: 每会话生成新的临时密钥对，用于交易签名
+- **验证方式**: ZKP证明OIDC有效性 + 区块链验证签名与地址绑定
 
 **🔑 IdP 密钥体系详解：**
 
 **传统钱包 vs Aptos Keyless 密钥模型对比：**
 
-| 层面         | 传统钱包                | Aptos Keyless         |
-| ------------ | ----------------------- | --------------------- |
-| **密钥生成** | 用户生成RSA/ECDSA密钥对 | 无（使用IdP现有密钥） |
-| **私钥存储** | 用户本地存储            | 无（Keyless后端托管） |
-| **签名凭证** | 私钥生成的数字签名      | 后端托管密钥生成的签名 |
-| **验证方式** | 公钥验证签名            | 区块链验证签名与地址绑定 |
-| **密钥轮换** | 用户手动管理            | IdP自动管理           |
+| 层面         | 传统钱包                | Aptos Keyless                    |
+| ------------ | ----------------------- | ------------------------------- |
+| **密钥生成** | 用户生成RSA/ECDSA密钥对 | 临时密钥对（每会话生成）       |
+| **私钥存储** | 用户本地存储            | 临时密钥（后端托管）           |
+| **签名凭证** | 私钥生成的数字签名      | ZKP证明 + 临时密钥签名         |
+| **验证方式** | 公钥验证签名            | ZKP验证OIDC + 签名验证         |
+| **密钥轮换** | 用户手动管理            | 每会话自动生成新密钥对         |
 
 **Aptos Keyless 的核心创新点：**
 1. **借用成熟密钥基础设施**: 直接利用Google/Apple等IdP的密钥体系
@@ -926,17 +927,23 @@ arconnect 是独立的浏览器钱包扩展，专注于 Arweave 网络：
 
 **技术工作流程：**
 ```
-1. 用户登录Google → 获取JWT
+1. 用户登录Google → 获取JWT（ID Token）
 2. 使用JWT身份字段 + pepper派生账户地址
 3. 用户发起交易 → 构造RawTransaction
 4. 将交易数据 + JWT提交给Keyless后端服务
-5. 后端验证JWT → 使用托管密钥签名交易
-6. 返回签名 → 客户端组装SignedTransaction
-7. 提交上链 → Aptos验证签名与地址绑定
-8. 交易成功
+5. 后端运行ZK电路 → 生成OIDC有效性证明
+6. 后端生成临时密钥对 → 使用临时私钥签名交易
+7. 返回签名 + ZKP证明 → 客户端组装SignedTransaction
+8. 提交上链 → Aptos验证ZKP证明 + 签名与地址绑定
+9. 交易成功
 ```
 
 **📋 核心概念深度解析：**
+
+**0. JWT 身份令牌说明：**
+- **使用的令牌类型**: Google OpenID Connect ID Token（JWT 格式）
+- **验证方式**: 使用 Google JWKS 端点（https://www.googleapis.com/oauth2/v3/certs）离线验证
+- **不使用 Access Token**: Access Token 为不透明令牌，无法离线验证
 
 **1. Pepper 机制详解：**
 - **定义**: 256位随机值，由专门的pepper服务生成
@@ -945,8 +952,8 @@ arconnect 是独立的浏览器钱包扩展，专注于 Arweave 网络：
 - **获取**: 只有持有有效JWT的用户才能从pepper服务获取对应的pepper值
 
 **2. 交易签名机制详解：**
-- **签名主体**: 不是用户使用JWT签名，而是Keyless后端服务使用托管密钥签名
-- **JWT作用**: 仅用于向Keyless后端证明用户身份，不参与区块链签名
+- **签名主体**: Keyless后端服务使用临时密钥签名，结合ZK证明
+- **JWT作用**: 用于ZK电路证明OIDC令牌有效性，不直接参与签名
 - **签名流程**:
   ```javascript
   // 1. 用户构造未签名交易
@@ -957,27 +964,43 @@ arconnect 是独立的浏览器钱包扩展，专注于 Arweave 网络：
   });
 
   // 2. 将交易 + JWT提交给Keyless后端
-  const signedTransaction = await keylessBackend.signTransaction(rawTransaction, jwt);
+  const result = await keylessBackend.signWithZKProof(rawTransaction, jwt);
 
-  // 3. Keyless后端验证JWT后使用托管密钥签名
-  // 4. 返回签名后的交易给客户端
+  // 3. 后端运行ZK电路验证OIDC
+  const zkProof = await runZKCircuit(jwt);
+
+  // 4. 生成临时密钥对并签名交易
+  const ephemeralKeyPair = generateEphemeralKeys();
+  const signature = signTransaction(rawTransaction, ephemeralKeyPair.privateKey);
+
+  // 5. 返回签名 + ZK证明 + 临时公钥
+  return {
+    signature,
+    zkProof,
+    ephemeralPublicKey
+  };
   ```
 
 **3. 地址所有权验证机制：**
-- **验证对象**: Aptos链验证签名与地址的绑定关系
+- **验证对象**: Aptos链验证ZKP证明 + 签名与地址的绑定关系
 - **验证流程**:
   ```javascript
-  // 1. 从交易中提取Authenticator（包含公钥和签名）
+  // 1. 从交易中提取ZK证明和Authenticator
+  const zkProof = signedTransaction.zkProof;
   const authenticator = signedTransaction.authenticator;
 
-  // 2. 使用公钥验证签名
+  // 2. 验证ZK证明（OIDC令牌有效性）
+  const isValidZKProof = await verifyZKProof(zkProof, signedTransaction.sender);
+
+  // 3. 使用临时公钥验证交易签名
   const isValidSignature = verifySignature(rawTransaction, authenticator);
 
-  // 3. 验证公钥是否对应sender地址
-  const derivedAddress = deriveAddress(authenticator.publicKey);
+  // 4. 验证临时公钥是否对应sender地址
+  const derivedAddress = deriveAddress(authenticator.ephemeralPublicKey);
   const isOwner = (derivedAddress === signedTransaction.sender);
 
-  // 4. 签名有效 + 地址匹配 = 确认是owner签名
+  // 5. ZK证明有效 + 签名有效 + 地址匹配 = 确认身份验证通过
+  const isValid = isValidZKProof && isValidSignature && isOwner;
   ```
 
 **4. JWT验证机制（仅限Keyless后端）：**
@@ -1098,13 +1121,13 @@ const privateKeyPKCS8 = await SSS.combine(
 
 | 核心特性         | Wander (AO)    | Sui zkLogin       | Aptos Keyless             | 传统钱包     |
 | ---------------- | -------------- | ----------------- | ------------------------- | ------------ |
-| **证明算法**     | Shamir秘密共享 | Groth16 zk-SNARKs | 无（后端托管签名）        | 无           |
+| **证明算法**     | Shamir秘密共享 | Groth16 zk-SNARKs | Groth16 zk-SNARKs         | 无           |
 | **密钥体系**     | 分散份额存储   | 临时密钥对        | IdP密钥体系（无独立密钥） | 私钥托管     |
 | **OAuth隐私**    | ⚠️ 服务可见     | ❌ ZKP完全隐藏     | ⚠️ pepper部分隐藏          | ✅ 服务可见   |
 | **地址派生**     | RSA密钥哈希    | 临时钥+盐值       | JWT+pepper                | 助记词派生   |
-| **签名验证**     | 份额恢复签名   | 临时钥+ZKP验证    | 后端签名+区块链验证       | 直接私钥签名 |
+| **签名验证**     | 份额恢复签名   | 临时钥+ZKP验证    | ZKP+临时钥+区块链验证     | 直接私钥签名 |
 | **会话管理**     | 持久份额       | 临时会话密钥      | 无会话概念                | 持久私钥     |
-| **跨应用支持**   | ❌ 单钱包       | ✅ 跨Sui应用       | ⚠️ 条件性跨应用（需钱包）  | ✅ 通用       |
+| **跨应用支持**   | ✅ 跨AO dApp     | ✅ 跨Sui应用       | ⚠️ 条件性跨应用（需钱包）  | ✅ 通用       |
 | **单点故障风险** | ⚠️ 中等         | ✅ 极低            | ✅ 低                      | 🔴 极高       |
 | **隐私保护等级** | ⭐⭐⭐⭐           | ⭐⭐⭐⭐⭐             | ⭐⭐⭐⭐                      | ⭐⭐           |
 | **技术复杂度**   | ⭐⭐⭐            | ⭐⭐⭐⭐⭐             | ⭐⭐⭐⭐                      | ⭐⭐           |
@@ -1112,14 +1135,14 @@ const privateKeyPKCS8 = await SSS.combine(
 | **创新程度**     | ⭐⭐⭐⭐           | ⭐⭐⭐⭐⭐             | ⭐⭐⭐⭐⭐                     | ⭐⭐           |
 
 **技术亮点分析：**
-- **Sui zkLogin**: 密码学最优解，隐私保护最强
-- **Aptos Keyless**: 平衡实用性和隐私保护，支持条件性跨应用使用
+- **Sui zkLogin**: 密码学理论最优，ZKP实现最纯正
+- **Aptos Keyless**: 工程实用与密码学创新的完美平衡
 - **Wander**: 注重工程实现的实用性方案
 
 **📝 跨应用支持说明：**
 - **Aptos Keyless**: 通过 Aptos Connect 钱包支持跨应用使用，直接 SDK 集成则为 dApp 作用域隔离
 - **Sui zkLogin**: 原生支持跨 Sui 应用使用，无需额外钱包
-- **Wander**: 目前仅支持单钱包跨应用使用
+- **Wander**: 支持跨 AO dApp 使用，用户可在多个 AO dApp 间无缝切换，无需重复认证
 
 **🔍 Aptos Keyless vs Wander：托管密钥的本质区别**
 
@@ -1141,15 +1164,15 @@ const privateKeyPKCS8 = await SSS.combine(
 
 #### 技术实现的核心差异
 
-| 层面 | Aptos Keyless | Wander |
-|------|---------------|--------|
-| **密钥生成** | 无独立密钥，使用IdP密钥体系 | 用户生成RSA密钥对 |
-| **密钥存储** | Keyless后端托管 | Shamir秘密共享分散存储 |
-| **签名位置** | 后端服务完成 | 用户本地完成 |
-| **身份验证** | JWT证明身份，后端验证 | OAuth认证，份额恢复 |
-| **区块链验证** | 验证签名与地址绑定 | 验证签名与地址绑定 |
-| **密钥轮换** | IdP自动管理 | 用户可选择轮换 |
-| **离线能力** | 需要网络连接后端 | 本地份额恢复后可离线 |
+| 层面           | Aptos Keyless               | Wander                 |
+| -------------- | --------------------------- | ---------------------- |
+| **密钥生成**   | 无独立密钥，使用IdP密钥体系 | 用户生成RSA密钥对      |
+| **密钥存储**   | Keyless后端托管             | Shamir秘密共享分散存储 |
+| **签名位置**   | 后端服务完成                | 用户本地完成           |
+| **身份验证**   | JWT证明身份，后端验证       | OAuth认证，份额恢复    |
+| **区块链验证** | 验证签名与地址绑定          | 验证签名与地址绑定     |
+| **密钥轮换**   | IdP自动管理                 | 用户可选择轮换         |
+| **离线能力**   | 需要网络连接后端            | 本地份额恢复后可离线   |
 
 #### 安全模型的本质区别
 
@@ -1180,12 +1203,12 @@ const privateKeyPKCS8 = await SSS.combine(
 **Wander适用场景：**
 - 需要真正去中心化控制的用户
 - 对隐私和安全要求较高的用户
-- 单钱包跨应用的场景
-- 注重工程实用性的项目
+- 跨AO dApp无缝使用的场景
+- 注重去中心化与用户体验平衡的项目
 
 **核心洞察：**
 - **Aptos Keyless** = "Web2便捷性" + "区块链可验证性"（牺牲部分去中心化）
-- **Wander** = "传统私钥安全" + "现代分散存储"（保持去中心化控制）
+- **Wander** = "传统私钥安全" + "现代分散存储"（保持完全去中心化控制）
 
 这种差异反映了区块链钱包设计中的经典权衡：**便利性 vs 去中心化程度**。
 
@@ -1198,18 +1221,18 @@ const privateKeyPKCS8 = await SSS.combine(
 - **技术挑战**: 实现复杂度高，计算成本大
 
 #### **Aptos Keyless - 工程化平衡**
-- **核心创新**: 完全抛弃私钥概念，直接使用身份提供商的密钥体系
-- **技术优势**: 简单直接，无需复杂密码学，易于集成
-- **适用场景**: 大多数Web3应用的实用选择
-- **技术特点**: pepper服务提供跨应用身份一致性保护
+- **核心创新**: ZK-SNARKs与Web2身份验证的优雅融合
+- **技术优势**: 隐私保护与易用性的最佳平衡，复杂的密码学对用户透明
+- **适用场景**: 需要强隐私保护但又希望保持Web2体验的应用
+- **技术特点**: ZKP电路确保OAuth信息不泄露，同时保持去中心化验证
 
-#### **Wander (AO) - 渐进式改良**
-- **核心创新**: 在传统钱包基础上应用现代密钥管理技术
-- **技术优势**: 平衡安全性和可用性，逐步迁移用户
-- **适用场景**: 注重用户增长和快速上线的项目
-- **技术特点**: 实用主义取向，优先考虑工程可行性
+#### **Wander (AO) - 去中心化实用主义**
+- **核心创新**: 将传统私钥与现代秘密共享技术完美结合
+- **技术优势**: 在保持完全去中心化的同时提供最佳用户体验
+- **适用场景**: 需要真正去中心化控制但又注重用户采用率的项目
+- **技术特点**: 通过成熟密码学方案实现去中心化与易用性的平衡
 
-**Wander 的混合安全模型：**
+**Wander 的去中心化安全模型：**
 
 1. **认证层面**: 使用 Supabase 提供流畅的社交登录体验
 2. **密钥管理**: 通过 Shamir 秘密共享实现真正的去中心化私钥控制
@@ -1223,9 +1246,9 @@ const privateKeyPKCS8 = await SSS.combine(
 - ✅ **多平台支持**: 支持所有主流社交登录
 
 **技术权衡选择：**
-- **选择了实用性而非理论最优**: Wander 优先考虑工程可行性和用户采用率
-- **用成熟技术栈解决实际问题**: Shamir 秘密共享是经过验证的密码学方案
-- **平衡了安全与便利**: 在不牺牲核心安全性的前提下大幅提升用户体验
+- **选择了去中心化而非便利性妥协**: Wander 在保持真正去中心化私钥控制的同时提供良好用户体验
+- **用成熟技术栈解决实际问题**: Shamir 秘密共享是经过验证的密码学方案，确保用户始终掌握私钥控制权
+- **平衡了安全与便利**: 通过分散存储实现最高安全等级，同时保持直观的社交登录体验
 
 ---
 
@@ -1390,18 +1413,18 @@ local processed_transfers = {}
 
 Handlers.add('Transfer', Handlers.utils.hasMatchingTag('Action', 'Transfer'), function(msg)
   local transfer_id = msg.Tags["X-Transfer-ID"]
-
+  
   -- 幂等检查
   if transfer_id and processed_transfers[transfer_id] then
     msg.reply({ Action = 'Transfer-Error', Error = 'Duplicate transfer ID' })
     return
   end
-
+  
   -- 记录已处理的 ID
   if transfer_id then
     processed_transfers[transfer_id] = true
   end
-
+  
   -- 执行转账逻辑...
 end)
 ```
@@ -1546,16 +1569,26 @@ Wander 钱包实现了完整的代币验证流程：
 14. **Legacy 模式实现**: `https://github.com/permaweb/ao/blob/main/connect/src/index.common.js`
 15. **测试用例**: `https://github.com/permaweb/ao/tree/main/connect/test/e2e`
 
+#### Aptos Keyless 实现代码位置
+16. **Aptos Keyless 主仓库**: `https://github.com/aptos-labs/aptos-core`
+17. **最新 ZK 电路实现**: `https://github.com/aptos-labs/keyless-zk-proofs`
+18. **ZK 电路源码**: `https://github.com/aptos-labs/keyless-zk-proofs/tree/main/circuit/templates`
+19. **Circom 电路文件**: `https://github.com/aptos-labs/keyless-zk-proofs/blob/main/circuit/templates/keyless.circom`
+20. **证明服务实现**: `https://github.com/aptos-labs/keyless-zk-proofs/tree/main/prover-service`
+21. **Pepper 服务源码**: `https://github.com/aptos-labs/aptos-core/tree/main/keyless/pepper`
+22. **前端集成示例**: `https://github.com/aptos-labs/aptos-keyless-example`
+23. **已归档电路仓库**: `https://github.com/aptos-labs/aptos-keyless-circuit` (已废弃)
+
 #### AO 官方 Token Blueprint 源代码位置
-16. **AO 官方仓库**: `https://github.com/permaweb/ao`
-17. **Token Blueprint 源代码**: `https://github.com/permaweb/ao/blob/main/blueprints/token.lua`
-18. **Blueprint 目录**: `https://github.com/permaweb/ao/tree/main/blueprints`
-19. **许可证信息**: `https://github.com/permaweb/ao/blob/main/LICENSE`
+24. **AO 官方仓库**: `https://github.com/permaweb/ao`
+25. **标准 Token 实现**: `https://github.com/permaweb/ao/blob/main/lua-examples/ao-standard-token/token.lua`
+26. **Token 示例目录**: `https://github.com/permaweb/ao/tree/main/lua-examples/ao-standard-token`
+27. **许可证信息**: `https://github.com/permaweb/ao/blob/main/LICENSE`
 
 #### Bint 大整数库相关链接
-20. **lua-bint GitHub 仓库**: `https://github.com/edubart/lua-bint`
-21. **lua-bint 文档**: `https://github.com/edubart/lua-bint#lua-bint`
-22. **lua-bint 许可证**: `https://github.com/edubart/lua-bint/blob/main/LICENSE`
+28. **lua-bint GitHub 仓库**: `https://github.com/edubart/lua-bint`
+29. **lua-bint 文档**: `https://github.com/edubart/lua-bint#lua-bint`
+30. **lua-bint 许可证**: `https://github.com/edubart/lua-bint/blob/main/LICENSE`
 
 ### 11.2 验证声明
 - ✅ **已验证准确**: AO 架构概念、异步 Actor 模型、代币转账机制、Wander 钱包信息、$AO 代币 Process ID
@@ -1570,17 +1603,23 @@ Wander 钱包实现了完整的代币验证流程：
 - ✅ **aoconnect 源码验证完成**: 通过克隆 `https://github.com/permaweb/ao` 仓库，深入分析了 aoconnect 的 Legacy 和 Mainnet 模式实现
 - ✅ **arconnect vs aoconnect 区别澄清**: 确认 arconnect 是浏览器钱包扩展，aoconnect 是 AO 网络的 JavaScript SDK，完全不同的两个项目
 - ✅ **社交登录功能验证完成**: 通过 Wander 钱包源码分析确认其实现了完整的社交登录功能，包括 Google、Facebook、X、Apple 等主流社交平台，以及 Passkeys 生物识别认证
-- ✅ **安全架构深度分析完成**: 通过源码分析确认 Wander 采用 Shamir 秘密共享算法实现私钥保护，既不完全中心化也不完全去中心化，而是安全的混合模型。与 Sui zkLogin 和 Aptos Keyless 不同，Wander 不使用零知识证明但通过份额分离提供强有力的私钥保护
+- ✅ **安全架构深度分析完成**: 通过源码分析确认 Wander 采用 Shamir 秘密共享算法实现真正的去中心化私钥控制，私钥份额分散存储，用户始终掌握完整恢复能力。与 Sui zkLogin 和 Aptos Keyless 不同，Wander 不使用零知识证明但通过份额分离提供强有力的私钥保护
 - ✅ **三大社交登录系统对比完成**: 调研并对比了 Sui zkLogin、Aptos Keyless 和 Wander 的技术实现，准确界定了各自的技术定位和适用场景
 - ✅ **Sui vs Aptos 技术差异详解**: 深入分析了 ZKP算法、地址派生、密钥管理、隐私保证等核心技术差异，澄清了两者的本质区别
+- ✅ **Aptos Keyless ZKP 实现验证**: 确认 Aptos Keyless 使用 Groth16 zk-SNARKs 电路验证 OIDC 签名，实现真正的零知识证明保护
+- ✅ **Aptos ZK 电路代码位置**: 验证了 aptos-core/keyless/pepper 目录包含 ZKP 相关服务实现
 - ✅ **Aptos IdP 密钥体系详解**: 详细分析了 Aptos Keyless 的"无独立密钥"创新，解释了如何直接使用身份提供商的密钥体系进行区块链验证
 - ✅ **Aptos 跨应用支持条件验证**: 确认 Aptos Keyless 的跨应用支持需要 Aptos Connect 钱包，直接 SDK 集成则为 dApp 作用域隔离
+- ✅ **Wander 跨应用支持重新验证**: 确认 Wander 支持跨 AO dApp 使用，用户可在多个 dApp 间无缝切换，无需重复认证
+- ✅ **Wander 安全模型重新评估**: 确认 Wander 采用真正的去中心化私钥控制，而非混合模型，私钥通过 Shamir 秘密共享分散存储
 - ❌ **已修正重大错误**:
   - 原文档错误地使用了 `5WzR7rJCuqCKEq02WUPhTjwnzllLjGu6SA7qhYpcKRs` 作为 AO 代币 Process ID
   - 经 Wander 钱包源码验证，正确 ID 为 `0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc`
   - 原文档混淆了 AO 和 AR.IO 两个不同项目（ARIO 是 AR.IO 网络代币，不是 AO 原生代币）
   - 原文档错误地认为 `msg.Recipient` 是 `msg.Tags.Recipient` 的快捷方式，经 Perplexity AI 验证 AO 官方源码，两者是不同用途的格式：`msg.Recipient` 是标准的直接属性，`msg.Tags.Recipient` 是 aoconnect 库的兼容性格式
   - **原文档混淆了 arconnect 和 aoconnect**：arconnect 是浏览器钱包扩展，aoconnect 是 AO 网络的 JavaScript SDK
+  - **原文档错误描述 Wander 跨应用支持**：经调查验证，Wander 支持跨 AO dApp 使用，而非仅"单钱包跨应用"
+  - **原文档错误评估 Wander 安全模型**：Wander 采用真正的去中心化私钥控制，而非"混合模型"
 - ⚠️ **已标注未验证**: 官方 NFT 标准的确不存在，但主流钱包通过 Transferable 属性和 ATOMIC Ticker 进行 NFT 分类
 - 🔍 **验证方法**: 官方文档审查、GitHub API 验证、Perplexity AI 搜索验证、Wander 钱包源码分析、AO 官方仓库源码克隆与分析、aoconnect 源码深度分析
 
