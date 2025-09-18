@@ -218,9 +218,18 @@ local bint = require('.bint')(256)
 local json = require('json')
 
 -- 注意：AO 消息格式说明
--- 1. 直接属性（如 msg.Recipient, msg.Quantity）：用于核心协议参数，是 AO 标准做法
--- 2. Tags 格式（如 msg.Tags.Name）：用于自定义参数或元数据
--- 两种格式在 AO 中都有其用途，NFT 实现选择 Tags 格式是为了灵活性
+-- 根据 AO 官方源码验证，消息对象使用直接属性格式：
+-- 1. 核心属性：msg.From, msg.Recipient, msg.Quantity 等直接属性
+-- 2. 扩展属性：Action, Name, Description 等也使用直接属性
+-- 3. Tags 格式：主要用于 aoconnect 库的兼容性处理
+--
+-- 标准 AO 消息格式示例：
+-- Send({
+--   Target = "PROCESS_ID",
+--   Action = "Transfer",
+--   Recipient = "ADDRESS",
+--   Quantity = "1000"
+-- })
 
 -- NFT Blueprint 核心状态
 NFTs = NFTs or {}
@@ -246,6 +255,8 @@ local utils = {
 
 -- Info handler - 让 Wander 钱包能够识别这个 NFT 合约
 Handlers.add('nft_info', Handlers.utils.hasMatchingTag("Action", "Info"), function(msg)
+  -- 注意：AO 消息格式使用直接属性，不需要 msg.Tags.Action
+  -- 这里保持兼容性，但建议使用 msg.Action 进行匹配
   if msg.reply then
     msg.reply({
       Name = "AO NFT Collection",
@@ -257,36 +268,34 @@ Handlers.add('nft_info', Handlers.utils.hasMatchingTag("Action", "Info"), functi
   else
     Send({
       Target = msg.From,
-      Tags = {
-        { name = "Action", value = "Info" },
-        { name = "Name", value = "AO NFT Collection" },
-        { name = "Ticker", value = "NFT" },
-        { name = "Logo", value = "NFT_LOGO_TXID_HERE" },
-        { name = "Denomination", value = "0" },
-        { name = "Transferable", value = "true" },
-        { name = "Data-Protocol", value = "ao" },
-        { name = "Type", value = "NFT-Contract" }
-      }
+      Action = "Info",
+      Name = "AO NFT Collection",
+      Ticker = "NFT",
+      Logo = "NFT_LOGO_TXID_HERE",
+      Denomination = "0",
+      Transferable = "true",
+      ["Data-Protocol"] = "ao",
+      Type = "NFT-Contract"
     })
   end
 end)
 
 -- 铸造 NFT
 Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), function(msg)
-  assert(type(msg.Tags.Name) == 'string', 'Name is required!')
-  assert(type(msg.Tags.Description) == 'string', 'Description is required!')
-  assert(type(msg.Tags.Image) == 'string', 'Image is required!')
+  assert(type(msg.Name) == 'string', 'Name is required!')
+  assert(type(msg.Description) == 'string', 'Description is required!')
+  assert(type(msg.Image) == 'string', 'Image is required!')
 
   TokenIdCounter = TokenIdCounter + 1
   local tokenId = tostring(TokenIdCounter)
 
   NFTs[tokenId] = {
-    name = msg.Tags.Name,
-    description = msg.Tags.Description,
-    image = msg.Tags.Image,
+    name = msg.Name,
+    description = msg.Description,
+    image = msg.Image,
     attributes = json.decode(msg.Data or '{}').attributes or {},
-    transferable = msg.Tags.Transferable == 'true',
-    createdAt = msg.Tags.Timestamp or tostring(os.time()),
+    transferable = msg.Transferable == 'true',
+    createdAt = msg.Timestamp or tostring(os.time()),
     creator = msg.From
   }
 
@@ -297,23 +306,21 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
     msg.reply({
       Action = 'Mint-Confirmation',
       TokenId = tokenId,
-      Name = msg.Tags.Name,
-      Data = "NFT '" .. msg.Tags.Name .. "' minted successfully with ID: " .. tokenId
+      Name = msg.Name,
+      Data = "NFT '" .. msg.Name .. "' minted successfully with ID: " .. tokenId
     })
   else
     Send({
       Target = msg.From,
-      Tags = {
-        { name = "Action", value = "Mint-Confirmation" },
-        { name = "TokenId", value = tokenId },
-        { name = "Name", value = msg.Tags.Name },
-        { name = "Data-Protocol", value = "ao" },
-        { name = "Type", value = "NFT-Mint" }
-      },
+      Action = "Mint-Confirmation",
+      TokenId = tokenId,
+      Name = msg.Name,
+      ["Data-Protocol"] = "ao",
+      Type = "NFT-Mint",
       Data = json.encode({
         success = true,
         tokenId = tokenId,
-        message = "NFT '" .. msg.Tags.Name .. "' minted successfully with ID: " .. tokenId
+        message = "NFT '" .. msg.Name .. "' minted successfully with ID: " .. tokenId
       })
     })
   end
@@ -321,11 +328,11 @@ end)
 
 -- 转让 NFT
 Handlers.add('transfer_nft', Handlers.utils.hasMatchingTag("Action", "Transfer-NFT"), function(msg)
-  assert(type(msg.Tags.TokenId) == 'string', 'TokenId is required!')
-  assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
+  assert(type(msg.TokenId) == 'string', 'TokenId is required!')
+  assert(type(msg.Recipient) == 'string', 'Recipient is required!')
 
-  local tokenId = msg.Tags.TokenId
-  local recipient = msg.Tags.Recipient
+  local tokenId = msg.TokenId
+  local recipient = msg.Recipient
 
   -- 验证所有权
   assert(Owners[tokenId] == msg.From, 'You do not own this NFT!')
@@ -349,15 +356,13 @@ Handlers.add('transfer_nft', Handlers.utils.hasMatchingTag("Action", "Transfer-N
     -- 发送给接收者（Credit-Notice 格式）
     Send({
       Target = recipient,
-      Tags = {
-        { name = "Action", value = "Credit-Notice" },
-        { name = "TokenId", value = tokenId },
-        { name = "From", value = oldOwner },
-        { name = "To", value = recipient },
-        { name = "Name", value = NFTs[tokenId].name },
-        { name = "Data-Protocol", value = "ao" },
-        { name = "Type", value = "NFT-Transfer" }
-      },
+      Action = "Credit-Notice",
+      TokenId = tokenId,
+      From = oldOwner,
+      To = recipient,
+      Name = NFTs[tokenId].name,
+      ["Data-Protocol"] = "ao",
+      Type = "NFT-Transfer",
       Data = json.encode({
         success = true,
         tokenId = tokenId,
@@ -368,15 +373,13 @@ Handlers.add('transfer_nft', Handlers.utils.hasMatchingTag("Action", "Transfer-N
     -- 发送给发送者（Debit-Notice 格式）
     Send({
       Target = oldOwner,
-      Tags = {
-        { name = "Action", value = "Debit-Notice" },
-        { name = "TokenId", value = tokenId },
-        { name = "From", value = oldOwner },
-        { name = "To", value = recipient },
-        { name = "Name", value = NFTs[tokenId].name },
-        { name = "Data-Protocol", value = "ao" },
-        { name = "Type", value = "NFT-Transfer" }
-      },
+      Action = "Debit-Notice",
+      TokenId = tokenId,
+      From = oldOwner,
+      To = recipient,
+      Name = NFTs[tokenId].name,
+      ["Data-Protocol"] = "ao",
+      Type = "NFT-Transfer",
       Data = json.encode({
         success = true,
         tokenId = tokenId,
@@ -388,9 +391,9 @@ end)
 
 -- 查询 NFT 信息
 Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), function(msg)
-  assert(type(msg.Tags.TokenId) == 'string', 'TokenId is required!')
+  assert(type(msg.TokenId) == 'string', 'TokenId is required!')
 
-  local tokenId = msg.Tags.TokenId
+  local tokenId = msg.TokenId
   local nft = NFTs[tokenId]
 
   assert(nft, 'NFT not found!')
@@ -413,19 +416,17 @@ Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), func
   else
     Send({
       Target = msg.From,
-      Tags = {
-        { name = "Action", value = "NFT-Info" },
-        { name = "TokenId", value = tokenId },
-        { name = "Name", value = nft.name },
-        { name = "Description", value = nft.description },
-        { name = "Image", value = nft.image },
-        { name = "Owner", value = Owners[tokenId] },
-        { name = "Creator", value = nft.creator },
-        { name = "CreatedAt", value = nft.createdAt },
-        { name = "Transferable", value = tostring(nft.transferable) },
-        { name = "Data-Protocol", value = "ao" },
-        { name = "Type", value = "NFT-Info" }
-      },
+      Action = "NFT-Info",
+      TokenId = tokenId,
+      Name = nft.name,
+      Description = nft.description,
+      Image = nft.image,
+      Owner = Owners[tokenId],
+      Creator = nft.creator,
+      CreatedAt = nft.createdAt,
+      Transferable = tostring(nft.transferable),
+      ["Data-Protocol"] = "ao",
+      Type = "NFT-Info",
       Data = json.encode({
         tokenId = tokenId,
         name = nft.name,
@@ -443,7 +444,7 @@ end)
 
 -- 查询用户拥有的 NFTs
 Handlers.add('get_user_nfts', Handlers.utils.hasMatchingTag("Action", "Get-User-NFTs"), function(msg)
-  local userAddress = msg.Tags.Address or msg.From
+  local userAddress = msg.Address or msg.From
   local userNFTs = {}
 
   for tokenId, owner in pairs(Owners) do
@@ -469,13 +470,11 @@ Handlers.add('get_user_nfts', Handlers.utils.hasMatchingTag("Action", "Get-User-
   else
     Send({
       Target = msg.From,
-      Tags = {
-        { name = "Action", value = "User-NFTs" },
-        { name = "Address", value = userAddress },
-        { name = "Count", value = tostring(#userNFTs) },
-        { name = "Data-Protocol", value = "ao" },
-        { name = "Type", value = "User-NFTs" }
-      },
+      Action = "User-NFTs",
+      Address = userAddress,
+      Count = tostring(#userNFTs),
+      ["Data-Protocol"] = "ao",
+      Type = "User-NFTs",
       Data = json.encode({
         address = userAddress,
         nfts = userNFTs,
@@ -487,11 +486,11 @@ end)
 
 -- 设置 NFT 可转让性
 Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Set-NFT-Transferable"), function(msg)
-  assert(type(msg.Tags.TokenId) == 'string', 'TokenId is required!')
-  assert(type(msg.Tags.Transferable) == 'string', 'Transferable is required!')
+  assert(type(msg.TokenId) == 'string', 'TokenId is required!')
+  assert(type(msg.Transferable) == 'string', 'Transferable is required!')
 
-  local tokenId = msg.Tags.TokenId
-  local transferable = msg.Tags.Transferable == 'true'
+  local tokenId = msg.TokenId
+  local transferable = msg.Transferable == 'true'
 
   assert(Owners[tokenId] == msg.From, 'You do not own this NFT!')
 
@@ -509,13 +508,11 @@ Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Se
   else
     Send({
       Target = msg.From,
-      Tags = {
-        { name = "Action", value = "NFT-Transferable-Updated" },
-        { name = "TokenId", value = tokenId },
-        { name = "Transferable", value = tostring(transferable) },
-        { name = "Data-Protocol", value = "ao" },
-        { name = "Type", value = "NFT-Update" }
-      },
+      Action = "NFT-Transferable-Updated",
+      TokenId = tokenId,
+      Transferable = tostring(transferable),
+      ["Data-Protocol"] = "ao",
+      Type = "NFT-Update",
       Data = json.encode({
         tokenId = tokenId,
         transferable = transferable,
@@ -531,13 +528,11 @@ end)
 -- 铸造 NFT（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
-  Tags = {
-    { name = "Action", value = "Mint-NFT" },
-    { name = "Name", value = "Digital Art #001" },
-    { name = "Description", value = "A beautiful digital artwork" },
-    { name = "Image", value = "Arweave_TxID_Here" },
-    { name = "Transferable", value = "true" }
-  },
+  Action = "Mint-NFT",
+  Name = "Digital Art #001",
+  Description = "A beautiful digital artwork",
+  Image = "Arweave_TxID_Here",
+  Transferable = "true",
   Data = json.encode({
     attributes = {
       { trait_type = "Rarity", value = "Legendary" },
@@ -549,39 +544,31 @@ Send({
 -- 转让 NFT（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
-  Tags = {
-    { name = "Action", value = "Transfer-NFT" },
-    { name = "TokenId", value = "1" },
-    { name = "Recipient", value = "RECIPIENT_ADDRESS" }
-  }
+  Action = "Transfer-NFT",
+  TokenId = "1",
+  Recipient = "RECIPIENT_ADDRESS"
 })
 
 -- 查询 NFT 信息（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
-  Tags = {
-    { name = "Action", value = "Get-NFT" },
-    { name = "TokenId", value = "1" }
-  }
+  Action = "Get-NFT",
+  TokenId = "1"
 })
 
 -- 查询用户的所有 NFT（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
-  Tags = {
-    { name = "Action", value = "Get-User-NFTs" },
-    { name = "Address", value = "USER_ADDRESS" }
-  }
+  Action = "Get-User-NFTs",
+  Address = "USER_ADDRESS"
 })
 
 -- 设置 NFT 可转让性（标准的 AO 消息格式）
 Send({
   Target = "NFT_CONTRACT_ADDRESS",
-  Tags = {
-    { name = "Action", value = "Set-NFT-Transferable" },
-    { name = "TokenId", value = "1" },
-    { name = "Transferable", value = "false" }
-  }
+  Action = "Set-NFT-Transferable",
+  TokenId = "1",
+  Transferable = "false"
 })
 ```
 
@@ -913,6 +900,12 @@ arconnect 是独立的浏览器钱包扩展，专注于 Arweave 网络：
 - **验证方式**: JWT签名验证，无临时密钥
 - **作用域**: 跨dApp（所有Aptos应用通用）
 
+**🔍 Aptos Keyless 核心机制：**
+- **Pepper**: 256位随机值，基于VUF算法生成，确保跨应用账户唯一性
+- **JWT流程**: 用户持有JWT但不披露给区块链，仅用于后端身份验证
+- **签名机制**: Keyless后端托管密钥签名，用户无需管理私钥
+- **验证方式**: 区块链通过公钥推导地址验证所有权
+
 **🔑 IdP 密钥体系详解：**
 
 **传统钱包 vs Aptos Keyless 密钥模型对比：**
@@ -920,30 +913,120 @@ arconnect 是独立的浏览器钱包扩展，专注于 Arweave 网络：
 | 层面         | 传统钱包                | Aptos Keyless         |
 | ------------ | ----------------------- | --------------------- |
 | **密钥生成** | 用户生成RSA/ECDSA密钥对 | 无（使用IdP现有密钥） |
-| **私钥存储** | 用户本地存储            | 无（IdP服务器存储）   |
-| **签名凭证** | 私钥生成的数字签名      | IdP签发的JWT令牌      |
-| **验证方式** | 公钥验证签名            | IdP公钥验证JWT        |
+| **私钥存储** | 用户本地存储            | 无（Keyless后端托管） |
+| **签名凭证** | 私钥生成的数字签名      | 后端托管密钥生成的签名 |
+| **验证方式** | 公钥验证签名            | 区块链验证签名与地址绑定 |
 | **密钥轮换** | 用户手动管理            | IdP自动管理           |
 
 **Aptos Keyless 的核心创新点：**
 1. **借用成熟密钥基础设施**: 直接利用Google/Apple等IdP的密钥体系
-2. **JWT双重身份**: JWT既是身份凭证又是签名凭证
+2. **身份与签名分离**: JWT仅作为身份凭证，后端托管密钥负责交易签名
 3. **无密钥管理负担**: 用户无需存储或备份任何私钥
-4. **实时验证**: 每次交易都验证JWT的有效性和签名
+4. **隐私保护**: JWT不暴露给区块链网络，保护用户身份隐私
 
 **技术工作流程：**
 ```
 1. 用户登录Google → 获取JWT
-2. Aptos链验证JWT签名（使用Google公钥）
-3. 使用JWT身份字段 + pepper派生账户地址
-4. 验证地址匹配且JWT有效
-5. 交易成功，无需独立私钥签名
+2. 使用JWT身份字段 + pepper派生账户地址
+3. 用户发起交易 → 构造RawTransaction
+4. 将交易数据 + JWT提交给Keyless后端服务
+5. 后端验证JWT → 使用托管密钥签名交易
+6. 返回签名 → 客户端组装SignedTransaction
+7. 提交上链 → Aptos验证签名与地址绑定
+8. 交易成功
+```
+
+**📋 核心概念深度解析：**
+
+**1. Pepper 机制详解：**
+- **定义**: 256位随机值，由专门的pepper服务生成
+- **生成方式**: 基于VUF(可验证不可预测函数)算法
+- **作用**: 确保同一身份在不同应用中产生不同地址，防止跨应用追踪
+- **获取**: 只有持有有效JWT的用户才能从pepper服务获取对应的pepper值
+
+**2. 交易签名机制详解：**
+- **签名主体**: 不是用户使用JWT签名，而是Keyless后端服务使用托管密钥签名
+- **JWT作用**: 仅用于向Keyless后端证明用户身份，不参与区块链签名
+- **签名流程**:
+  ```javascript
+  // 1. 用户构造未签名交易
+  const rawTransaction = buildRawTransaction({
+    sender: accountAddress,
+    payload: transactionPayload,
+    sequenceNumber: seqNum
+  });
+
+  // 2. 将交易 + JWT提交给Keyless后端
+  const signedTransaction = await keylessBackend.signTransaction(rawTransaction, jwt);
+
+  // 3. Keyless后端验证JWT后使用托管密钥签名
+  // 4. 返回签名后的交易给客户端
+  ```
+
+**3. 地址所有权验证机制：**
+- **验证对象**: Aptos链验证签名与地址的绑定关系
+- **验证流程**:
+  ```javascript
+  // 1. 从交易中提取Authenticator（包含公钥和签名）
+  const authenticator = signedTransaction.authenticator;
+
+  // 2. 使用公钥验证签名
+  const isValidSignature = verifySignature(rawTransaction, authenticator);
+
+  // 3. 验证公钥是否对应sender地址
+  const derivedAddress = deriveAddress(authenticator.publicKey);
+  const isOwner = (derivedAddress === signedTransaction.sender);
+
+  // 4. 签名有效 + 地址匹配 = 确认是owner签名
+  ```
+
+**4. JWT验证机制（仅限Keyless后端）：**
+- **JWT结构**: header.payload.signature 三段式
+- **验证主体**: Keyless后端验证JWT，区块链不验证JWT
+- **公钥获取**: 通过IdP的标准JWK端点动态获取
+```bash
+# Google OAuth 2.0 JWK集端点
+curl https://www.googleapis.com/oauth2/v3/certs
+
+# 返回格式示例：
+{
+  "keys": [
+    {
+      "use": "sig",
+      "e": "AQAB",
+      "n": "pX0uFURVHarx3LZWaF4LnP3Kh2MbVl3iEOpQUcSxADEutXj383X9ZU6wdCmX4y_K23b0BU6oID1q0jkEE3sfQYaJJ7Qj9u2UnT-G9oGUoAn9GV1AYWxCNSz9mCrIJxP7ywcrvWJsKiYo7Q3Q-Tz44W1dCdVDQW870eixQSCnc6xrz4tu7RKrpeStH_GDhNIY3tXOuZvlPIvv4PH5sL39RaQ36T8ceGTWVDlYogKtvUUWl2YCGhz0f5y_ToRKU_WjnOmrN25_x30chCH3uz6I1RUa8vTAjbxCk4H5d1NmFNgV1zMSUKG0qo2d91fbyjmIRyODPVuUzSozREcVeSF_3Q",
+      "kid": "07f078f2647e8cd019c40da9569e4f5247991094",
+      "alg": "RS256",
+      "kty": "RSA"
+    }
+  ]
+}
 ```
 
 **安全性保证：**
 - ✅ **IdP安全等级**: 继承Google/Apple等顶级安全公司的安全标准
 - ✅ **实时验证**: JWT过期或撤销立即失效
-- ⚠️ **依赖外部**: 安全性依赖IdP的密钥管理
+- ⚠️ **依赖外部**: 安全性依赖IdP的密钥管理和Keyless后端服务
+
+**🔐 关键问题详解：**
+
+**1. JWT披露机制：**
+- **用户持有**: 用户确实持有有效的JWT令牌
+- **披露范围**: JWT仅披露给Keyless后端服务，用于身份验证
+- **区块链透明**: JWT不会包含在区块链交易中，区块链只看到签名和公钥
+- **隐私保护**: JWT内容对区块链网络完全不可见
+
+**2. 交易签名流程：**
+- **签名主体**: Keyless后端服务使用托管的密钥对交易进行签名
+- **用户参与**: 用户只需提供JWT证明身份，无需任何密钥操作
+- **签名返回**: 后端将签名结果返回给客户端
+- **上链内容**: 最终交易包含公钥、签名和交易数据
+
+**3. 地址所有权验证：**
+- **验证依据**: 通过公钥能否正确验证签名来确认所有权
+- **地址绑定**: 账户地址是从公钥推导出来的
+- **验证逻辑**: 签名有效 + 地址匹配 = 确认是地址owner的签名
+- **无需JWT**: 区块链验证完全基于密码学签名，不依赖JWT
 
 **Wander（工程实用主义）：**
 - **核心算法**: Shamir秘密共享（成熟密钥分割技术）
@@ -1015,11 +1098,11 @@ const privateKeyPKCS8 = await SSS.combine(
 
 | 核心特性         | Wander (AO)    | Sui zkLogin       | Aptos Keyless             | 传统钱包     |
 | ---------------- | -------------- | ----------------- | ------------------------- | ------------ |
-| **证明算法**     | Shamir秘密共享 | Groth16 zk-SNARKs | 无（直接JWT验证）         | 无           |
+| **证明算法**     | Shamir秘密共享 | Groth16 zk-SNARKs | 无（后端托管签名）        | 无           |
 | **密钥体系**     | 分散份额存储   | 临时密钥对        | IdP密钥体系（无独立密钥） | 私钥托管     |
 | **OAuth隐私**    | ⚠️ 服务可见     | ❌ ZKP完全隐藏     | ⚠️ pepper部分隐藏          | ✅ 服务可见   |
 | **地址派生**     | RSA密钥哈希    | 临时钥+盐值       | JWT+pepper                | 助记词派生   |
-| **签名验证**     | 份额恢复签名   | 临时钥+ZKP验证    | JWT签名验证               | 直接私钥签名 |
+| **签名验证**     | 份额恢复签名   | 临时钥+ZKP验证    | 后端签名+区块链验证       | 直接私钥签名 |
 | **会话管理**     | 持久份额       | 临时会话密钥      | 无会话概念                | 持久私钥     |
 | **跨应用支持**   | ❌ 单钱包       | ✅ 跨Sui应用       | ⚠️ 条件性跨应用（需钱包）  | ✅ 通用       |
 | **单点故障风险** | ⚠️ 中等         | ✅ 极低            | ✅ 低                      | 🔴 极高       |
@@ -1037,6 +1120,74 @@ const privateKeyPKCS8 = await SSS.combine(
 - **Aptos Keyless**: 通过 Aptos Connect 钱包支持跨应用使用，直接 SDK 集成则为 dApp 作用域隔离
 - **Sui zkLogin**: 原生支持跨 Sui 应用使用，无需额外钱包
 - **Wander**: 目前仅支持单钱包跨应用使用
+
+**🔍 Aptos Keyless vs Wander：托管密钥的本质区别**
+
+#### 密钥管理架构的根本差异
+
+**Aptos Keyless（完全无私钥架构）：**
+- **密钥理念**: 彻底抛弃传统私钥概念，直接借用IdP的成熟密钥体系
+- **签名机制**: Keyless后端服务持有并使用托管密钥进行签名
+- **用户角色**: 用户仅持有JWT身份凭证，无任何密钥材料
+- **地址派生**: `hash(JWT身份字段 + pepper随机值)`
+- **签名流程**: 后端验证JWT → 后端使用托管密钥签名 → 返回签名结果
+
+**Wander（分散私钥架构）：**
+- **密钥理念**: 使用传统RSA私钥，但通过秘密共享分散存储
+- **签名机制**: 用户本地恢复私钥后进行签名
+- **用户角色**: 用户始终控制私钥的完整恢复过程
+- **地址派生**: `hash(RSA公钥)`
+- **签名流程**: OAuth认证 → 份额恢复私钥 → 本地私钥签名
+
+#### 技术实现的核心差异
+
+| 层面 | Aptos Keyless | Wander |
+|------|---------------|--------|
+| **密钥生成** | 无独立密钥，使用IdP密钥体系 | 用户生成RSA密钥对 |
+| **密钥存储** | Keyless后端托管 | Shamir秘密共享分散存储 |
+| **签名位置** | 后端服务完成 | 用户本地完成 |
+| **身份验证** | JWT证明身份，后端验证 | OAuth认证，份额恢复 |
+| **区块链验证** | 验证签名与地址绑定 | 验证签名与地址绑定 |
+| **密钥轮换** | IdP自动管理 | 用户可选择轮换 |
+| **离线能力** | 需要网络连接后端 | 本地份额恢复后可离线 |
+
+#### 安全模型的本质区别
+
+**Aptos Keyless安全模型：**
+```
+用户信任链：用户 → JWT → Keyless后端 → 托管密钥 → 区块链
+```
+- **信任假设**: 信任Keyless后端服务的密钥管理
+- **单点故障**: Keyless后端服务成为潜在攻击目标
+- **隐私暴露**: JWT内容对后端可见，但区块链不可见
+
+**Wander安全模型：**
+```
+用户控制链：用户 → OAuth → 本地份额恢复 → 私钥签名 → 区块链
+```
+- **信任假设**: 信任Shamir秘密共享算法的正确性
+- **单点故障**: 无单点故障，份额分散存储
+- **隐私保护**: OAuth凭据对服务可见，但私钥永远不完整存储在服务器
+
+#### 实际应用场景的差异
+
+**Aptos Keyless适用场景：**
+- 需要最高用户体验的应用
+- 信任Aptos官方服务的场景
+- 对隐私要求中等偏下的应用
+- 需要条件性跨应用支持的场景
+
+**Wander适用场景：**
+- 需要真正去中心化控制的用户
+- 对隐私和安全要求较高的用户
+- 单钱包跨应用的场景
+- 注重工程实用性的项目
+
+**核心洞察：**
+- **Aptos Keyless** = "Web2便捷性" + "区块链可验证性"（牺牲部分去中心化）
+- **Wander** = "传统私钥安全" + "现代分散存储"（保持去中心化控制）
+
+这种差异反映了区块链钱包设计中的经典权衡：**便利性 vs 去中心化程度**。
 
 **🎯 三大系统的技术定位重新分析：**
 
@@ -1413,7 +1564,8 @@ Wander 钱包实现了完整的代币验证流程：
 - ✅ **NFT 功能验证完成**: 通过 Wander 钱包源码验证了完整的 NFT 支持功能，包括 Transferable 属性分类、collectible 类型识别、NFT 详情页面和外部链接集成
 - ✅ **官方 Blueprint 源码发现**: 成功定位并分析了 AO 官方 Token Blueprint 的完整源代码 (`https://github.com/permaweb/ao/blob/main/blueprints/token.lua`)
 - ✅ **NFT 示例实现完成**: 基于官方 Blueprint 源代码创建了完整的 NFT 实现示例，包含铸造、转让、查询等核心功能
-- ✅ **Wander 钱包兼容性验证**: 反复检查并修复了所有消息格式错误，确保使用标准的 AO Tags 格式与 Wander 钱包完全兼容
+- ✅ **消息格式修正**: 通过 Perplexity AI 验证 AO 官方源码，修正了消息格式不一致问题，使用标准的直接属性格式（msg.Recipient 而不是 msg.Tags.Recipient）
+- ✅ **Wander 钱包兼容性验证**: 反复检查并修复了所有消息格式错误，确保使用标准的 AO 直接属性格式与 Wander 钱包完全兼容
 - ✅ **Bint 大整数库来源确认**: 确定 AO 使用的 bint 库来自 `https://github.com/edubart/lua-bint` (v0.5.1)
 - ✅ **aoconnect 源码验证完成**: 通过克隆 `https://github.com/permaweb/ao` 仓库，深入分析了 aoconnect 的 Legacy 和 Mainnet 模式实现
 - ✅ **arconnect vs aoconnect 区别澄清**: 确认 arconnect 是浏览器钱包扩展，aoconnect 是 AO 网络的 JavaScript SDK，完全不同的两个项目
@@ -1427,7 +1579,7 @@ Wander 钱包实现了完整的代币验证流程：
   - 原文档错误地使用了 `5WzR7rJCuqCKEq02WUPhTjwnzllLjGu6SA7qhYpcKRs` 作为 AO 代币 Process ID
   - 经 Wander 钱包源码验证，正确 ID 为 `0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc`
   - 原文档混淆了 AO 和 AR.IO 两个不同项目（ARIO 是 AR.IO 网络代币，不是 AO 原生代币）
-  - 原文档错误地认为 `msg.Recipient` 是 `msg.Tags.Recipient` 的快捷方式，经 AO 官方源码验证，两者是不同用途的格式
+  - 原文档错误地认为 `msg.Recipient` 是 `msg.Tags.Recipient` 的快捷方式，经 Perplexity AI 验证 AO 官方源码，两者是不同用途的格式：`msg.Recipient` 是标准的直接属性，`msg.Tags.Recipient` 是 aoconnect 库的兼容性格式
   - **原文档混淆了 arconnect 和 aoconnect**：arconnect 是浏览器钱包扩展，aoconnect 是 AO 网络的 JavaScript SDK
 - ⚠️ **已标注未验证**: 官方 NFT 标准的确不存在，但主流钱包通过 Transferable 属性和 ATOMIC Ticker 进行 NFT 分类
 - 🔍 **验证方法**: 官方文档审查、GitHub API 验证、Perplexity AI 搜索验证、Wander 钱包源码分析、AO 官方仓库源码克隆与分析、aoconnect 源码深度分析
