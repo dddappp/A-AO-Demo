@@ -910,13 +910,13 @@ arconnect 是独立的浏览器钱包扩展，专注于 Arweave 网络：
 
 **传统钱包 vs Aptos Keyless 密钥模型对比：**
 
-| 层面         | 传统钱包                | Aptos Keyless                    |
-| ------------ | ----------------------- | ------------------------------- |
-| **密钥生成** | 用户生成RSA/ECDSA密钥对 | 临时密钥对（每会话生成）       |
-| **私钥存储** | 用户本地存储            | 临时密钥（后端托管）           |
-| **签名凭证** | 私钥生成的数字签名      | ZKP证明 + 临时密钥签名         |
-| **验证方式** | 公钥验证签名            | ZKP验证OIDC + 签名验证         |
-| **密钥轮换** | 用户手动管理            | 每会话自动生成新密钥对         |
+| 层面         | 传统钱包                | Aptos Keyless            |
+| ------------ | ----------------------- | ------------------------ |
+| **密钥生成** | 用户生成RSA/ECDSA密钥对 | 临时密钥对（每会话生成） |
+| **私钥存储** | 用户本地存储            | 临时密钥（后端托管）     |
+| **签名凭证** | 私钥生成的数字签名      | ZKP证明 + 临时密钥签名   |
+| **验证方式** | 公钥验证签名            | ZKP验证OIDC + 签名验证   |
+| **密钥轮换** | 用户手动管理            | 每会话自动生成新密钥对   |
 
 **Aptos Keyless 的核心创新点：**
 1. **借用成熟密钥基础设施**: 直接利用Google/Apple等IdP的密钥体系
@@ -1126,7 +1126,7 @@ const privateKeyPKCS8 = await SSS.combine(
 | **地址派生**     | RSA密钥哈希    | 临时钥+盐值       | JWT+pepper                | 助记词派生   |
 | **签名验证**     | 份额恢复签名   | 临时钥+ZKP验证    | ZKP+临时钥+区块链验证     | 直接私钥签名 |
 | **会话管理**     | 持久份额       | 临时会话密钥      | 无会话概念                | 持久私钥     |
-| **跨应用支持**   | ✅ 跨AO dApp     | ✅ 跨Sui应用       | ⚠️ 条件性跨应用（需钱包）  | ✅ 通用       |
+| **跨应用支持**   | ✅ 跨AO dApp    | ✅ 跨Sui应用       | ⚠️ 条件性跨应用（需钱包）  | ✅ 通用       |
 | **单点故障风险** | ⚠️ 中等         | ✅ 极低            | ✅ 低                      | 🔴 极高       |
 | **隐私保护等级** | ⭐⭐⭐⭐           | ⭐⭐⭐⭐⭐             | ⭐⭐⭐⭐                      | ⭐⭐           |
 | **技术复杂度**   | ⭐⭐⭐            | ⭐⭐⭐⭐⭐             | ⭐⭐⭐⭐                      | ⭐⭐           |
@@ -1412,21 +1412,118 @@ local processed_transfers = {}
 
 Handlers.add('Transfer', Handlers.utils.hasMatchingTag('Action', 'Transfer'), function(msg)
   local transfer_id = msg.Tags["X-Transfer-ID"]
-  
+
   -- 幂等检查
   if transfer_id and processed_transfers[transfer_id] then
     msg.reply({ Action = 'Transfer-Error', Error = 'Duplicate transfer ID' })
     return
   end
-  
+
   -- 记录已处理的 ID
   if transfer_id then
     processed_transfers[transfer_id] = true
   end
-  
+
   -- 执行转账逻辑...
 end)
 ```
+
+### 8.5 AO 钱包余额查询机制详解
+
+#### 8.5.1 余额查询底层实现原理
+
+经过深入调研和代码分析，主流 AO 钱包（如 Wander）的余额查询机制采用了以下工作方式：
+
+**🔍 底层查询流程验证：**
+
+1. **消息驱动查询**：钱包根据代币合约类型选择合适的 `dryrun` 函数，向代币合约进程发送标准查询消息
+   ```javascript
+   // Wander 钱包实现示例
+   const res = await dryrunFn({
+     Id,
+     Owner: address,
+     process,
+     tags: [
+       { name: "Action", value: "Balance" },
+       { name: "Recipient", value: address },
+       { name: "Target", value: address },
+     ],
+   });
+   ```
+
+2. **标准消息格式**：查询使用 AO 协议标准格式，包含 Action、Recipient、Target 等标签。在某些情况下，还会添加 Referer 标签用于标识请求来源
+
+   **Dryrun 函数选择机制**：
+   - 对于特定代币合约（如 ARIO、USDA、WNDR），使用自定义 CU URL 的 dryrun 函数
+   - 对于 WAR 代币，使用专门的 AO Asia CU URL
+   - 对于其他代币，使用默认的 dryrun 函数
+   - 这种选择机制确保查询请求路由到正确的 AO 计算单元
+
+3. **outcome 解析**：钱包不需要处理完整的底层消息，只需解析返回的 DryRunResult
+   ```javascript
+   // 从返回的 Messages 数组中解析余额标签值
+   for (const msg of res.Messages as Message[]) {
+     const balance = getTagValue("Balance", msg.Tags);
+     if (balance && +balance) {
+       return new Quantity(BigInt(balance), BigInt(aoToken.Denomination));
+     }
+   }
+   ```
+
+#### 8.5.2 钱包与 AO 网络通信架构
+
+**✅ 通信协议验证：**
+
+- **标准 AO 消息协议**：钱包通过 aoconnect 库使用 ANS-104 数据打包格式
+- **异步通信模式**：无需等待同步结果，支持并发查询
+- **节点中介转发**：AO 节点作为安全代理，负责消息转发和签名验证
+
+**✅ Outcome 解析机制：**
+
+- **结果封装**：aoconnect 库自动处理消息收发、签名和结果解析
+- **数据提取**：钱包只需从返回的 Messages 数组中提取 Balance 标签值
+- **无需完整消息**：应用层只关注业务数据，无需管理底层协议细节
+
+#### 8.5.3 查询发起方地址处理
+
+**✅ 地址无关性验证：**
+
+- **查询权限**：任何地址都可以查询其他地址的余额
+- **无需运行进程**：查询发起方不需要运行独立进程来接收回复
+- **直接返回**：代币合约进程直接将结果返回给查询发起方
+
+**代码验证**（来自 AO 标准 Token 实现）：
+```lua
+-- Balance 查询处理逻辑
+handlers.add('balance', handlers.utils.hasMatchingTag('Action', 'Balance'), function(msg)
+  local bal = '0'
+
+  -- 支持查询指定地址或默认查询发送方地址
+  if (msg.Tags.Target and Balances[msg.Tags.Target]) then
+    bal = tostring(Balances[msg.Tags.Target])
+  elseif Balances[msg.From] then
+    bal = tostring(Balances[msg.From])
+  end
+
+  -- 直接回复查询发起方
+  ao.send({
+    Target = msg.From,
+    Tags = { Target = msg.From, Balance = bal, Ticker = Ticker }
+  })
+end)
+```
+
+#### 8.5.4 技术实现总结
+
+| 特性         | 实现方式                | 验证状态 |
+| ------------ | ----------------------- | -------- |
+| 余额查询方式 | `dryrun` + Balance 消息 | ✅ 已验证 |
+| 通信协议     | ANS-104 数据格式        | ✅ 已验证 |
+| 结果解析     | outcome.Messages 解析   | ✅ 已验证 |
+| 查询权限     | 任意地址可查询          | ✅ 已验证 |
+| 进程依赖     | 无需运行进程接收        | ✅ 已验证 |
+
+**结论**：AO 钱包余额查询机制通过向代币合约发送标准 Balance 查询消息来获取余额信息，整个过程采用 AO 的异步消息协议，通过 aoconnect 库封装实现，应用层只需解析返回的 outcome 数据即可。
 
 ---
 
