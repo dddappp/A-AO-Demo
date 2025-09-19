@@ -1505,10 +1505,10 @@ handlers.add('balance', handlers.utils.hasMatchingTag('Action', 'Balance'), func
     bal = tostring(Balances[msg.From])
   end
 
-  -- 直接回复查询发起方
+  -- 直接回复查询发起方（包含数值数据和JSON格式数据）
   ao.send({
     Target = msg.From,
-    Tags = { Target = msg.From, Balance = bal, Ticker = Ticker }
+    Tags = { Target = msg.From, Balance = bal, Ticker = Ticker, Data = json.encode(tonumber(bal)) }
   })
 end)
 ```
@@ -1643,15 +1643,24 @@ Wander 采用混合定时策略确保可靠性：
 **浏览器层面的 Alarm**：
 ```javascript
 // 使用浏览器 Alarm API 进行本地定时检查
+// AO_YIELD_AGENT_ALARM_NAME：一次性alarm，用于立即触发执行
 browser.alarms.create(AO_YIELD_AGENT_ALARM_NAME, {
+  when: Date.now()  // 立即执行一次
+});
+
+// AO_YIELD_AGENT_RECENT_TXS_CHECK_ALARM_NAME：周期性alarm，用于检查交易状态
+browser.alarms.create(AO_YIELD_AGENT_RECENT_TXS_CHECK_ALARM_NAME, {
   delayInMinutes: 1,      // 1分钟后开始
-  periodInMinutes: 60     // 每60分钟重复执行
+  periodInMinutes: 2      // 每2分钟重复执行
 });
 
 // Alarm 监听器处理定时任务
 browser.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === AO_YIELD_AGENT_ALARM_NAME) {
     await executeAutomaticSwapIfNeeded();
+  }
+  if (alarm.name === AO_YIELD_AGENT_RECENT_TXS_CHECK_ALARM_NAME) {
+    await checkIfRecentTxSwapSucceeded();
   }
 });
 ```
@@ -1704,12 +1713,12 @@ browser.alarms.create(AO_YIELD_AGENT_RECENT_TXS_CHECK_ALARM_NAME, {
 
 #### **6. 技术架构优势**
 
-| 特性           | 实现方式                        | 用户收益         |
-| -------------- | ------------------------------- | ---------------- |
-| **自动化执行** | AO Cron + 浏览器 Alarm 双重机制 | 无需手动操作     |
-| **可靠性保证** | 多层容错和重试机制              | 任务执行有保障   |
-| **状态同步**   | 实时监控和状态更新              | 及时了解执行情况 |
-| **安全性**     | 本地验证和多重签名              | 资产安全有保障   |
+| 特性           | 实现方式                                     | 用户收益         |
+| -------------- | -------------------------------------------- | ---------------- |
+| **自动化执行** | AO Cron + 一次性+周期性浏览器 Alarm 双重机制 | 无需手动操作     |
+| **可靠性保证** | 多层容错和重试机制 + 交易状态周期性检查      | 任务执行有保障   |
+| **状态同步**   | 实时监控和状态更新 + 定时状态检查            | 及时了解执行情况 |
+| **安全性**     | 本地验证和多重签名                           | 资产安全有保障   |
 
 **结论**：Wander 钱包成功地将 AO 的 Cron 机制与浏览器 Alarm API 相结合，实现了一个完整的自动化收益管理系统，为用户提供了便捷、安全、高效的 DeFi 自动化服务。
 
