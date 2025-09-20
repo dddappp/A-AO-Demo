@@ -1,0 +1,38 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: google-oauth2-demo
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:your-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-client-secret}
+            scope:
+              - openid
+              - profile
+              - email
+            redirect-uri: https://api.u2511175.nyat.app:55139/oauth2/callback
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://openidconnect.googleapis.com/v1/userinfo
+            user-name-attribute: sub
+            jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+
+logging:
+  level:
+    com.example.oauth2demo: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security.oauth2: DEBUG

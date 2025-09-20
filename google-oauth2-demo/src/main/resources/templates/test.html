@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 
+        === CSRF Token 元数据配置 ===
+        
+        什么是CSRF Token？
+        - CSRF Token是服务器生成的随机字符串，用于验证请求的合法性
+        - 每个用户会话都有唯一的CSRF Token
+        - 恶意网站无法获取到这个Token，因此无法伪造请求
+        
+        这里通过Thymeleaf模板引擎将服务器生成的CSRF Token和Header名称
+        嵌入到HTML的meta标签中，方便JavaScript获取和使用
+        
+        _csrf.token: 实际的CSRF Token值 (例如: "a1b2c3d4-e5f6-7890...")
+        _csrf.headerName: HTTP请求头名称 (通常是: "X-XSRF-TOKEN")
+    -->
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <title>Google OAuth2 Demo - 测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .user-info {
+            background-color: #e8f5e8;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            border-left: 4px solid #4CAF50;
+        }
+        .user-info h2 {
+            color: #2e7d32;
+            margin-top: 0;
+        }
+        .user-info p {
+            margin: 8px 0;
+            color: #333;
+        }
+        .button {
+            background-color: #2196F3;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #1976D2;
+        }
+        .button.danger {
+            background-color: #f44336;
+        }
+        .button.danger:hover {
+            background-color: #d32f2f;
+        }
+        .result {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            border-left: 4px solid #4CAF50;
+            background-color: #e8f5e8;
+        }
+        .error {
+            border-left: 4px solid #f44336;
+            background-color: #ffebee;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        .actions {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .logout-link {
+            color: #f44336;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .logout-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Google OAuth2 ID Token 验证测试</h1>
+
+        <div class="user-info">
+            <h2>用户信息</h2>
+            <p><strong>姓名：</strong><span th:text="${userName}">未知</span></p>
+            <p><strong>邮箱：</strong><span th:text="${userEmail}">未知</span></p>
+            <p><strong>用户 ID：</strong><span th:text="${userId}">未知</span></p>
+        </div>
+
+        <div class="actions">
+            <button id="validateBtn" class="button">验证 ID Token</button>
+            <button id="manualValidateBtn" class="button">手动验证 JWT</button>
+            <a href="/logout" class="logout-link">登出</a>
+        </div>
+
+        <!-- 手动验证区域 -->
+        <div id="manualValidationSection" style="display: none; margin-top: 20px;">
+            <h3>手动 JWT Token 验证</h3>
+            <textarea id="jwtTokenInput" placeholder="粘贴您的 JWT Token 这里..." rows="4" style="width: 100%; padding: 10px; margin: 10px 0; font-family: monospace;"></textarea>
+            <button id="submitManualValidation" class="button">验证 Token</button>
+        </div>
+
+        <div id="resultContainer" style="display: none;">
+            <h3>验证结果</h3>
+            <div id="result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        /*
+         * === 前端CSRF保护机制 ===
+         * 
+         * 为什么前端需要处理CSRF Token？
+         * - 现代Web应用大量使用AJAX/Fetch进行异步请求
+         * - 浏览器的表单提交会自动包含CSRF Token，但AJAX请求不会
+         * - 因此需要手动在AJAX请求中添加CSRF Token
+         * 
+         * CSRF防护工作流程：
+         * 1. 服务器在页面加载时生成CSRF Token
+         * 2. Token通过meta标签嵌入到HTML中
+         * 3. JavaScript读取meta标签中的Token
+         * 4. 发送POST请求时，在HTTP头中包含CSRF Token
+         * 5. 服务器验证Token，匹配则允许请求，不匹配则拒绝
+         */
+        
+        /**
+         * 获取CSRF Token值
+         * 从页面的meta标签中读取服务器生成的CSRF Token
+         * @returns {string} CSRF Token字符串
+         */
+        function getCsrfToken() {
+            return document.querySelector('meta[name="_csrf"]').getAttribute('content');
+        }
+
+        /**
+         * 获取CSRF Token的HTTP头名称
+         * 通常是 "X-XSRF-TOKEN"，但可能根据配置有所不同
+         * @returns {string} CSRF Token的HTTP头名称
+         */
+        function getCsrfHeader() {
+            return document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+        }
+
+        document.getElementById('validateBtn').addEventListener('click', function() {
+            const resultContainer = document.getElementById('resultContainer');
+            const resultDiv = document.getElementById('result');
+
+            // 显示加载状态
+            resultContainer.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '正在验证 ID Token...';
+
+            /*
+             * === CSRF Token在AJAX请求中的使用 ===
+             * 
+             * 重要：为什么AJAX请求需要手动添加CSRF Token？
+             * - 浏览器的安全策略：普通的HTML表单提交会自动包含CSRF Token
+             * - 但是JavaScript的fetch/XMLHttpRequest不会自动包含CSRF Token
+             * - 恶意网站可以发送AJAX请求，但无法获取到正确的CSRF Token
+             * 
+             * 实现步骤：
+             * 1. 创建HTTP请求头对象
+             * 2. 添加Content-Type等常规头信息
+             * 3. 使用getCsrfHeader()获取CSRF头名称(通常是"X-XSRF-TOKEN")
+             * 4. 使用getCsrfToken()获取实际的Token值
+             * 5. 将Token添加到请求头中
+             * 
+             * 安全性说明：
+             * - 只有来自同源的页面才能读取meta标签中的CSRF Token
+             * - 恶意的跨域网站无法获取Token，因此无法伪造请求
+             */
+            
+            // 第1步：创建请求头对象，添加常规头信息
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            
+            // 第2步：添加CSRF Token到请求头
+            // 格式：headers["X-XSRF-TOKEN"] = "actual-token-value"
+            headers[getCsrfHeader()] = getCsrfToken();
+            
+            // 第3步：发送带有CSRF Token的POST请求
+            fetch('/api/validate-token', {
+                method: 'POST',
+                headers: headers  // 包含CSRF Token的完整请求头
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = '✅ 验证成功!\n\n' + JSON.stringify(data.validation, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '❌ 验证失败: ' + data.message;
+                }
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '❌ 请求失败: ' + error.message;
+                console.error('Error:', error);
+            });
+        });
+
+        // 手动验证按钮
+        document.getElementById('manualValidateBtn').addEventListener('click', function() {
+            const manualSection = document.getElementById('manualValidationSection');
+            manualSection.style.display = manualSection.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // 提交手动验证
+        document.getElementById('submitManualValidation').addEventListener('click', function() {
+            const tokenInput = document.getElementById('jwtTokenInput');
+            const resultContainer = document.getElementById('resultContainer');
+            const resultDiv = document.getElementById('result');
+
+            const token = tokenInput.value.trim();
+            if (!token) {
+                alert('请输入 JWT Token');
+                return;
+            }
+
+            // 显示加载状态
+            resultContainer.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '正在验证 JWT Token...';
+
+            /*
+             * === 表单数据提交中的CSRF Token处理 ===
+             * 
+             * 不同的Content-Type需要不同的CSRF处理方式：
+             * 
+             * 1. application/json：Token放在HTTP头中 (如上面的例子)
+             * 2. application/x-www-form-urlencoded：Token可以放在头中或表单数据中
+             * 3. multipart/form-data：Token通常放在表单数据中
+             * 
+             * 这个例子展示表单编码方式下的CSRF Token使用：
+             * - Content-Type是application/x-www-form-urlencoded
+             * - CSRF Token仍然放在HTTP头中（推荐方式）
+             * - 表单数据使用URLSearchParams编码
+             */
+            
+            // 创建表单请求的请求头，同样需要包含CSRF Token
+            const manualHeaders = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            };
+            // 添加CSRF Token到请求头（与JSON请求完全相同的方式）
+            manualHeaders[getCsrfHeader()] = getCsrfToken();
+
+            // 发送包含表单数据和CSRF Token的POST请求
+            fetch('/api/test-validate-token', {
+                method: 'POST',
+                body: new URLSearchParams({  // 表单编码的请求体
+                    'token': token
+                }),
+                headers: manualHeaders  // 包含CSRF Token的请求头
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = '✅ 手动验证成功!\n\n' + JSON.stringify(data.validation, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '❌ 手动验证失败: ' + data.message;
+                }
+            })
+            .catch(error => {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '❌ 请求失败: ' + error.message;
+                console.error('Error:', error);
+            });
+        });
+    </script>
+</body>
+</html>

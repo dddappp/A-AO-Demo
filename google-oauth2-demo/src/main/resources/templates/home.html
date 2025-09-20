@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google OAuth2 Demo - 首页</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4285f4;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #3367d6;
+        }
+        .features {
+            margin-top: 30px;
+        }
+        .features ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .features li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .features li:before {
+            content: "✓";
+            color: #4CAF50;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Google OAuth2 登录演示</h1>
+
+        <div class="description">
+            <p>这是一个使用 Spring Boot 和 Google OAuth2 实现的登录演示应用。</p>
+            <p>本应用演示了以下功能：</p>
+        </div>
+
+        <div class="features">
+            <ul>
+                <li>使用 Google 账户进行 OAuth2 登录</li>
+                <li>获取和存储 ID Token（JWT 格式）</li>
+                <li>使用 HTTP Only Cookie 安全存储 ID Token</li>
+                <li>使用 Google JWKS 验证 ID Token</li>
+                <li>前端展示验证结果</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px;">
+            <a href="/test" class="button">开始登录测试</a>
+        </div>
+    </div>
+</body>
+</html>
