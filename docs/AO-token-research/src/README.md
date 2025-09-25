@@ -192,6 +192,107 @@ Owners[tokenId] = "owner_address"
 - **错误处理**: 完善的错误处理机制
 - **消息验证**: 验证所有必需参数的存在性
 
+## 故障排除与经验教训
+
+### 消息格式最佳实践（初步判断）
+
+在开发过程中，我们观察到以下模式对消息传递的可靠性有重要影响：
+
+#### ✅ 推荐的消息格式（已验证有效）
+```lua
+-- 方式1：使用简单字符串 Data（与 Mint-NFT 一致）
+msg.reply({
+  Action = 'NFT-Info',
+  TokenId = tokenId,
+  Name = nft.name,
+  Data = "NFT information retrieved successfully"
+})
+
+-- 方式2：使用简洁 JSON 结构（与 messaging.lua 一致）
+msg.reply({
+  Action = 'NFT-Info',
+  Data = json.encode({
+    tokenId = tokenId,
+    name = nft.name,
+    description = nft.description,
+    image = nft.image,
+    attributes = nft.attributes,
+    owner = ownerAddress,
+    creator = creatorAddress,
+    createdAt = createdAt,
+    transferable = transferable
+  })
+})
+```
+
+#### ❌ 避免的消息格式（可能导致问题）
+```lua
+-- 过多根级别字段 + 复杂嵌套 JSON（已观察到问题）
+msg.reply({
+  Action = 'NFT-Info',
+  TokenId = tokenId,                    // 根级别字段1
+  Name = nft.name,                     // 根级别字段2
+  Description = nft.description,       // 根级别字段3
+  Image = nft.image,                   // 根级别字段4
+  Owner = ownerAddress,                // 根级别字段5
+  Creator = creatorAddress,            // 根级别字段6
+  CreatedAt = createdAt,               // 根级别字段7
+  Transferable = transferable,         // 根级别字段8
+  Data = json.encode({                 // 根级别字段9 - 复杂嵌套
+    tokenId = tokenId,                 // 字段重复！
+    name = nft.name,                   // 字段重复！
+    description = nft.description,     // 字段重复！
+    image = nft.image,                 // 字段重复！
+    attributes = nft.attributes,       // 字段重复！
+    owner = ownerAddress,              // 字段重复！
+    creator = creatorAddress,          // 字段重复！
+    createdAt = createdAt,             // 字段重复！
+    transferable = transferable        // 字段重复！
+  })
+})
+```
+
+#### 📝 经验观察（需要进一步验证）
+
+1. **根级别字段数量**：
+   - 2-4个字段：通常工作正常 ✅
+   - 9+个字段：可能导致问题 ❌
+
+2. **字段重复传递**：
+   - 避免在根级别和 Data 中传递相同信息
+   - 选择一种传递方式：要么根级别，要么 Data 中
+
+3. **JSON 复杂度**：
+   - 扁平 JSON 结构：更可靠 ✅
+   - 深度嵌套结构：可能有兼容性问题 ❌
+
+4. **与成功示例一致性**：
+   - 参考 messaging.lua 和 BlogExample 的格式 ✅
+   - 避免自定义复杂格式 ❌
+
+### 调试建议
+
+当遇到消息传递问题时，建议按以下顺序排查：
+
+1. **检查参数获取**：
+   ```lua
+   print("msg.Tags.TokenId: " .. tostring(msg.Tags.TokenId))
+   print("msg.Tags.Tokenid: " .. tostring(msg.Tags.Tokenid))
+   print("Final tokenId: " .. tostring(tokenId))
+   ```
+
+2. **简化消息格式**：
+   - 先用简单字符串测试
+   - 再逐步添加 JSON 结构
+3. **参考成功示例**：
+   - 对比 messaging.lua 的格式
+   - 参考 BlogExample 的实现
+
+4. **确保执行确定性**：
+   - 验证所有节点执行结果一致
+   - 检查是否为正确的 AO Legacy 网络环境
+   - 确认合约代码的确定性实现
+
 ## 扩展建议
 
 1. **版税功能**: 可以添加版税分配机制
