@@ -525,60 +525,54 @@ Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), func
 
   local targetCount = 1  -- 至少发送给 msg.From
 
+  -- 尝试多种回复方式，确保消息能被接收
+  local responseData = {
+    tokenId = tokenId,
+    name = nft.name,
+    description = nft.description,
+    image = nft.image,
+    attributes = nft.attributes,
+    owner = Owners[tokenId],
+    creator = nft.creator,
+    createdAt = nft.createdAt,
+    transferable = nft.transferable
+  }
+
   if msg.reply then
-    print("Using msg.reply() - Simple format like Mint-NFT")
-    -- 使用与 Mint-NFT 完全相同的简单格式
-    msg.reply({
-      Action = 'NFT-Info',
-      TokenId = tokenId,
-      Name = nft.name,
-      Data = "NFT '" .. nft.name .. "' information retrieved successfully"
-    })
-  else
-    print("Using Send() to: " .. tostring(msg.From))
-
-    -- 尝试多种发送方式
-    local targets = {msg.From}
-
-    -- 如果有 Pushed-For 字段，也发送一份
-    if msg.Tags["Pushed-For"] then
-      table.insert(targets, msg.Tags["Pushed-For"])
-      print("Also sending to Pushed-For: " .. tostring(msg.Tags["Pushed-For"]))
-    end
-
-    -- 发送到所有可能的目标
-    for _, target in ipairs(targets) do
-      Send({
-        Target = target,
-        Action = "NFT-Info",
-        TokenId = tokenId,
-        Name = nft.name,
-        Description = nft.description,
-        Image = nft.image,
-        Owner = Owners[tokenId],
-        Creator = nft.creator,
-        CreatedAt = nft.createdAt,
-        Transferable = tostring(nft.transferable),
-        ["Data-Protocol"] = "ao",
-        Type = "NFT-Info",
-        Data = json.encode({
-          success = true,
-          tokenId = tokenId,
-          name = nft.name,
-          description = nft.description,
-          image = nft.image,
-          attributes = nft.attributes,
-          owner = Owners[tokenId],
-          creator = nft.creator,
-          createdAt = nft.createdAt,
-          transferable = nft.transferable
-        })
+    print("Trying msg.reply() with JSON")
+    local replySuccess = pcall(function()
+      msg.reply({
+        Action = 'NFT-Info',
+        Data = json.encode(responseData)
       })
-      print("Sent to target: " .. tostring(target))
-    end
+    end)
 
-    print("Response sent successfully to " .. #targets .. " target(s)")
+    if replySuccess then
+      print("msg.reply() succeeded")
+      return
+    else
+      print("msg.reply() failed, using Send() fallback")
+    end
   end
+
+  -- Send() 备选方案
+  print("Using Send() fallback")
+  local targets = {msg.From}
+  if msg.Tags["Pushed-For"] then
+    table.insert(targets, msg.Tags["Pushed-For"])
+  end
+
+  for _, target in ipairs(targets) do
+    Send({
+      Target = target,
+      Action = "NFT-Info",
+      Data = json.encode(responseData),
+      ["Data-Protocol"] = "ao",
+      Type = "NFT-Info"
+    })
+  end
+
+  print("Response sent to " .. #targets .. " target(s)")
 end)
 
 -- 查询用户拥有的 NFTs
@@ -607,9 +601,11 @@ Handlers.add('get_user_nfts', Handlers.utils.hasMatchingTag("Action", "Get-User-
   if msg.reply then
     msg.reply({
       Action = 'User-NFTs',
-      Address = userAddress,
-      Count = #userNFTs,
-      Data = "Found " .. #userNFTs .. " NFTs for address " .. userAddress
+      Data = json.encode({
+        address = userAddress,
+        nfts = userNFTs,
+        count = #userNFTs
+      })
     })
   else
     Send({
@@ -947,8 +943,10 @@ Handlers.add('get_contract_stats', Handlers.utils.hasMatchingTag("Action", "Get-
   if msg.reply then
     msg.reply({
       Action = 'Contract-Stats',
-      Stats = json.encode(stats),
-      Data = "Contract statistics retrieved successfully"
+      Data = json.encode({
+        stats = stats,
+        message = "Contract statistics retrieved successfully"
+      })
     })
   else
     Send({
