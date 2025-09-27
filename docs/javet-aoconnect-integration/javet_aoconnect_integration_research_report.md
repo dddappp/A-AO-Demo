@@ -445,11 +445,11 @@ npm install @permaweb/aoconnect@0.0.90
 经过npm包分析，aoconnect **确实提供了打包后的单个文件**：
 
 ```bash
-# aoconnect包结构 (基于实际npm包验证)
+# aoconnect包结构 (基于实际npm包和源码验证)
 dist/
-├── index.js     (66.4kB)  - ESM版本，完整打包
-├── index.cjs    (72.0kB)  - CommonJS版本，完整打包
-└── browser.js   (3.2MB)  - 浏览器版本，包含polyfill
+├── index.js     (66.4kB)  - ESM版本，主要包含hyper-async
+├── index.cjs    (72.0kB)  - CommonJS版本，主要包含hyper-async
+└── browser.js   (3.2MB)  - 浏览器版本，包含所有polyfill
 ```
 
 > 📏 **文件大小差异解释**:
@@ -774,10 +774,16 @@ public class OptimizedAOService {
 ```xml
 <dependency>
     <groupId>com.caoccao.javet</groupId>
-    <artifactId>javet-node</artifactId>
-    <version>4.1.7</version>
+    <artifactId>javet</artifactId>
+    <version>3.1.6</version>
 </dependency>
 ```
+
+> ⚠️ **Javet原生库说明**:
+> - Javet需要平台特定的原生库文件
+> - 自动下载到 `~/.m2/repository/com/caoccao/javet/`
+> - 如果运行时提示"library not found"，需要检查原生库是否正确下载
+> - macOS可能需要额外安装依赖
 
 #### npm 依赖配置
 ```json
@@ -1318,10 +1324,10 @@ await esbuild.build({
 ```
 
 #### ✅ 依赖策略分析
-- **部分自包含**: ESM版本只打包hyper-async (~66kB)
+- **部分自包含**: ESM版本只打包hyper-async (~66kB)，其他依赖标记为external
 - **外部依赖**: 其他依赖在Node.js环境中全局可用
 - **零安装运行**: 在标准Node.js环境中无需额外安装
-- **Javet兼容**: V8模式下需要确保依赖可用性
+- **Javet兼容**: V8模式下需要确保依赖可用性或使用浏览器版本
 
 ### 13.5 技术准确性评估
 - **架构分析**: 95% 准确（基于实际代码结构）
