@@ -457,6 +457,12 @@ dist/
 > - **浏览器版本** (3.2MB): 需要polyfill Node.js模块，包含大量兼容性代码
 > - **polyfill开销**: crypto、events、stream等Node.js模块的浏览器实现
 
+> 💡 **V8模式使用浏览器版本**:
+> - **✅ 可以直接使用**: V8模式可以加载浏览器版本的aoconnect
+> - **✅ polyfill可用**: 浏览器版本包含了Node.js API的浏览器polyfill
+> - **⚠️ 体积较大**: 3.2MB vs 66kB，加载时间更长
+> - **🎯 推荐**: 如果不需要最小体积，使用浏览器版本最简单
+
 **推荐的集成方案**：
 
 **方案1: 使用官方ESM文件（Node.js模式）**
@@ -467,6 +473,16 @@ npm install @permaweb/aoconnect@0.0.90
 # 复制官方ESM文件到项目
 mkdir -p src/main/resources/js
 cp node_modules/@permaweb/aoconnect/dist/index.js src/main/resources/js/aoconnect.js
+```
+
+**方案1.5: 使用浏览器版本（V8模式推荐）**
+```bash
+# 安装aoconnect依赖
+npm install @permaweb/aoconnect@0.0.90
+
+# 复制浏览器版本（包含所有polyfill，V8模式下直接可用）
+mkdir -p src/main/resources/js
+cp node_modules/@permaweb/aoconnect/dist/browser.js src/main/resources/js/aoconnect.browser.js
 ```
 
 **方案2: 自定义打包（V8模式专用）**
@@ -665,11 +681,16 @@ ao.nodejs.module.paths=/your/project/directory/node_modules
 
 > 🔧 **模式选择建议**（前端新手友好）:
 > ```bash
-> # 推荐：使用Node.js模式（简单）
+> # 方案1: Node.js模式（最简单）
 > IJavetEnginePool<NodeRuntime> pool = new JavetEnginePool<>();
 > pool.getConfig().setJSRuntimeType(JSRuntimeType.Node);
 >
-> # V8模式（高级，需要额外工作）
+> # 方案2: V8模式 + 浏览器版本（推荐）
+> IJavetEnginePool<V8Runtime> pool = new JavetEnginePool<>();
+> pool.getConfig().setJSRuntimeType(JSRuntimeType.V8);
+> # 使用浏览器版本，无需额外打包或拦截器
+>
+> # 方案3: V8模式 + 自定义打包（高级）
 > IJavetEnginePool<V8Runtime> pool = new JavetEnginePool<>();
 > pool.getConfig().setJSRuntimeType(JSRuntimeType.V8);
 > # 需要为aoconnect依赖创建拦截器或使用完整打包
@@ -677,17 +698,19 @@ ao.nodejs.module.paths=/your/project/directory/node_modules
 >
 > **V8模式打包检查**:
 > ```bash
-> # 检查打包文件是否存在
+> # 检查浏览器版本是否存在（推荐方案）
+> ls -la src/main/resources/js/aoconnect.browser.js
+> # 大小应该约3.2MB
+>
+> # 检查自定义打包版本（可选）
 > ls -la src/main/resources/js/aoconnect.v8-bundle.js
+> # 大小应该比66kB大很多
 >
-> # 检查打包文件大小（应该比66kB大很多）
-> wc -c src/main/resources/js/aoconnect.v8-bundle.js
->
-> # 验证打包文件可以加载
+> # 验证浏览器版本可以加载
 > node -e "
-> import('./src/main/resources/js/aoconnect.v8-bundle.js')
->   .then(() => console.log('✅ Bundle加载成功'))
->   .catch(err => console.log('❌ Bundle加载失败:', err.message));
+> import('./src/main/resources/js/aoconnect.browser.js')
+>   .then(() => console.log('✅ 浏览器版本加载成功'))
+>   .catch(err => console.log('❌ 浏览器版本加载失败:', err.message));
 > "
 > ```
 >
@@ -1148,9 +1171,15 @@ public <R extends V8Runtime> R createV8Runtime(RuntimeOptions<?> runtimeOptions)
 > - **V8环境**: 纯JavaScript引擎，无这些全局包
 > - **解决方案**: 需要为依赖创建拦截器或使用完整打包
 
-**V8模式的3种解决方案**:
+**V8模式的4种解决方案**:
 
-1. **🎯 推荐: 完整打包**
+1. **🎯 最佳推荐: 使用浏览器版本**
+   ```bash
+   # 直接复制浏览器版本，无需额外打包
+   cp node_modules/@permaweb/aoconnect/dist/browser.js src/main/resources/js/aoconnect.browser.js
+   ```
+
+2. **📦 完整打包（如果浏览器版本太大）**
    ```javascript
    // 使用esbuild打包所有依赖到单个文件
    await build({
@@ -1163,7 +1192,7 @@ public <R extends V8Runtime> R createV8Runtime(RuntimeOptions<?> runtimeOptions)
    });
    ```
 
-2. **🔧 依赖拦截器**
+3. **🔧 依赖拦截器（高级用户）**
    ```javascript
    // 在V8环境中为依赖创建模拟实现
    globalThis.axios = {
@@ -1179,7 +1208,7 @@ public <R extends V8Runtime> R createV8Runtime(RuntimeOptions<?> runtimeOptions)
    const aoconnect = await import('./aoconnect.js');
    ```
 
-3. **📦 渐进式打包**
+4. **📦 渐进式打包（专家级）**
    ```javascript
    // 只打包必要的依赖
    await build({
@@ -1214,11 +1243,34 @@ public class V8AOBundleService {
         enginePool.getConfig().setJSRuntimeType(JSRuntimeType.V8);
     }
 
-    public String spawnProcessWithBundle(String moduleId, String schedulerId) throws JavetException {
+    // 方案1: 使用浏览器版本（推荐，最简单）
+    public String spawnProcessWithBrowserBundle(String moduleId, String schedulerId) throws JavetException {
         try (IJavetEngine<V8Runtime> engine = enginePool.getEngine()) {
             V8Runtime runtime = engine.getV8Runtime();
 
-            // 加载完整打包的aoconnect bundle
+            // 加载浏览器版本（包含所有polyfill）
+            File browserBundle = new File("src/main/resources/js/aoconnect.browser.js");
+            if (browserBundle.exists()) {
+                runtime.getExecutor(browserBundle).executeVoid();
+            }
+
+            // 直接使用，无需额外配置
+            return runtime.getExecutor(
+                "const { spawn } = globalThis.aoconnect;" +
+                "return spawn({" +
+                "module: '" + moduleId + "', " +
+                "scheduler: '" + schedulerId + "'" +
+                "});"
+            ).executeString();
+        }
+    }
+
+    // 方案2: 使用自定义打包版本
+    public String spawnProcessWithCustomBundle(String moduleId, String schedulerId) throws JavetException {
+        try (IJavetEngine<V8Runtime> engine = enginePool.getEngine()) {
+            V8Runtime runtime = engine.getV8Runtime();
+
+            // 加载自定义打包的aoconnect bundle
             File bundleFile = new File("src/main/resources/js/aoconnect.v8-bundle.js");
             if (bundleFile.exists()) {
                 runtime.getExecutor(bundleFile).executeVoid();
