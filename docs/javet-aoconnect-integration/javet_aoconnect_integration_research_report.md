@@ -495,7 +495,7 @@ public class AOService {
         // 创建V8模式引擎池 (推荐用于纯ESM模块)
         enginePool = new JavetEnginePool<>();
         enginePool.getConfig().setJSRuntimeType(JSRuntimeType.V8);
-        // V8模式完全支持ESM模块，无需Node.js生态
+        // 注意：V8模式下需要为aoconnect的外部依赖创建拦截器
     }
 
     public String spawnProcess(String moduleId, String schedulerId) throws JavetException {
@@ -588,15 +588,34 @@ ao.nodejs.module.paths=/your/project/directory/node_modules
 - **✅ 资源管理**: 正确管理 NodeRuntime 生命周期
 - **⚠️ 依赖可用性**: ESM版本依赖Node.js全局环境中的包
 
+> 💡 **V8模式依赖处理**（前端新手友好解释）:
+> - **V8模式**: 纯JavaScript引擎，无Node.js环境
+> - **ESM依赖**: aoconnect需要axios、ramda等包
+> - **解决方案**: 需要为这些依赖创建"拦截器"或打包成完整bundle
+> - **推荐**: 使用Node.js模式更简单，V8模式需要额外工作
+
 ### 8.4 故障排除
 1. **模块找不到**: 检查模块搜索路径配置
 2. **依赖不存在**: 确认已运行 `npm install`
 3. **版本冲突**: 检查 Node.js 和 npm 版本兼容性
 4. **ESM依赖缺失**: 确保Node.js环境中包含aoconnect的所有依赖包
+5. **V8模式依赖**: 在V8模式下需要为外部依赖创建拦截器
 
-> 🔧 **ESM依赖问题解决**:
+> 🔧 **模式选择建议**（前端新手友好）:
 > ```bash
-> # 检查依赖可用性
+> # 推荐：使用Node.js模式（简单）
+> IJavetEnginePool<NodeRuntime> pool = new JavetEnginePool<>();
+> pool.getConfig().setJSRuntimeType(JSRuntimeType.Node);
+>
+> # V8模式（高级，需要额外工作）
+> IJavetEnginePool<V8Runtime> pool = new JavetEnginePool<>();
+> pool.getConfig().setJSRuntimeType(JSRuntimeType.V8);
+> # 需要为aoconnect依赖创建拦截器
+> ```
+>
+> 📋 **依赖检查命令**:
+> ```bash
+> # 检查Node.js环境中的依赖可用性
 > node -e "console.log('依赖检查:'); ['axios', 'ramda', 'base64url', 'buffer', 'debug', 'mnemonist', 'zod', '@dha-team/arbundles', '@permaweb/ao-scheduler-utils', '@permaweb/protocol-tag-utils'].forEach(dep => { try { require(dep); console.log('✅', dep); } catch(e) { console.log('❌', dep, '- 缺失'); } });"
 > ```
 
@@ -1046,6 +1065,11 @@ public <R extends V8Runtime> R createV8Runtime(RuntimeOptions<?> runtimeOptions)
 - **零依赖**: 不需要Node.js生态，减少攻击面
 - **性能优势**: 更轻量，启动更快
 
+> ⚠️ **V8模式依赖挑战**:
+> - **问题**: aoconnect的ESM版本依赖axios、ramda等Node.js包
+> - **V8环境**: 纯JavaScript引擎，无这些全局包
+> - **解决方案**: 需要为依赖创建拦截器或使用完整打包
+
 ##### Node.js模式ESM支持
 - **双模式**: 同时支持ESM和CommonJS
 - **完整生态**: 包含Node.js所有API和模块系统
@@ -1114,6 +1138,19 @@ await esbuild.build({
 - 🚀 **性能**: 加载1个大文件比加载10个小文件快
 - 🔧 **维护**: 统一管理依赖版本和更新
 - 📦 **部署**: 简化文件管理和缓存策略
+
+### V8模式 vs Node.js模式
+如果你是前端新手，这两种模式就像：
+
+| 模式 | 简单比喻 | 适用场景 |
+|------|----------|----------|
+| **V8模式** | 纯净的JavaScript引擎 | 需要最高性能和安全性的场景 |
+| **Node.js模式** | JavaScript + 系统功能 | 需要完整Web开发能力的场景 |
+
+**实际区别**：
+- **V8模式**: 只有基本的JavaScript功能，速度快，内存少
+- **Node.js模式**: 包含文件系统、网络、加密等完整功能
+- **依赖处理**: V8模式需要手动处理依赖，Node.js模式自动可用
 
 ---
 
