@@ -8,7 +8,6 @@
 docs/javet-aoconnect-integration/
 ├── README.md                              # 本说明文件
 ├── javet_aoconnect_integration_research_report.md  # 完整技术调研报告
-├── application-ao.properties              # AO网络和Javet配置示例
 └── js/
     └── module-paths.js                    # Node.js模块路径配置脚本
 ```
@@ -30,7 +29,7 @@ docs/javet-aoconnect-integration/
 
 1. **阅读技术报告**: 了解完整的集成方案和技术细节
 2. **参考配置示例**: 复制配置文件到你的项目中
-3. **运行模块脚本**: 使用提供的JavaScript配置脚本
+3. **理解技术要求**: 掌握Javet和aoconnect的集成要点
 
 ## 关键发现
 
@@ -48,4 +47,4 @@ docs/javet-aoconnect-integration/
 
 ---
 
-*最后更新: 2025年1月 | 基于Javet 4.1.7和aoconnect 0.0.90版本*
+*最后更新: 2025年1月 | 基于Javet 3.1.6和aoconnect 0.0.90版本*
