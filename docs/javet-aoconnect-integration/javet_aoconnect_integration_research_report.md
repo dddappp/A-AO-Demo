@@ -458,17 +458,78 @@ dist/
 > - **polyfill开销**: crypto、events、stream等Node.js模块的浏览器实现
 
 **推荐的集成方案**：
+
+**方案1: 使用官方ESM文件（Node.js模式）**
 ```bash
-# 方案1: 直接使用官方打包文件
+# 安装aoconnect依赖
+npm install @permaweb/aoconnect@0.0.90
+
+# 复制官方ESM文件到项目
 mkdir -p src/main/resources/js
 cp node_modules/@permaweb/aoconnect/dist/index.js src/main/resources/js/aoconnect.js
+```
 
-# 方案2: 自定义打包 (如果需要特定优化)
-# 安装rollup (npm install -g rollup)
-# rollup node_modules/@permaweb/aoconnect/dist/index.js \
-#        --file src/main/resources/js/aoconnect.custom.js \
-#        --format iife \
-#        --external none
+**方案2: 自定义打包（V8模式专用）**
+```bash
+# 安装esbuild打包工具
+npm install -g esbuild
+
+# 创建V8兼容的打包配置
+cat > v8-bundle-config.js << 'EOF'
+// V8模式专用打包配置
+import { build } from 'esbuild';
+
+await build({
+  entryPoints: ['./node_modules/@permaweb/aoconnect/dist/index.js'],
+  bundle: true,
+  platform: 'browser',  // V8兼容
+  format: 'esm',
+  external: [],  // 打包所有依赖！
+  outfile: './src/main/resources/js/aoconnect.v8-bundle.js',
+  minify: true,
+  treeShaking: true,
+  // 排除不需要的Node.js特定功能
+  define: {
+    'process.env.NODE_ENV': '"production"'
+  }
+});
+EOF
+
+# 执行打包
+node v8-bundle-config.js
+```
+
+**方案3: 手动依赖打包（高级）**
+```bash
+# 安装所有依赖到本地
+npm install
+
+# 创建包含所有依赖的打包配置
+cat > full-bundle-config.js << 'EOF'
+import { build } from 'esbuild';
+
+const dependencies = [
+  '@permaweb/ao-scheduler-utils',
+  '@permaweb/protocol-tag-utils',
+  'axios', 'base64url', 'buffer', 'debug',
+  'http-message-signatures', 'hyper-async',
+  'mnemonist', 'ramda', 'structured-headers', 'zod'
+];
+
+await build({
+  entryPoints: ['./node_modules/@permaweb/aoconnect/dist/index.js'],
+  bundle: true,
+  platform: 'neutral',
+  format: 'esm',
+  external: [], // 打包所有内容
+  outfile: './src/main/resources/js/aoconnect.full-bundle.js',
+  minify: true,
+  treeShaking: true
+});
+EOF
+
+# 执行完整打包
+node full-bundle-config.js
 ```
 
 **打包机制验证**：
@@ -600,6 +661,7 @@ ao.nodejs.module.paths=/your/project/directory/node_modules
 3. **版本冲突**: 检查 Node.js 和 npm 版本兼容性
 4. **ESM依赖缺失**: 确保Node.js环境中包含aoconnect的所有依赖包
 5. **V8模式依赖**: 在V8模式下需要为外部依赖创建拦截器
+6. **Bundle文件不存在**: 检查自定义打包是否成功生成
 
 > 🔧 **模式选择建议**（前端新手友好）:
 > ```bash
@@ -610,7 +672,23 @@ ao.nodejs.module.paths=/your/project/directory/node_modules
 > # V8模式（高级，需要额外工作）
 > IJavetEnginePool<V8Runtime> pool = new JavetEnginePool<>();
 > pool.getConfig().setJSRuntimeType(JSRuntimeType.V8);
-> # 需要为aoconnect依赖创建拦截器
+> # 需要为aoconnect依赖创建拦截器或使用完整打包
+> ```
+>
+> **V8模式打包检查**:
+> ```bash
+> # 检查打包文件是否存在
+> ls -la src/main/resources/js/aoconnect.v8-bundle.js
+>
+> # 检查打包文件大小（应该比66kB大很多）
+> wc -c src/main/resources/js/aoconnect.v8-bundle.js
+>
+> # 验证打包文件可以加载
+> node -e "
+> import('./src/main/resources/js/aoconnect.v8-bundle.js')
+>   .then(() => console.log('✅ Bundle加载成功'))
+>   .catch(err => console.log('❌ Bundle加载失败:', err.message));
+> "
 > ```
 >
 > 📋 **依赖检查命令**:
@@ -1070,6 +1148,50 @@ public <R extends V8Runtime> R createV8Runtime(RuntimeOptions<?> runtimeOptions)
 > - **V8环境**: 纯JavaScript引擎，无这些全局包
 > - **解决方案**: 需要为依赖创建拦截器或使用完整打包
 
+**V8模式的3种解决方案**:
+
+1. **🎯 推荐: 完整打包**
+   ```javascript
+   // 使用esbuild打包所有依赖到单个文件
+   await build({
+     entryPoints: ['./node_modules/@permaweb/aoconnect/dist/index.js'],
+     bundle: true,
+     platform: 'browser',  // V8兼容
+     format: 'esm',
+     external: [],  // 打包所有依赖
+     outfile: './aoconnect.v8-bundle.js'
+   });
+   ```
+
+2. **🔧 依赖拦截器**
+   ```javascript
+   // 在V8环境中为依赖创建模拟实现
+   globalThis.axios = {
+     get: (url) => fetch(url).then(r => r.json()),
+     post: (url, data) => fetch(url, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify(data)
+     }).then(r => r.json())
+   };
+
+   // 加载aoconnect
+   const aoconnect = await import('./aoconnect.js');
+   ```
+
+3. **📦 渐进式打包**
+   ```javascript
+   // 只打包必要的依赖
+   await build({
+     entryPoints: ['./node_modules/@permaweb/aoconnect/dist/index.js'],
+     bundle: true,
+     platform: 'neutral',
+     format: 'esm',
+     external: ['axios', 'ramda'], // 这些依赖需要手动提供
+     outfile: './aoconnect.partial-bundle.js'
+   });
+   ```
+
 ##### Node.js模式ESM支持
 - **双模式**: 同时支持ESM和CommonJS
 - **完整生态**: 包含Node.js所有API和模块系统
@@ -1081,6 +1203,39 @@ public <R extends V8Runtime> R createV8Runtime(RuntimeOptions<?> runtimeOptions)
 > const aoconnect = await import('./aoconnect.js');
 > const result = await aoconnect.spawn({...});
 > ```
+
+**V8模式Java集成示例**:
+```java
+public class V8AOBundleService {
+    private final IJavetEnginePool<V8Runtime> enginePool;
+
+    public V8AOBundleService() throws JavetException {
+        enginePool = new JavetEnginePool<>();
+        enginePool.getConfig().setJSRuntimeType(JSRuntimeType.V8);
+    }
+
+    public String spawnProcessWithBundle(String moduleId, String schedulerId) throws JavetException {
+        try (IJavetEngine<V8Runtime> engine = enginePool.getEngine()) {
+            V8Runtime runtime = engine.getV8Runtime();
+
+            // 加载完整打包的aoconnect bundle
+            File bundleFile = new File("src/main/resources/js/aoconnect.v8-bundle.js");
+            if (bundleFile.exists()) {
+                runtime.getExecutor(bundleFile).executeVoid();
+            }
+
+            // 使用打包后的aoconnect
+            return runtime.getExecutor(
+                "const { spawn } = globalThis.aoconnect;" +
+                "return spawn({" +
+                "module: '" + moduleId + "', " +
+                "scheduler: '" + schedulerId + "'" +
+                "});"
+            ).executeString();
+        }
+    }
+}
+```
 
 > 🔍 **ESM模块支持对比**:
 > - **V8模式**: ✅ 完全支持ES6 `import()` 和ESM模块
