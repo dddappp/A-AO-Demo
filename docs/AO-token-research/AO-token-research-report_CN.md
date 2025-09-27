@@ -2436,143 +2436,121 @@ end
 
 ---
 
-## 13. AO 消息属性处理机制深度分析
+## 13. AO 消息属性处理机制
 
-### 13.1 消息属性访问的双重机制
+### 13.1 消息访问机制
 
-**核心发现：** AO 消息系统支持两种参数访问方式：直接属性访问和 Tags 访问。这种设计提供了灵活性和向后兼容性。
+**AO 消息支持两种访问方式：**
 
-**官方示例代码验证：**
+**直接属性访问：**
 ```lua
--- 官方 AO Token 合约中的参数访问
 -- 来源: /Users/yangjiefeng/Documents/ao/lua-examples/ao-standard-token/token.lua
-handlers.add('transfer', handlers.utils.hasMatchingTag('Action', 'Transfer'), function(msg)
-  assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
-  assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
-end)
+local qty = tonumber(msg.Tags.Quantity)
 ```
 
-**调试输出验证：**
+**Tags 访问：**
 ```lua
-=== GET-NFT DEBUG ===
-msg.TokenId: nil          -- 大写直接属性为 nil
-msg.Tokenid: 1           -- 首字母大写直接属性为 "1"
-msg.Tags.TokenId: nil    -- 大写 Tags 为 nil
-msg.Tags.Tokenid: 1      -- 首字母大写 Tags 为 "1"
+-- 来源: /Users/yangjiefeng/Documents/ao/lua-examples/ao-standard-token/token.lua
+assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
 ```
 
-### 13.2 AO 网络的参数名标准化机制
+### 13.2 参数名转换机制
 
-**核心发现：** AO 网络会自动将用户发送的参数名转换为首字母大写其他小写的格式，而不是全小写。
+**AO 网络将参数名转换为首字母大写格式：**
 
-**源代码出处：**
+**转换函数：**
 ```javascript
 // 来源: /Users/yangjiefeng/Documents/ao/servers/cu/src/domain/logger.js
 function capitalize (str) {
-  if (!str) return ''
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
 ```
 
-**转换验证：**
-```javascript
-// 测试验证
-const userParam = 'TokenId'
-const converted = capitalizeFirst(userParam)
-// 结果: 'Tokenid' (首字母大写 T，其他小写 id)
+**转换结果：**
+- 用户发送：`TokenId = "1"`
+- AO 网络转换：`Tokenid = "1"`
+
+### 13.3 AO 消息参数名转换机制
+
+**核心问题：** 用户发送 `TokenId = "1"`，但在目标进程中需要用 `Tokenid`（首字母大写）访问。
+
+**调试输出验证：**
+```lua
+=== GET-NFT DEBUG ===
+msg.TokenId: nil          -- 大写版本不存在
+msg.Tokenid: 1           -- 首字母大写版本存在
+msg.Tags.TokenId: nil    -- 大写 Tags 不存在
+msg.Tags.Tokenid: 1      -- 首字母大写 Tags 存在
 ```
 
-### 13.3 消息处理完整流程
+**消息处理流程：**
 
 **1. 用户发送消息：**
 ```lua
 Send({ Target = "...", Action = "Get-NFT", TokenId = "1" })
 ```
 
-**2. AOS 处理：**
-- 将 Lua 代码作为 `data` 发送到 AO 进程
-- 来源: /Users/yangjiefeng/Documents/aos-repo/src/evaluate.js
+**2. AOS 调用 aoconnect 发送 Eval 消息：**
 ```javascript
+// 来源: /Users/yangjiefeng/Documents/aos-repo/src/evaluate.js
 return of({ processId, wallet, tags: [{ name: 'Action', value: 'Eval' }], data: line })
 ```
+- AOS 将包含 Send 调用的 Lua 代码作为 `data` 发送到 AO 进程
 
-**3. AO 进程执行：**
-- `ao.send` 函数将参数直接复制到消息对象
-- 来源: /Users/yangjiefeng/Documents/ao/lua-examples/ao-standard-token/token.lua
+**3. aoconnect 将消息上链：**
+```javascript
+// 来源: /Users/yangjiefeng/Documents/ao/connect/src/client/hb.js
+if (tags) tags.forEach(t => { obj[t.name.toLowerCase()] = t.value })
+```
+- aoconnect 将参数名转换为全小写并提交到 Arweave 网络
+
+**4. AO 节点处理消息：**
+```javascript
+// 来源: /Users/yangjiefeng/Documents/ao/servers/su/src/domain/core/json.rs
+MessageInner {
+  tags: Vec<Tag>,
+  target: Option<String>,
+  // ... 其他字段
+}
+```
+- SU/CU 节点接收并解析消息
+
+**5. AO 节点参数名转换：**
+```javascript
+// 来源: /Users/yangjiefeng/Documents/ao/servers/cu/src/domain/logger.js
+function capitalize (str) {
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+}
+
+// AO 节点将参数名转换为首字母大写格式
+// 用户发送: TokenId -> AO 节点处理后: Tokenid
+```
+
+**6. AO 进程执行 Lua 代码：**
 ```lua
+// 来源: /Users/yangjiefeng/Documents/ao/lua-examples/ao-standard-token/token.lua
 ao.send({
   Target = msg.From,
   Tags = { Action = 'Debit-Notice', Recipient = msg.Tags.Recipient, Quantity = tostring(qty) }
 })
 ```
-
-**4. 消息返回给 AOS：**
-```javascript
-{
-  Target: "...",
-  TokenId: "1",
-  Tags: [
-    { name: "TokenId", value: "1" }
-  ]
-}
-```
-
-**5. AO 网络参数转换：**
-- AO 网络将参数名转换为首字母大写格式
-- 来源: /Users/yangjiefeng/Documents/ao/connect/src/lib/request/transform.js
-```javascript
-map.Messages = result.Messages.map((m) => {
-  const miniMap = {}
-  m.Tags.forEach((t) => {
-    miniMap[t.name] = t.value  // Tags → 对象属性
-  })
-  miniMap.Target = m.Target  // 保留直接属性
-  return miniMap
-})
-```
+- AO 进程执行 Lua 代码，访问参数时使用首字母大写格式
 
 **6. 目标进程接收：**
 ```lua
--- 既可以通过直接属性访问
-local tokenId = msg.Tokenid  -- "1"
-
--- 也可以通过 Tags 访问
-local tokenId = msg.Tags.Tokenid  -- "1"
+-- 调试输出验证
+msg.TokenId: nil          -- 大写版本不存在
+msg.Tokenid: 1           -- 首字母大写版本存在
+msg.Tags.TokenId: nil    -- 大写 Tags 不存在
+msg.Tags.Tokenid: 1      -- 首字母大写 Tags 存在
 ```
 
-### 13.4 参数访问的最佳实践
+### 13.4 最佳实践
 
-**推荐的访问方式：**
+**兼容性访问：**
 ```lua
--- 多重检查确保兼容性
 local tokenId = msg.Tags.Tokenid or msg.Tags.TokenId or msg.TokenId
 ```
-
-**官方示例验证：**
-```lua
--- 来源: /Users/yangjiefeng/Documents/ao/lua-examples/ao-standard-token/token.lua
-handlers.add('transfer', handlers.utils.hasMatchingTag('Action', 'Transfer'), function(msg)
-  assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
-  assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
-end)
-```
-
-### 13.5 技术验证与权威来源
-
-**权威技术验证：**
-- ✅ **AO 消息格式**: 验证了消息支持直接属性和 Tags 双重访问机制
-- ✅ **参数名转换**: 确认 AO 网络使用首字母大写转换机制
-- ✅ **访问兼容性**: 验证了多重访问方式的兼容性设计
-
-**技术基础：**
-- **消息处理**: 基于 AO 网络的消息传递和处理机制
-- **参数转换**: 基于 AO 网络的参数名标准化逻辑
-- **访问机制**: 基于 Lua 表访问和 AO 消息对象结构
-
-**性能验证：**
-- **标准化**: 首字母大写转换确保参数访问的一致性
-- **兼容性**: 多重访问方式保证向后兼容性
-- **扩展性**: 支持未来参数处理机制的升级
 
 ---
 
