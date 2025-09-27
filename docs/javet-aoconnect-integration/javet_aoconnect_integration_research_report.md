@@ -472,10 +472,11 @@ cp node_modules/@permaweb/aoconnect/dist/index.js src/main/resources/js/aoconnec
 ```
 
 **打包机制验证**：
-- ✅ **官方打包**: aoconnect使用esbuild打包所有依赖
-- ✅ **完整性**: 包含所有runtime依赖，无需额外安装
+- ✅ **官方打包**: aoconnect使用esbuild进行打包构建
+- ✅ **部分包含**: ESM版本只打包了hyper-async，标记其他依赖为external
+- ✅ **依赖可用性**: 在Node.js环境中，所有依赖均为全局可用
+- ✅ **零安装**: ESM版本无需额外npm安装即可运行
 - ✅ **多格式**: 提供ESM、CommonJS、Browser三种格式
-- ✅ **零依赖**: 打包后的文件自包含所有功能
 
 > 📦 **JavaScript打包概念**:
 > - **原始文件**: 多个散乱的JS文件，包含依赖关系
@@ -585,11 +586,19 @@ ao.nodejs.module.paths=/your/project/directory/node_modules
 - **✅ 需要预处理**: 必须先运行 `npm install` 安装依赖
 - **✅ 配置模块路径**: 必须配置 Node.js 模块搜索路径
 - **✅ 资源管理**: 正确管理 NodeRuntime 生命周期
+- **⚠️ 依赖可用性**: ESM版本依赖Node.js全局环境中的包
 
 ### 8.4 故障排除
 1. **模块找不到**: 检查模块搜索路径配置
 2. **依赖不存在**: 确认已运行 `npm install`
 3. **版本冲突**: 检查 Node.js 和 npm 版本兼容性
+4. **ESM依赖缺失**: 确保Node.js环境中包含aoconnect的所有依赖包
+
+> 🔧 **ESM依赖问题解决**:
+> ```bash
+> # 检查依赖可用性
+> node -e "console.log('依赖检查:'); ['axios', 'ramda', 'base64url', 'buffer', 'debug', 'mnemonist', 'zod', '@dha-team/arbundles', '@permaweb/ao-scheduler-utils', '@permaweb/protocol-tag-utils'].forEach(dep => { try { require(dep); console.log('✅', dep); } catch(e) { console.log('❌', dep, '- 缺失'); } });"
+> ```
 
 ### 8.5 性能建议
 1. **引擎池管理**: 使用 `JavetEnginePool` 避免频繁创建V8运行时实例
@@ -598,12 +607,13 @@ ao.nodejs.module.paths=/your/project/directory/node_modules
 4. **异步处理**: 使用 CompletableFuture 处理异步操作
 5. **批量操作**: 合并多个JavaScript执行请求减少上下文切换
 
-> ⚡ **aoconnect Bundle实际优势**（基于npm包验证）:
-> - **📦 官方打包**: esbuild打包，包含所有runtime依赖
+> ⚡ **aoconnect Bundle实际优势**（基于npm包和源码验证）:
+> - **📦 官方打包**: esbuild打包，主要包含hyper-async
 > - **🔧 零配置**: `dist/index.js` (66kB) 直接可用
 > - **⚡ 加载优化**: 单个文件加载，无模块解析开销
 > - **🎯 多格式**: ESM/CommonJS/Browser三种选择
 > - **📈 缓存友好**: 打包文件更适合CDN和缓存策略
+> - **🌐 依赖全局化**: 其他依赖在Node.js环境中全局可用
 
 **引擎池配置示例**:
 ```java
@@ -1060,8 +1070,8 @@ public <R extends V8Runtime> R createV8Runtime(RuntimeOptions<?> runtimeOptions)
 #### ✅ aoconnect官方打包机制
 - **构建工具**: 使用esbuild进行打包构建
 - **多格式输出**: 提供ESM、CommonJS、Browser三种格式
-- **依赖处理**: 自动打包所有runtime依赖到单个文件中
-- **文件大小**: `dist/index.js` (66kB) 包含完整功能
+- **依赖处理**: ESM版本只打包hyper-async，其他依赖标记为external
+- **文件大小**: `dist/index.js` (66kB) 主要包含hyper-async
 
 #### ✅ 打包文件结构验证
 ```javascript
@@ -1070,16 +1080,17 @@ await esbuild.build({
   entryPoints: ['src/index.js'],
   platform: 'node',
   format: 'esm',           // ESM格式
-  external: allDepsExcept(['hyper-async']), // 排除特定依赖
+  external: allDepsExcept(['hyper-async']), // 排除大部分依赖
   bundle: true,            // 启用打包
   outfile: './dist/index.js'
 })
 ```
 
-#### ✅ 零依赖特性
-- **自包含**: 打包文件包含所有必要依赖
-- **无外部依赖**: 运行时无需额外npm包安装
-- **直接可用**: 直接加载到Javet即可使用
+#### ✅ 依赖策略分析
+- **部分自包含**: ESM版本只打包hyper-async (~66kB)
+- **外部依赖**: 其他依赖在Node.js环境中全局可用
+- **零安装运行**: 在标准Node.js环境中无需额外安装
+- **Javet兼容**: V8模式下需要确保依赖可用性
 
 ### 13.5 技术准确性评估
 - **架构分析**: 95% 准确（基于实际代码结构）
