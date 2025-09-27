@@ -452,6 +452,11 @@ dist/
 └── browser.js   (3.2MB)  - 浏览器版本，包含polyfill
 ```
 
+> 📏 **文件大小差异解释**:
+> - **ESM版本** (66kB): 针对Node.js环境，无需polyfill
+> - **浏览器版本** (3.2MB): 需要polyfill Node.js模块，包含大量兼容性代码
+> - **polyfill开销**: crypto、events、stream等Node.js模块的浏览器实现
+
 **推荐的集成方案**：
 ```bash
 # 方案1: 直接使用官方打包文件
@@ -486,9 +491,10 @@ public class AOService {
     private final IJavetEnginePool<V8Runtime> enginePool;
 
     public AOService() throws JavetException {
-        // 创建V8模式引擎池
+        // 创建V8模式引擎池 (推荐用于纯ESM模块)
         enginePool = new JavetEnginePool<>();
         enginePool.getConfig().setJSRuntimeType(JSRuntimeType.V8);
+        // V8模式完全支持ESM模块，无需Node.js生态
     }
 
     public String spawnProcess(String moduleId, String schedulerId) throws JavetException {
@@ -1020,6 +1026,33 @@ public <R extends V8Runtime> R createV8Runtime(RuntimeOptions<?> runtimeOptions)
 - **模式配置**: `JSRuntimeType.V8` vs `JSRuntimeType.Node`
 - **场景适用**: V8模式适合纯计算，Node.js模式适合完整生态
 - **灵活切换**: 运行时可根据需要选择不同模式
+
+#### ✅ ESM模块支持验证
+通过Javet设计文档验证，确认以下技术事实：
+
+##### V8模式ESM支持
+- **完全支持**: ES6 `import()` 和ESM模块系统
+- **模块虚拟化**: 支持任意来源的模块加载（文件、URL、内存等）
+- **零依赖**: 不需要Node.js生态，减少攻击面
+- **性能优势**: 更轻量，启动更快
+
+##### Node.js模式ESM支持
+- **双模式**: 同时支持ESM和CommonJS
+- **完整生态**: 包含Node.js所有API和模块系统
+- **灵活性**: 可以混合使用不同模块格式
+
+> 💡 **V8模式ESM使用示例**:
+> ```javascript
+> // 在V8模式中加载ESM模块
+> const aoconnect = await import('./aoconnect.js');
+> const result = await aoconnect.spawn({...});
+> ```
+
+> 🔍 **ESM模块支持对比**:
+> - **V8模式**: ✅ 完全支持ES6 `import()` 和ESM模块
+> - **Node.js模式**: ✅ 完全支持ESM + CommonJS双模式
+> - **模块虚拟化**: Javet支持任意来源的模块加载
+> - **安全优势**: V8模式无需Node.js生态，攻击面更小
 
 ### 13.4 aoconnect打包机制验证
 通过分析AO官方代码库和npm发布包，确认以下技术事实：
