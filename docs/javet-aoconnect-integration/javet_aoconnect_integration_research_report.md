@@ -442,20 +442,20 @@ npm install @permaweb/aoconnect@0.0.90
 #### 步骤2: 准备JavaScript模块
 
 **aoconnect发布版本分析**：
-经过npm包分析，aoconnect **确实提供了打包后的单个文件**：
+经过npm包和源码分析，aoconnect **提供了不同打包策略的版本**：
 
 ```bash
 # aoconnect包结构 (基于实际npm包和源码验证)
 dist/
-├── index.js     (66.4kB)  - ESM版本，主要包含hyper-async
-├── index.cjs    (72.0kB)  - CommonJS版本，主要包含hyper-async
+├── index.js     (66.4kB)  - ESM版本，只包含hyper-async
+├── index.cjs    (72.0kB)  - CommonJS版本，只包含hyper-async
 └── browser.js   (3.2MB)  - 浏览器版本，包含所有polyfill
 ```
 
 > 📏 **文件大小差异解释**:
-> - **ESM版本** (66kB): 针对Node.js环境，无需polyfill
-> - **浏览器版本** (3.2MB): 需要polyfill Node.js模块，包含大量兼容性代码
-> - **polyfill开销**: crypto、events、stream等Node.js模块的浏览器实现
+> - **ESM版本** (66kB): 针对Node.js环境，主要包含hyper-async
+> - **浏览器版本** (3.2MB): 包含所有依赖的polyfill，体积较大
+> - **依赖策略**: ESM版本将大部分依赖标记为external，依赖运行时环境
 
 > 💡 **V8模式使用浏览器版本**:
 > - **✅ 可以直接使用**: V8模式可以加载浏览器版本的aoconnect
@@ -1328,6 +1328,13 @@ await esbuild.build({
 - **外部依赖**: 其他依赖在Node.js环境中全局可用
 - **零安装运行**: 在标准Node.js环境中无需额外安装
 - **Javet兼容**: V8模式下需要确保依赖可用性或使用浏览器版本
+
+> 🔍 **esbuild external配置含义**:
+> ```javascript
+> // 排除大部分依赖，只打包hyper-async
+> external: allDepsExcept(['hyper-async'])
+> // 结果：ESM版本只包含hyper-async，其他依赖需运行时可用
+> ```
 
 ### 13.5 技术准确性评估
 - **架构分析**: 95% 准确（基于实际代码结构）

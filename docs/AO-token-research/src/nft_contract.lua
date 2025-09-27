@@ -189,6 +189,18 @@ Handlers.add('transfer_nft', Handlers.utils.hasMatchingTag("Action", "Transfer-N
   local tokenId = msg.Tags.Tokenid or msg.Tags.TokenId or msg.TokenId
   local recipient = msg.Tags.Recipient or msg.Tags.Recipient or msg.Recipient
 
+  -- 调试信息：打印所有可用字段
+  print("=== TRANSFER-NFT DEBUG ===")
+  print("msg.TokenId: " .. tostring(msg.TokenId))
+  print("msg.Tokenid: " .. tostring(msg.Tokenid))
+  print("msg.Recipient: " .. tostring(msg.Recipient))
+  print("msg.Tags.TokenId: " .. tostring(msg.Tags.TokenId))
+  print("msg.Tags.Tokenid: " .. tostring(msg.Tags.Tokenid))
+  print("msg.Tags.Recipient: " .. tostring(msg.Tags.Recipient))
+  print("msg.Tags: " .. json.encode(msg.Tags or {}))
+  print("Final tokenId: " .. tostring(tokenId))
+  print("Final recipient: " .. tostring(recipient))
+
   -- 参数验证：返回错误消息而不是崩溃
   if not tokenId or type(tokenId) ~= 'string' then
     local errorResponse = {
@@ -414,8 +426,11 @@ Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), func
   -- 调试信息：打印所有可用字段
   print("=== GET-NFT DEBUG ===")
   print("msg.TokenId: " .. tostring(msg.TokenId))
+  print("msg.Tokenid: " .. tostring(msg.Tokenid))
+  print("msg.tokenid: " .. tostring(msg.tokenid))
   print("msg.Tags.TokenId: " .. tostring(msg.Tags.TokenId))
   print("msg.Tags.Tokenid: " .. tostring(msg.Tags.Tokenid))
+  print("msg.Tags.tokenid: " .. tostring(msg.Tags.tokenid))
   print("msg.Tags: " .. json.encode(msg.Tags or {}))
   print("Final tokenId: " .. tostring(tokenId))
 
@@ -629,6 +644,18 @@ Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Se
   -- 在 AO 中，参数通过 Tags 传递，AO 会将参数名转换为小写
   local tokenId = msg.Tags.Tokenid or msg.Tags.TokenId or msg.TokenId
   local transferable = msg.Tags.Transferable or msg.Tags.Transferable or msg.Transferable
+
+  -- 调试信息：打印所有可用字段
+  print("=== SET-NFT-TRANSFERABLE DEBUG ===")
+  print("msg.TokenId: " .. tostring(msg.TokenId))
+  print("msg.Tokenid: " .. tostring(msg.Tokenid))
+  print("msg.Transferable: " .. tostring(msg.Transferable))
+  print("msg.Tags.TokenId: " .. tostring(msg.Tags.TokenId))
+  print("msg.Tags.Tokenid: " .. tostring(msg.Tags.Tokenid))
+  print("msg.Tags.Transferable: " .. tostring(msg.Tags.Transferable))
+  print("msg.Tags: " .. json.encode(msg.Tags or {}))
+  print("Final tokenId: " .. tostring(tokenId))
+  print("Final transferable: " .. tostring(transferable))
 
   -- 参数验证：返回错误消息而不是崩溃
   if not tokenId or type(tokenId) ~= 'string' then

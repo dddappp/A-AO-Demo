@@ -5,6 +5,12 @@ async function testAOConnectIntegration() {
     console.log('🧪 测试aoconnect集成...');
 
     try {
+        // 先加载aoconnect模块
+        console.log('🔄 加载aoconnect模块...');
+        const aoconnect = require('@permaweb/aoconnect');
+        global.aoconnect = aoconnect;
+        console.log('✅ aoconnect模块加载成功');
+
         // 测试模块是否正确加载
         assert(global.aoconnect, 'aoconnect模块未加载');
         assert(global.aoconnect.spawn, 'spawn函数不存在');

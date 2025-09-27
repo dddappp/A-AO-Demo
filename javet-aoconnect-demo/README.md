@@ -32,7 +32,20 @@ javet-aoconnect-demo/
 - **Maven**: 3.6+
 - **Javet原生库**: 需要平台特定的Javet原生库文件
 
-### 2. 运行预处理脚本
+### 2. 运行环境检查（推荐）
+
+```bash
+chmod +x test-environment.sh
+./test-environment.sh
+```
+
+此脚本将：
+- 检查所有必需的环境和依赖
+- 自动安装缺失的依赖
+- 验证aoconnect文件完整性
+- 确保演示项目可以正常运行
+
+### 3. 运行预处理脚本
 
 ```bash
 chmod +x scripts/prepare-aoconnect.sh
@@ -44,7 +57,7 @@ chmod +x scripts/prepare-aoconnect.sh
 - 复制aoconnect文件到资源目录
 - 创建必要的配置脚本
 
-### 3. 运行演示
+### 4. 运行演示
 
 ```bash
 # 方法1: 使用运行脚本（推荐）
@@ -69,7 +82,7 @@ java -cp target/classes:target/dependency/* com.example.javetaodemo.JavetAOConne
 🎯 演示2: Node.js模式 + ESM版本aoconnect
 ✅ aoconnect加载成功，版本: 可用
 🎯 演示3: 引擎池管理
-🏊 引擎池创建成功，池大小: 3
+🏊 引擎池创建成功
 ✅ 任务0执行完成
 ✅ 任务1执行完成
 ✅ 任务2执行完成
@@ -77,6 +90,13 @@ java -cp target/classes:target/dependency/* com.example.javetaodemo.JavetAOConne
 ✅ 任务4执行完成
 ✅ 演示完成
 ```
+
+> ⚠️ **实际运行注意事项**:
+> - 演示项目可能因Javet原生库依赖而无法运行
+> - 需要确保系统已正确安装Javet原生库文件
+> - 建议先运行测试脚本验证环境兼容性
+> - 如果遇到原生库问题，请参考官方文档解决
+> - **macOS Intel芯片**: 可能需要额外安装依赖或使用不同版本
 
 ## 🎯 演示功能
 
