@@ -36,7 +36,7 @@ end
 function comment_coll:clone()
     local cloned = comment_coll.new(self.data_table, self.article_id)
 
-    -- 复制操作缓存，避免原始 state 与克隆之间的提交日志互相影响
+    -- Copy operation cache to avoid interference between original and cloned states
     if self.operation_cache then
         for index, operation in ipairs(self.operation_cache) do
             cloned.operation_cache[index] = deepcopy(operation)
