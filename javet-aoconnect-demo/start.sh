@@ -17,6 +17,17 @@ if ! command -v mvn &> /dev/null; then
     exit 1
 fi
 
+# 设置代理环境变量（如果需要）
+echo "Setting proxy environment variables..."
+export HTTPS_PROXY=http://127.0.0.1:1235
+export HTTP_PROXY=http://127.0.0.1:1235
+export ALL_PROXY=socks5://127.0.0.1:1234
+
+echo "Proxy configuration:"
+echo "  HTTPS_PROXY: $HTTPS_PROXY"
+echo "  HTTP_PROXY: $HTTP_PROXY"
+echo "  ALL_PROXY: $ALL_PROXY"
+
 # 创建日志目录
 mkdir -p logs
 

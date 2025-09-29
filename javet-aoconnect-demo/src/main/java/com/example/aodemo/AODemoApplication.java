@@ -5,26 +5,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * AO Demo 应用程序 - 展示 Javet 和 aoconnect 集成的演示应用
- *
- * 本应用演示了如何：
- * 1. 初始化 AO Java Bridge
- * 2. 连接到 AO 网络
- * 3. 创建 AO 进程
- * 4. 发送消息并获取结果
- *
- * 运行方式：
- * - 使用 Maven: mvn compile exec:java
- * - 使用 IDE: 直接运行 main 方法
- *
- * 注意：需要确保 AO 网络配置正确，特别是 scheduler ID
+ * 入口应用：在 Java 中跑通 "spawn -> message" 的真实 Legacy AO 流程。
  */
 public class AODemoApplication {
     private static final Logger logger = LoggerFactory.getLogger(AODemoApplication.class);
-
-    // AO 网络配置 - 这些应该从配置文件中读取
-    private static final String MODULE_ID = "S9ydoEDkzP_bSFI-Lm-vzBcBK4hZxPqVrtMNyO6zq-W4"; // 示例模块ID
-    private static final String SCHEDULER_ID = "GNcuO-pnva8hcIAn2rGTp0sNqGx-v9V8GqVh_K8JFhSc"; // 示例调度器ID
 
     public static void main(String[] args) {
         logger.info("Starting AO Demo Application...");
@@ -33,13 +17,11 @@ public class AODemoApplication {
         System.setProperty("javet.logger.level", "INFO");
 
         try (AOJavaBridge bridge = new AOJavaBridge()) {
-            // 初始化桥接
             logger.info("Initializing AO Java Bridge...");
             bridge.initialize();
 
             logger.info("✅ AO Java Bridge initialized successfully!");
 
-            // 测试连接
             logger.info("Testing AO network connection...");
             try {
                 boolean connected = bridge.testConnection();
@@ -53,6 +35,9 @@ public class AODemoApplication {
             logger.info("Bridge info: {}", bridge.getPoolInfo());
             logger.info("Bridge initialized: {}", bridge.isInitialized());
 
+            // 运行真实AO网络演示
+            demonstrateRealAONetwork(bridge);
+
         } catch (JavetException e) {
             logger.error("Javet exception occurred", e);
         } catch (Exception e) {
@@ -63,37 +48,51 @@ public class AODemoApplication {
     }
 
     /**
-     * 演示 AO 网络的各种功能
+     * 演示真实 AO 网络交互
      */
-    private static void demonstrateAOCapabilities(AOJavaBridge bridge) {
+    private static void demonstrateRealAONetwork(AOJavaBridge bridge) {
         try {
-            logger.info("=== AO Network Capabilities Demo ===");
+            logger.info("=== Real AO Network Interaction Demo ===");
+            logger.info("🚀 Demonstrating actual AO network operations...");
 
-            // 1. 创建 AO 进程
-            logger.info("1. Creating AO process...");
-            String processId = bridge.spawnProcess(MODULE_ID, SCHEDULER_ID);
-            logger.info("✅ Process created: {}", processId);
+            // 显示钱包信息
+            logger.info("\n💰 Wallet Information:");
+            logger.info("   Wallet Path: {}", bridge.getWalletPath());
+            logger.info("   Network: AO Legacy (arweave.net)");
+            logger.info("   Status: Wallet initialized and ready for signing");
 
-            // 2. 发送消息
-            logger.info("2. Sending message to process...");
-            String messageData = "Hello from Java via Javet!";
-            String messageId = bridge.sendMessage(processId, "Echo", messageData);
-            logger.info("✅ Message sent: {}", messageId);
+            // 显示网络配置
+            logger.info("\n🌐 AO Network Configuration:");
+            logger.info("   Gateway: {}", bridge.getGatewayUrl());
+            logger.info("   AO URL: {}", bridge.getAoUrl());
+            logger.info("   MU URL: {}", bridge.getMuUrl());
+            logger.info("   CU URL: {}", bridge.getCuUrl());
+            logger.info("   Scheduler: {}", bridge.getSchedulerId());
+            logger.info("   Module: {}", bridge.getModuleId());
 
-            // 3. 获取结果
-            logger.info("3. Retrieving result...");
-            String result = bridge.getResult(messageId);
-            logger.info("✅ Result received: {}", result);
+            // 尝试创建真实AO进程
+            logger.info("\n⚙️ Phase 1: Real AO Process Creation");
+            logger.info("   Attempting to create AO process with wallet signing...");
 
-            // 4. 显示引擎池信息
-            logger.info("4. Engine pool info:");
-            logger.info("   - Pool info: {}", bridge.getPoolInfo());
-            logger.info("   - Initialized: {}", bridge.isInitialized());
+            try {
+                String processId = bridge.spawnProcess();
+                logger.info("✅ Real AO Process created: {}", processId);
 
-            logger.info("=== Demo completed successfully ===");
+                logger.info("\n📤 Phase 2: Real Message Sending");
+                String messageData = "Hello from Java + Javet + aoconnect + Real AO Network!";
+                String messageId = bridge.sendMessage(processId, "Echo", messageData);
+                logger.info("✅ Real message sent: {}", messageId);
 
-        } catch (JavetException e) {
-            logger.error("Error during AO capabilities demonstration", e);
+                logger.info("\n🎉 AO Network Demo Completed Successfully!");
+                logger.info("   • Process ID: {}", processId);
+                logger.info("   • Message ID: {}", messageId);
+            } catch (Exception e) {
+                logger.error("❌ Real AO network operation failed: {}", e.getMessage());
+                logger.info("💡 Network connection failed - stopping demonstration as requested");
+            }
+
+        } catch (Exception e) {
+            logger.error("Real AO network demonstration failed", e);
         }
     }
 }

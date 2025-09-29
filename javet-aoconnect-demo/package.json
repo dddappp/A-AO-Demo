@@ -4,13 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "echo 'Node dependencies ready'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@permaweb/aoconnect": "^0.0.90"
+    "@permaweb/aoconnect": "^0.0.90",
+    "undici": "^6.19.2"
   }
 }

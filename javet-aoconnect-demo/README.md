@@ -1,298 +1,113 @@
-# Javet AOConnect Integration Demo
+# Javet AOConnect Demo
 
-## 项目概述
+## 目标
 
-这是一个演示项目，展示如何在 Java 应用程序中集成 **Javet** 框架和 **aoconnect** SDK，实现与 AO（Actor-Oriented Computer）网络的无缝交互。
+在 Java 中直接调用 Node.js 运行时，复刻 `js-aoconnect-test` 的 `spawn -> message` 成功流程，证明 **Javet 集成 @permaweb/aoconnect 可行且可靠**。
 
-**⚠️ 重要说明**: 本项目已成功实现 Javet + aoconnect 集成，并可以连接到 AO Legacy 网络。原生库依赖已正确配置，支持 macOS arm64 架构。
+## 成果
 
-### 核心特性
+- ✅ JVM 内部启动 Node runtime（Javet Node 模式）
+- ✅ 直接复用 `js-aoconnect-test` 的环境设置、代理和 API 调用方式
+- ✅ 使用 AOS CLI 同款钱包 `~/.aos.json`
+- ✅ Javet 依赖使用官方 4.x 架构后缀命名：macOS `javet-node-macos-*` + Linux `javet-node-linux-x86_64`
+- ✅ Docker 镜像默认走 `linux/amd64`，并强制本地编译 `keccak`、`secp256k1` 确保 N-API 与 Node 22 兼容
+- ✅ `spawn` 返回真实 43 字符 AO 进程 ID
+- ✅ `message` 返回真实消息 ID，指向上一步新建的进程
 
-- ✅ **Javet 集成**: 使用 Node.js 运行时在 Java 中执行 JavaScript 代码
-- ✅ **AO 网络连接**: 通过 aoconnect SDK 与 AO Legacy 网络交互
-- ✅ **引擎池管理**: 高效的 Node.js 运行时实例池化
-- ✅ **自动资源管理**: try-with-resources 模式的资源清理
-- ✅ **完整日志记录**: 详细的操作日志和错误处理
-- ✅ **代理支持**: 支持 HTTP/SOCKS 代理访问网络
-- ✅ **单元测试**: 完整的测试覆盖
+最新跑通记录（2025-09-29）：
+- Process ID: `hd34HJGjgX3tw8tJY7psHiEGDBIJTxWova77BGWGXWM`
+- Message ID: `XsP-ZH9OqEhtYwq23tlv5O5r5k_x3KS-UYCIFF57O9c`
 
-### 技术架构
+## 关键经验
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Java 应用层    │───▶│ Javet 桥接层     │───▶│ AO 网络层       │
-│                 │    │                  │    │                 │
-│ - 业务逻辑      │    │ - V8 引擎运行时  │    │ - 进程管理      │
-│ - 状态管理      │    │ - 引擎池管理     │    │ - 消息传递      │
-│ - 错误处理      │    │ - 资源管理       │    │ - 状态查询      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-```
+1. **Node 运行时**：Javet 默认是 V8；必须显式设置 `JSRuntimeType.Node` 才能使用 `require`、`process`。
+2. **代理处理**：AOS CLI 会覆写 `global.fetch` 使用 `undici.ProxyAgent`，直接抄一样的逻辑；光设环境变量会失败。
+3. **初始化顺序**：一定要先设置环境和代理，再 `require('@permaweb/aoconnect')`，否则内部请求不会走代理。
+4. **异步结果**：JS 返回 Promise，Java 通过 `runtime.await()` + 轮询全局变量收集结果，不能凭空 `sleep`。
+5. **不要返还假数据**：任何网络错误直接抛出异常并停止演示，避免“成功但是假 ID”。
 
-## 技术栈
-
-- **Java 11+** - 主要编程语言
-- **Javet 3.1.6** - Java与V8/Node.js引擎桥接
-- **Node.js 18+** - JavaScript运行时环境
-- **aoconnect 0.0.90** - AO网络官方SDK
-- **Maven 3.8+** - Java项目构建工具
-- **SLF4J + Logback** - 日志框架
-
-## 环境要求
-
-- **操作系统**: Windows 11/10, Linux (glibc 2.29+), macOS 12.0+ (包括 Apple Silicon)
-- **架构**: 支持 x86_64 和 arm64
-- **内存**: 最小 512MB RAM，推荐 2GB RAM
-- **磁盘**: 2GB 可用空间（包括依赖下载）
-- **Java**: JDK 11+ (推荐 JDK 17+)
-- **Node.js**: 18.0.0+ (推荐 20.x LTS)
-- **npm**: 8.0.0+ (推荐最新版本)
-- **Maven**: 3.8.0+ (推荐 3.9.x)
-
-## 快速开始
-
-### 1. 环境准备
-
-```bash
-# 验证环境
-java -version
-node --version
-npm --version
-mvn --version
-
-# 配置代理（如果需要）
-export HTTPS_PROXY=http://127.0.0.1:1235
-export HTTP_PROXY=http://127.0.0.1:1235
-export ALL_PROXY=socks5://127.0.0.1:1234
-```
-
-### 2. 构建项目
-
-```bash
-git clone <repository-url>
-cd javet-aoconnect-demo
-
-# 安装依赖
-npm install
-mvn clean compile
-```
-
-### 3. 运行应用
-
-```bash
-# 方式一：Maven 插件（推荐）
-mvn exec:java
-
-# 方式二：启动脚本
-./start.sh
-
-# 方式三：JAR 包
-mvn clean package
-java -jar target/javet-aoconnect-demo.jar
-```
-
-### 4. 运行测试
-
-```bash
-mvn test
-```
-
-### 5. 预期输出
-
-```
-✅ AO Java Bridge initialized with Node.js runtime pool
-✅ Loading aoconnect SDK...
-✅ aoconnect SDK loaded successfully
-✅ AO Java Bridge initialized successfully!
-✅ Bridge info: V8Runtime pool initialized
-✅ Bridge initialized: true
-```
-
-## 项目结构
+## 目录结构
 
 ```
 javet-aoconnect-demo/
-├── src/
-│   ├── main/
-│   │   ├── java/com/example/aodemo/
-│   │   │   ├── AOJavaBridge.java          # 核心桥接类 - AO 网络桥接实现
-│   │   │   └── AODemoApplication.java     # 演示应用 - 主程序入口
-│   │   └── resources/
-│   │       ├── js/
-│   │       │   └── aoconnect.browser.js   # aoconnect 浏览器版本 (备用)
-│   │       ├── application.properties     # 应用配置 - AO 网络和代理设置
-│   │       └── logback.xml               # 日志配置 - 详细日志记录
-│   └── test/
-│       └── java/com/example/aodemo/
-│           └── AOJavaBridgeTest.java      # 单元测试 - 桥接功能测试
-├── node_modules/                          # npm 依赖 - @permaweb/aoconnect
-├── package.json                           # npm 配置 - 依赖管理
-├── package-lock.json                      # npm 锁定文件 - 版本锁定
-├── pom.xml                               # Maven 配置 - Java 依赖和构建
-├── start.sh                              # 启动脚本 - 一键启动应用
-├── .gitignore                            # Git 忽略文件 - 排除可下载内容
-└── README.md                             # 项目文档 - 完整使用指南
+├── src/main/java/com/example/aodemo/
+│   ├── AOJavaBridge.java      # Node runtime + aoconnect 桥接
+│   └── AODemoApplication.java # 演示入口，打印真实 ID
+├── src/main/resources/
+│   ├── application.properties # Legacy 网络端点配置
+│   └── logback.xml            # 日志配置
+├── package.json / node_modules/undici
+├── pom.xml
+└── start.sh                   # 可选启动脚本，预设代理环境变量
 ```
 
-**文件说明**:
-- `AOJavaBridge.java`: 核心桥接类，实现 Javet + aoconnect 集成
-- `AODemoApplication.java`: 主程序，演示 AO 网络交互功能
-- `application.properties`: 配置 AO 网络端点和代理设置
-- `aoconnect.browser.js`: aoconnect SDK 浏览器版本 (项目中未使用)
+## 运行方式
 
-## 技术要点
-
-### 依赖管理
-- **Javet 3.1.6**: 自动下载平台原生库，支持 macOS arm64
-- **aoconnect 0.0.90**: 通过 npm 安装，Node.js 模式运行
-
-### 核心机制
-- **引擎池管理**: Node.js 运行时复用
-- **模块路径配置**: 自动设置 npm 模块搜索路径
-- **资源管理**: try-with-resources 自动清理
-- **错误处理**: 统一异常处理和日志记录
-
-### AO 网络交互
-支持进程创建、消息发送和结果查询等核心操作。
-
-## 配置说明
-
-### 应用配置
-- **AO 网络端点**: 配置 gateway、mu、cu 等服务地址
-- **调度器 ID**: 指定使用的 AO 调度器进程
-- **代理设置**: 支持 HTTP/SOCKS 代理访问
-- **日志级别**: 可调整 DEBUG/INFO 等日志级别
-
-## 测试和验证
-
-### 单元测试
-- **桥接初始化测试**: 验证 Javet 引擎池和 aoconnect 加载
-- **网络连接测试**: 验证 AO 网络可达性
-- **功能测试**: 验证进程创建、消息发送等核心功能
-
-运行测试：`mvn test`
-
-## 故障排除
-
-### 常见问题
-
-#### 1. Javet 原生库加载失败
-**解决方案**:
-- 确保添加了 `javet-macos` 依赖用于 macOS arm64 支持
-- 验证原生库已正确下载：`find ~/.m2/repository/com/caoccao/javet/ -name "*.dylib"`
-- 清理 Maven 本地仓库后重新构建
-
-#### 2. 依赖安装问题
-**解决方案**:
-- 确保 npm 依赖已正确安装：`npm install`
-- 验证 aoconnect 模块存在且版本正确
-- 检查 node_modules 目录权限
-
-#### 3. 网络连接失败
-**解决方案**:
-- 验证网络连通性：`curl -I https://arweave.net`
-- 检查代理配置是否正确
-- 确认 AO 网络端点配置
-
-#### 4. 调试模式
-启用详细日志：
-```properties
-logging.level.com.example.aodemo=TRACE
-logging.level.com.caoccao.javet=DEBUG
 ```
-
-## 性能优化
-
-- **引擎池调优**: 根据负载调整池大小和超时时间
-- **内存管理**: 自动清理和引擎复用
-- **并发处理**: 支持异步操作和连接复用
-
-## 部署指南
-
-### 开发环境
-```bash
+cd javet-aoconnect-demo
 npm install
-mvn clean compile
-mvn exec:java
+mvn -q exec:java
 ```
 
-### 生产环境
-- 构建：`mvn clean package`
-- 配置生产环境网络端点和日志
-- 设置 JVM 优化参数
+> 若 `undici` 缺失，会报 `Cannot find module 'undici'`，执行 `npm install undici --no-save` 即可。
 
-### 监控要点
-- 定期检查日志文件
-- 监控引擎池使用情况
-- 设置健康检查端点
+## 输出示例
 
-## 扩展开发
+```
+✅ AO Java Bridge initialized with Node.js runtime pool
+…
+📥 Spawn result: hd34HJGjgX3tw8tJY7psHiEGDBIJTxWova77BGWGXWM
+✅ Real AO Process created: hd34HJGjgX3tw8tJY7psHiEGDBIJTxWova77BGWGXWM
+…
+📨 Message Details:
+   - Message ID: XsP-ZH9OqEhtYwq23tlv5O5r5k_x3KS-UYCIFF57O9c
+   - Target Process: hd34HJGjgX3tw8tJY7psHiEGDBIJTxWova77BGWGXWM
+```
 
-### 自定义功能
-- 扩展 `AOJavaBridge` 类添加新方法
-- 在 `application.properties` 中添加配置
-- 实现自定义 AO 网络操作
+## 常见报错速记
 
-### 框架集成
-- **Spring Boot**: 配置为 Bean 自动注入
-- **监控**: 集成 Micrometer 等监控框架
-- **异步**: 使用 CompletableFuture 处理并发
+| 报错                                                   | 解决方式                                                                    |
+| ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `Cannot find module 'undici'`                          | `npm install undici --no-save`                                              |
+| `fetch failed`                                         | 检查代理覆写脚本是否执行；确认 `HTTPS_PROXY` 指向代理；代理需要支持 CONNECT |
+| `Timeout waiting for JavaScript operation to complete` | 确认 `runtime.await()` 每轮被调用；不要用 `Thread.sleep` 替代事件循环       |
+| `Invalid process ID format`                            | 进程创建失败，日志会包含实际错误；不要返回假 ID                             |
 
-## 贡献指南
+## 与 `js-aoconnect-test` 的对照
 
-### 开发流程
+| 项目                   | 运行时     | 核心脚本            | 结果                    |
+| ---------------------- | ---------- | ------------------- | ----------------------- |
+| `js-aoconnect-test`    | Node CLI   | `spawn-test.js`     | Spawn 真实进程 + 消息   |
+| `javet-aoconnect-demo` | Javet Node | `AOJavaBridge.java` | 同样流程，运行在 JVM 内 |
 
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
+## Docker 打包示例
 
-### 代码规范
+`Dockerfile` 默认使用 `linux/amd64` 基础镜像，并在 Node 阶段安装 `python3`, `make`, `g++` 后执行 `npm rebuild --build-from-source keccak secp256k1`。原因如下：
+- `@permaweb/aoconnect` 依赖的 `keccak` / `secp256k1` 只有 `linux-x64` 预编译包，而 OrbStack/Docker Desktop 在 macOS 上默认构建 `arm64` 镜像会导致 `napi_module_register` 等符号缺失。
+- 统一以 `amd64` 构建可以与 Javet 提供的 `javet-node-linux-x86_64` 原生库匹配，避免运行时加载失败。
+- 如果宿主机是 arm64（例如 M 系列 Mac），Docker 会在运行时通过仿真执行 `amd64` 镜像，只需启动命令加上 `--platform linux/amd64` 即可消除警告。
 
-- 遵循 Java 编码规范
-- 添加适当的注释和文档
-- 编写单元测试
-- 更新相关文档
+构建与运行步骤：
+```
+cd javet-aoconnect-demo
+# 1. 构建镜像（始终输出 linux/amd64）
+docker build -t javet-aoconnect-demo .
 
-## 版本历史
+# 2. 运行容器，指向宿主机代理与钱包
+# macOS/Windows: 使用 host.docker.internal
+# Linux: 替换为宿主机实际 IP
+docker run --rm \
+  --platform linux/amd64 \
+  -e HTTPS_PROXY=http://host.docker.internal:1235 \
+  -e HTTP_PROXY=http://host.docker.internal:1235 \
+  -e ALL_PROXY=http://host.docker.internal:1235 \
+  -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+  -v $HOME/.aos.json:/root/.aos.json \
+  javet-aoconnect-demo
+```
 
-### v1.0.0
-- 初始版本发布
-- 实现基本的 Javet + aoconnect 集成
-- 包含完整的演示应用和测试
-- 提供详细的文档和故障排除指南
+容器内输出应与本地运行一致：先 `spawn` 新进程，再向该进程发送消息并返回真实 ID。
 
-## 许可证
+> 注意：在 OrbStack 的 macOS 环境中，即使强制 `linux/amd64` 并重新编译原生模块，仍可能出现 `secp256k1: undefined symbol napi_define_class`。推测是仿真层的 Node ABI 与编译结果不一致，建议在真实 x86_64 主机上执行 Docker 流程或进一步排查。
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
-
-## 支持
-
-如有问题或建议，请：
-
-1. 查看 [故障排除](#故障排除) 部分
-2. 查阅日志文件
-3. 提交 Issue 描述问题
-
-## 📚 贡献指南
-
-### 开发流程
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
-
-### 代码规范
-- 遵循 Java 编码规范
-- 添加适当的注释和文档
-- 编写单元测试
-- 更新相关文档
-
-## 📄 许可证
-
-本项目采用 **MIT 许可证**。
-
----
-
-**注意**: 本项目基于 AO 网络测试网，生产使用前请确保网络配置正确，并进行充分的测试。
+两者的环境变量、代理处理、tag 处理完全一致；Javet 只是把 Node 封装进了 Java。如此可验证 Java 集成 aoconnect 不需要 Mock，不需要“改协议”，关键是 Node 环境与代理配置必须和 AOS CLI 一模一样。
