@@ -111,3 +111,7 @@ docker run --rm \
 > 注意：在 OrbStack 的 macOS 环境中，即使强制 `linux/amd64` 并重新编译原生模块，仍可能出现 `secp256k1: undefined symbol napi_define_class`。推测是仿真层的 Node ABI 与编译结果不一致，建议在真实 x86_64 主机上执行 Docker 流程或进一步排查。
 
 两者的环境变量、代理处理、tag 处理完全一致；Javet 只是把 Node 封装进了 Java。如此可验证 Java 集成 aoconnect 不需要 Mock，不需要“改协议”，关键是 Node 环境与代理配置必须和 AOS CLI 一模一样。
+
+## 进一步方案（推荐评估）
+- 如果需要在 Docker/CI 环境提高稳定性，可评估迁移到 V8 模式并使用浏览器构建的 aoconnect，避免 Node/N-API 依赖。
+- 详见《V8-Migration-Guide.md》。
