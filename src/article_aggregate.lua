@@ -27,6 +27,24 @@ local article_table
 local comment_table
 local article_id_sequence
 
+local function commit_article_state(article_id, original_state, new_state)
+    local comment_committer = original_state.comments
+    if (new_state ~= original_state and new_state.comments) then
+        comment_committer = new_state.comments
+    end
+
+    entity_coll.update(article_table, article_id, new_state)
+
+    if comment_committer then
+        comment_committer:commit()
+    end
+
+    original_state.comments = nil
+    if (new_state ~= original_state) then
+        new_state.comments = nil
+    end
+end
+
 local function current_article_id()
     if (article_id_sequence == nil) then
         error(ERRORS.NIL_ENTITY_ID_SEQUENCE)
@@ -68,9 +86,7 @@ function article_aggregate.update_body(cmd, msg, env)
     _new_state.article_id = article_id
     _new_state.version = (version and version or 0) + 1
     local commit = function()
-        entity_coll.update(article_table, article_id, _new_state)
-        _state.comments:commit()
-        _state.comments = nil
+        commit_article_state(article_id, _state, _new_state)
     end
 
     return _event, commit
@@ -80,8 +96,7 @@ function article_aggregate.create(cmd, msg, env)
     local article_id = next_article_id()
     local _event = article_create_logic.verify(article_id, cmd.title, cmd.body, cmd.tags, cmd, msg, env)
     if (_event.article_id ~= current_article_id()
-        or _event.article_id ~= article_id
-    ) then
+        or _event.article_id ~= article_id) then
         error(ERRORS.ENTITY_ID_MISMATCH)
     end
     local _state = article_create_logic.new(_event, msg, env)
@@ -116,9 +131,7 @@ function article_aggregate.update(cmd, msg, env)
     _new_state.article_id = article_id
     _new_state.version = (version and version or 0) + 1
     local commit = function()
-        entity_coll.update(article_table, article_id, _new_state)
-        _state.comments:commit()
-        _state.comments = nil
+        commit_article_state(article_id, _state, _new_state)
     end
 
     return _event, commit
@@ -143,9 +156,7 @@ function article_aggregate.add_comment(cmd, msg, env)
     _new_state.article_id = article_id
     _new_state.version = (version and version or 0) + 1
     local commit = function()
-        entity_coll.update(article_table, article_id, _new_state)
-        _state.comments:commit()
-        _state.comments = nil
+        commit_article_state(article_id, _state, _new_state)
     end
 
     return _event, commit
@@ -170,9 +181,7 @@ function article_aggregate.update_comment(cmd, msg, env)
     _new_state.article_id = article_id
     _new_state.version = (version and version or 0) + 1
     local commit = function()
-        entity_coll.update(article_table, article_id, _new_state)
-        _state.comments:commit()
-        _state.comments = nil
+        commit_article_state(article_id, _state, _new_state)
     end
 
     return _event, commit
@@ -197,9 +206,7 @@ function article_aggregate.remove_comment(cmd, msg, env)
     _new_state.article_id = article_id
     _new_state.version = (version and version or 0) + 1
     local commit = function()
-        entity_coll.update(article_table, article_id, _new_state)
-        _state.comments:commit()
-        _state.comments = nil
+        commit_article_state(article_id, _state, _new_state)
     end
 
     return _event, commit

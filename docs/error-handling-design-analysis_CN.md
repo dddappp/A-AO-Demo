@@ -468,6 +468,24 @@ end
 DDDML工具应该智能检测业务逻辑函数的实现方式，并直接在聚合层处理：
 
 ```lua
+local function commit_article_state(article_id, original_state, new_state)
+    local comment_committer = original_state.comments
+    if new_state ~= original_state and new_state.comments then
+        comment_committer = new_state.comments
+    end
+
+    entity_coll.update(article_table, article_id, new_state)
+
+    if comment_committer then
+        comment_committer:commit()
+    end
+
+    original_state.comments = nil
+    if new_state ~= original_state then
+        new_state.comments = nil
+    end
+end
+
 function article_aggregate.update_comment(cmd, msg, env)
     local _state = entity_coll.get_copy(article_table, cmd.article_id)
     -- ... 版本验证逻辑 ...
@@ -485,17 +503,7 @@ function article_aggregate.update_comment(cmd, msg, env)
 
     -- 智能commit函数：自动检测并处理不同实现方式
     local commit = function()
-        -- 更新文章状态
-        entity_coll.update(article_table, article_id, _new_state)
-
-        -- 智能判断需要提交哪个状态的评论操作
-        if _new_state ~= _state and _new_state.comments then
-            -- 纯函数方式：新状态有自己的comments，提交新状态的
-            _new_state.comments:commit()
-        else
-            -- mutate-in-place方式：新旧状态是同一个，提交旧状态的
-            _state.comments:commit()
-        end
+        commit_article_state(article_id, _state, _new_state)
     end
 
     return _event, commit
@@ -508,18 +516,15 @@ end
 
 **必需的改进**：
 ```lua
--- 需要为 comment_coll 添加 clone 方法
+-- 为 comment_coll 添加 clone 方法，确保复用底层数据表但分离操作缓存
 function comment_coll:clone()
-    -- 创建新的集合实例
     local cloned = comment_coll.new(self.data_table, self.article_id)
 
-    -- 深拷贝现有的评论数据
-    for key, value in pairs(self.data_table) do
-        cloned.data_table[key] = entity_coll.deepcopy(value)
+    if self.operation_cache then
+        for index, operation in ipairs(self.operation_cache) do
+            cloned.operation_cache[index] = entity_coll.deepcopy(operation)
+        end
     end
-
-    -- 注意：operation_cache 应该为空，因为这是全新的集合
-    cloned.operation_cache = {}
 
     return cloned
 end

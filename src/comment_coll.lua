@@ -32,6 +32,20 @@ local function deepcopy(origin)
     return entity_coll.deepcopy(origin)
 end
 
+-- Create a shallow clone that shares the data table but isolates operation caches
+function comment_coll:clone()
+    local cloned = comment_coll.new(self.data_table, self.article_id)
+
+    -- 复制操作缓存，避免原始 state 与克隆之间的提交日志互相影响
+    if self.operation_cache then
+        for index, operation in ipairs(self.operation_cache) do
+            cloned.operation_cache[index] = deepcopy(operation)
+        end
+    end
+
+    return cloned
+end
+
 -- Check if an entity exists
 function comment_coll:contains(comment_seq_id)
     local _article_comment_id = article_comment_id.new(self.article_id, comment_seq_id)
