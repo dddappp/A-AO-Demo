@@ -107,7 +107,9 @@ mcp_iterm-mcp_read_terminal_output linesOfOutput=80
 
 ### 步骤 5: 退出测试
 ```bash
-mcp_iterm-mcp_write_to_terminal command=".exit"
+# 使用 Ctrl + C (Control + C) 退出 AO 进程
+mcp_iterm-mcp_send_control_character letter="C"
+mcp_iterm-mcp_send_control_character letter="C"
 ```
 
 ## 自动化测试脚本示例
@@ -166,7 +168,9 @@ echo "  - 更多测试步骤请参考文档详细说明"
 
 # 7. 退出测试
 echo "7. 退出测试..."
-# mcp_iterm-mcp_write_to_terminal command=".exit"
+# 使用 Ctrl + C (Control + C) 退出 AO 进程
+# mcp_iterm-mcp_send_control_character letter="C"
+# mcp_iterm-mcp_send_control_character letter="C"
 
 echo "=== 测试完成 ==="
 ```
