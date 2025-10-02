@@ -1,3 +1,10 @@
+# Anti-pattern: Value object wrapping single property (bad example)
+# valueObjects:
+#   ArticleId:
+#     properties:
+#       Id:
+#         type: number
+
 valueObjects:
   InventoryItemId:
     properties:
