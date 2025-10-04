@@ -29,7 +29,6 @@ valueObjects:
         type: number
 
 aggregates:
-
   InventoryItem:
     id:
       name: InventoryItemId
@@ -95,56 +94,145 @@ services:
   InventoryService:
     requiredComponents:
       InventoryItem:
-        type: InventoryItem # Aggregate name
+        type: InventoryItem
+        # 依赖库存项目聚合，用于管理库存数量和变动历史
+        # Depends on InventoryItem aggregate for managing inventory quantities and change history
       InOut:
         type: InOutService
+        # 依赖出入库单服务，用于记录库存数量的变动记录
+        # Depends on InOutService for recording inventory quantity changes
     methods:
       ProcessInventorySurplusOrShortage:
+        # 业务意图：处理库存盘盈盘亏场景，实现跨聚合的最终一致性事务
+        # Business intent: Handle inventory surplus/shortage scenarios, implementing eventual consistency across aggregates
+        # 生成代码：创建基于编制的 SAGA 协调器，自动管理步骤执行、失败补偿和异步消息流
+        # Generated code: Creates an orchestration-based SAGA coordinator, automatically managing step execution, failure compensation, and async message flow
         parameters:
           ProductId:
             type: number
+            # 产品ID：标识具体的产品
+            # Product ID: Identifies the specific product
           Location:
             type: string
+            # 货位：标识库存所在的物理位置
+            # Location: Identifies the physical location of inventory
           Quantity:
             type: number
+            # 调整后的库存数量：期望的在库数量，用于计算盘盈/盘亏数量
+            # Adjusted quantity: Expected on-hand quantity, used to calculate surplus/shortage amounts
         steps:
           # StartWithLocalCall:
           #   invokeLocal: ""
           #   withCompensation: ""
+          # StartWithLocalCall: 可选的起始本地调用步骤（此示例中未使用）
+          # StartWithLocalCall: Optional initial local call step (not used in this example)
+
           GetInventoryItem:
+            # 步骤意图：查询当前库存状态，为后续计算盘盈盘亏数量做准备
+            # Step intent: Query current inventory status to prepare for calculating surplus/shortage quantities
+            # 生成代码：异步调用 InventoryItem 聚合的 GetInventoryItem 方法，生成对应的回调函数处理响应
+            # Generated code: Asynchronously calls InventoryItem aggregate's GetInventoryItem method, generates corresponding callback functions to handle responses
             prepareRequest:
               Lua: "-- TODO"
+              # 调用前的准备逻辑占位符，实际业务逻辑需在生成的 `inventory_service_local.lua` 中实现
+              # Pre-invocation preparation logic placeholder, actual business logic needs to be implemented in the generated `inventory_service_local.lua`
             invokeParticipant: "InventoryItem.GetInventoryItem"
+              # 调用语法："组件名.方法名"，这里调用库存项目聚合的查询方法
+              # Invocation syntax: "ComponentName.MethodName", here calling the inventory item aggregate's query method
             onReply:
               Lua: "-- TODO"
+              # 收到响应后的处理逻辑占位符，实际业务逻辑需在生成的 `inventory_service_local.lua` 中实现
+              # Post-response processing logic placeholder, actual business logic needs to be implemented in the generated `inventory_service_local.lua`
+
           CreateSingleLineInOut:
+            # 步骤意图：创建出入库单记录，作为库存变动的审计凭证
+            # Step intent: Create inbound/outbound order record as audit trail for inventory changes
+            # 生成代码：异步调用 InOutService 的 CreateSingleLineInOut 方法，失败时自动执行补偿逻辑
+            # Generated code: Asynchronously calls InOutService's CreateSingleLineInOut method, automatically executes compensation logic on failure
             invokeParticipant: "InOut.CreateSingleLineInOut"
+              # 调用语法："组件名.方法名"，这里调用出入库服务的创建方法
+              # Invocation syntax: "ComponentName.MethodName", here calling the inbound/outbound service's create method
             exportVariables:
-              # -- Export result variables into context
+              # 从响应结果中提取变量并保存到 SAGA 上下文，用于后续步骤和补偿
+              # Extracts variables from response and saves them to SAGA context for subsequent steps and compensation
               InOutId:
                 extractionPath: ".InOutId"
+                # 路径表达式，从响应中提取 InOutId 字段值
+                # Path expression to extract InOutId field value from response
               InOutVersion:
                 extractionPath: ".Version"
+                # 路径表达式，从响应中提取 Version 字段值，用于乐观并发控制
+                # Path expression to extract Version field value from response, used for optimistic concurrency control
             withCompensation: "InOut.VoidInOut"
+              # 失败时执行的补偿操作，调用 InOutService 的 VoidInOut 方法
+              # Compensation operation executed on failure, calls InOutService's VoidInOut method
             compensationArguments:
               InOutId: "InOutId"
+              # 从上下文获取 InOutId 传递给补偿操作
+              # Retrieves InOutId from context and passes it to compensation operation
               Version: "InOutVersion"
+              # 从上下文获取版本号传递给补偿操作
+              # Retrieves version number from context and passes it to compensation operation
+
           DoSomethingLocally:
-            invokeLocal: "" # default function name
-            withCompensation: "" # default compensation function name
+            # 步骤意图：关键字 `invokeLocal` 表示执行本地业务逻辑，可根据具体需求实现。
+            # Step intent: The `invokeLocal` keyword indicates execution of local business logic, implementable based on specific requirements.
+            # 生成代码：在当前进程内同步执行，支持失败时的本地补偿。本地调用默认使用 `inventory_service_local.lua` 中的函数。
+            # Generated code: Executes synchronously within the current process, supports local compensation on failure. Local calls default to functions in `inventory_service_local.lua`.
+            invokeLocal: ""
+            # 空字符串使用默认函数名：process_inventory_surplus_or_shortage_do_something_locally
+            # Empty string uses default function name: process_inventory_surplus_or_shortage_do_something_locally
+            withCompensation: ""
+            # 空字符串使用默认函数名：process_inventory_surplus_or_shortage_compensate_do_something_locally
+            # Empty string uses default function name: process_inventory_surplus_or_shortage_compensate_do_something_locally
+
           AddInventoryItemEntry:
+            # 步骤意图：通过添加库存条目来间接更新库存数量（账务模式）
+            # Step intent: Indirectly update inventory quantity by adding inventory entries (accounting pattern)
+            # 生成代码：异步调用 InventoryItem 聚合的 AddInventoryItemEntry 方法
+            # Generated code: Asynchronously calls InventoryItem aggregate's AddInventoryItemEntry method
             invokeParticipant: "InventoryItem.AddInventoryItemEntry"
+            # 调用语法："组件名.方法名"，这里调用库存项目聚合的添加条目方法
+            # Invocation syntax: "ComponentName.MethodName", here calling the inventory item aggregate's add entry method
             arguments:
               Version: "ItemVersion"
+              # 从上下文获取 ItemVersion 传递给方法，用于乐观并发控制
+              # Retrieves ItemVersion from context and passes it to method for optimistic concurrency control
+
           DoSomethingElseLocally:
+            # 步骤意图：执行另一个本地业务逻辑，可根据具体需求实现
+            # Step intent: Execute another local business logic, implementable based on specific requirements
+            # 生成代码：在当前进程内同步执行，支持失败时的本地补偿
+            # Generated code: Executes synchronously within the current process, supports local compensation on failure
             invokeLocal: ""
+            # 空字符串使用默认函数名：process_inventory_surplus_or_shortage_do_something_else_locally
+            # Empty string uses default function name: process_inventory_surplus_or_shortage_do_something_else_locally
             withCompensation: ""
+            # 空字符串使用默认函数名：process_inventory_surplus_or_shortage_compensate_do_something_else_locally
+            # Empty string uses default function name: process_inventory_surplus_or_shortage_compensate_do_something_else_locally
+
           CompleteInOut:
+            # 步骤意图：完成出入库单，标记业务流程结束
+            # Step intent: Complete the inbound/outbound order, marking the end of the business process
+            # 生成代码：异步调用 InOutService 的 CompleteInOut 方法，标志事务成功
+            # Generated code: Asynchronously calls InOutService's CompleteInOut method, indicating transaction success
             invokeParticipant: "InOut.CompleteInOut"
+            # 调用语法："组件名.方法名"，这里调用出入库服务的完成方法
+            # Invocation syntax: "ComponentName.MethodName", here calling the inbound/outbound service's complete method
             arguments:
               InOutId: "InOutId"
+              # 从上下文获取 InOutId 传递给方法
+              # Retrieves InOutId from context and passes it to method
               Version: "InOutVersion"
+              # 从上下文获取版本号传递给方法
+              # Retrieves version number from context and passes it to method
+
           ReturnResult:
-            # Use an Expression to return the result
+            # 步骤意图：返回业务处理结果给调用方
+            # Step intent: Return business processing result to the caller
+            # 生成代码：计算并返回最终结果，完成整个 SAGA 实例
+            # Generated code: Calculates and returns the final result, completing the entire SAGA instance
             expression:
               Lua: "{ in_out_id = context.in_out_id }"
+              # Lua 表达式，从上下文获取 in_out_id 并作为结果返回
+              # Lua expression that retrieves in_out_id from context and returns it as the result
