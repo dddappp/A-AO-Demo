@@ -1,5 +1,7 @@
 # 外部合约 Saga 集成方案：代理合约模式
 
+> **相关文档**：本文档为`dddml-saga-async-waiting-enhancement-proposal.md`提案的业务场景详细说明。该提案建议扩展DDDML规范以支持`waitForEvent`步骤类型，从而高效实现本文档描述的业务场景。
+
 ## 概述
 
 本方案通过**代理合约（Proxy Contract）模式**解决了 AO 生态系统中外部合约集成到 Saga 模式中的问题，支持两种不同的业务场景：
@@ -34,8 +36,19 @@
 ### 核心问题
 当前 DDDML 工具生成的 Saga 实现依赖 `X-SagaId` 消息标签来串接各个步骤，但外部合约（如 AO Token 合约）可能不支持此标签，导致无法直接作为 Saga 的一个步骤参与最终一致性事务。
 
+此外，**当前DDDML规范缺少描述"等待外部事件"的语法**，无法在YAML中优雅地定义需要等待用户操作、外部确认等异步步骤的业务流程。
+
 ### 解决方案
-引入**代理合约（Proxy Contract）**模式，让外部合约调用成为 Saga 的一个步骤，同时保持现有 Saga 模式的优雅性和完整性。
+1. **DDDML规范层面**（详见`dddml-saga-async-waiting-enhancement-proposal.md`）：
+   - 扩展DDDML规范，添加`waitForEvent`步骤类型
+   - 支持`onSuccess`/`onFailure`处理逻辑
+   - 提供`trigger_local_saga_event()` API供开发者调用
+
+2. **实现层面**（本文档重点）：
+   - 引入**代理合约（Proxy Contract）**模式
+   - 让外部合约调用成为 Saga 的一个步骤
+   - 通过本地事件发布机制触发Saga继续执行
+   - 保持现有 Saga 模式的优雅性和完整性
 
 ## 架构设计
 
@@ -1085,6 +1098,76 @@ POST /api/payment/register
 - **Saga起点**：注册支付意向后立即启动Saga（而非等到支付确认）
 - **等待步骤**：Saga启动后停下来等待支付接收合约的通知
 - **人/前端介入**：作为Saga流程中的异步等待步骤，而不是Saga启动的触发条件
+
+#### 🔧 使用waitForEvent语法的DDDML定义
+
+基于`dddml-saga-async-waiting-enhancement-proposal.md`提案的语法，场景B可以用DDDML优雅地定义：
+
+```yaml
+services:
+  EcommercePaymentService:
+    methods:
+      ProcessOrderPayment:
+        parameters:
+          order_id: number
+          customer_id: string
+          expected_amount: number
+        
+        steps:
+          # 步骤1：注册支付意向
+          RegisterPaymentIntent:
+            invokeLocal: "register_payment_intent"
+            description: "创建支付意向，启动等待流程"
+          
+          # 步骤2：等待支付验证（核心等待步骤）
+          WaitForPaymentValidation:
+            waitForEvent: "PaymentReceived"        # 等待支付接收合约的通知
+            onSuccess:                             # 处理支付成功
+              Lua: |
+                -- 验证支付金额和订单匹配
+                if event.verified and event.order_id == context.OrderId then
+                  return true  -- 继续Saga
+                else
+                  return false -- 过滤失败
+                end
+            exportVariables:                        # 提取支付详情
+              ActualAmount:
+                extractionPath: ".payment_details.amount"
+              TransactionId:
+                extractionPath: ".payment_details.transaction_id"
+              PaymentTimestamp:
+                extractionPath: ".payment_details.timestamp"
+            failureEvent: "PaymentFailed"           # 支付失败事件
+            onFailure:                              # 处理支付失败
+              Lua: "-- 记录失败原因并准备补偿"
+            maxWaitTime: "30m"                      # 支付最长等待30分钟
+            withCompensation: "cancel_order_and_refund"
+          
+          # 步骤3-5：支付成功后的业务处理
+          UpdateOrderStatus:
+            invokeLocal: "update_order_status"
+            arguments:
+              order_id: "order_id"
+              status: "'paid'"
+          
+          NotifyMerchant:
+            invokeParticipant: "MerchantService.NotifyOrderPaid"
+            arguments:
+              merchant_id: "order.merchant_id"
+              order_id: "order_id"
+          
+          UpdateLoyaltyPoints:
+            invokeLocal: "update_loyalty_points"
+            arguments:
+              customer_id: "customer_id"
+              order_amount: "actual_amount"
+```
+
+**关键点**：
+1. `WaitForPaymentValidation`步骤使用`waitForEvent`语法声明等待外部事件
+2. `onSuccess`中实现业务验证逻辑（金额匹配、订单匹配）
+3. `exportVariables`自动提取事件数据到Saga上下文
+4. 支付接收合约调用`trigger_local_saga_event(saga_id, "PaymentReceived", event_data)`触发Saga继续执行
 
 **📋 完整代码示例**：
 [查看 `ecommerce_order_payment_service.lua`](./proxy-contract-examples/ecommerce_order_payment_service.lua)
