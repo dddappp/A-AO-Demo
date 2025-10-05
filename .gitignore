@@ -3,3 +3,4 @@ docs/client_secret_*.json
 temp_aoconnect
 AES-Shamir-Demo/target
 google-oauth2-demo/target
+ao-cli-non-repl/node_modules
