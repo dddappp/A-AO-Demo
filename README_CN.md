@@ -223,8 +223,7 @@ aos process_alice
 ```
 
 让我们记下它的进程 ID，比如 `DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q`，
-我们在下面的示例命令中使用占位符 `__PROCESS_ALICE__` 表示它。
-
+我们在下面的示例命令中使用占位符 `__PROCESS_ALICE__` 表示它。（为了测试方便，下文可能会混用 `DH4EI_kDShcHFf7FZotIjzW3lMoy4fLZKDA0qqTPt1Q` 和 `__PROCESS_ALICE__` 作为 alice 进程的 ID。请读者注意甄别。）
 
 
 ## 编码
@@ -411,7 +410,7 @@ aos process_bob
 ```
 
 记录下它的进程 ID，比如 `0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow`，
-我们在下面的示例命令中可能会使用占位符 `__PROCESS_BOB__` 表示它。
+我们在下面的示例命令中可能会使用占位符 `__PROCESS_BOB__` 表示它。（为了测试方便，可能会混用 `0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow` 和 `__PROCESS_BOB__` 作为 bob 进程的 ID。请读者注意甄别。）
 
 
 在这个 aos (`__PROCESS_BOB__`) 进程中，装载我们的应用代码（注意将 `{PATH/TO/A-AO-Demo/src}` 替换为实际的路径）：
