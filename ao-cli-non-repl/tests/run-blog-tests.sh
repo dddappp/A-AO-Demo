@@ -131,29 +131,29 @@ echo "=== 步骤 5: 获取文章 ==="
 ao-cli message "$PROCESS_ID" GetArticle --data '1' --wait
 echo ""
 
-# 6. 更新文章
+# 6. 更新文章 (使用正确版本: 刚创建的文章版本是0)
 echo "=== 步骤 6: 更新文章 ==="
-ao-cli message "$PROCESS_ID" UpdateArticle --data '{"article_id": 1, "version": 1, "title": "new_title_1", "body": "new_body_1"}' --wait
+ao-cli message "$PROCESS_ID" UpdateArticle --data '{"article_id": 1, "version": 0, "title": "new_title_1", "body": "new_body_1"}' --wait
 echo ""
 
-# 7. 获取文章 (验证版本递增)
+# 7. 获取文章 (验证版本递增到1)
 echo "=== 步骤 7: 获取文章 (验证版本递增) ==="
 ao-cli message "$PROCESS_ID" GetArticle --data '1' --wait
 echo ""
 
-# 8. 更新正文
+# 8. 更新正文 (使用正确版本: 当前版本是1)
 echo "=== 步骤 8: 更新正文 ==="
-ao-cli message "$PROCESS_ID" UpdateArticleBody --data '{"article_id": 1, "version": 2, "body": "updated_body_manual"}' --wait
+ao-cli message "$PROCESS_ID" UpdateArticleBody --data '{"article_id": 1, "version": 1, "body": "updated_body_manual"}' --wait
 echo ""
 
-# 9. 获取文章 (验证正文更新)
+# 9. 获取文章 (验证正文更新，版本递增到2)
 echo "=== 步骤 9: 获取文章 (验证正文更新) ==="
 ao-cli message "$PROCESS_ID" GetArticle --data '1' --wait
 echo ""
 
-# 10. 添加评论
+# 10. 添加评论 (使用正确版本: 当前版本是2)
 echo "=== 步骤 10: 添加评论 ==="
-ao-cli message "$PROCESS_ID" AddComment --data '{"article_id": 1, "version": 3, "commenter": "alice", "body": "comment_body_manual"}' --wait
+ao-cli message "$PROCESS_ID" AddComment --data '{"article_id": 1, "version": 2, "commenter": "alice", "body": "comment_body_manual"}' --wait
 echo ""
 
 END_TIME=$(date +%s)
@@ -180,11 +180,11 @@ echo "✅ 步骤 2 (应用代码加载): 成功 - 加载了23个模块"
 echo "✅ 步骤 3 (获取文章序号): 成功 - 消息已发送"
 echo "✅ 步骤 4 (创建文章): 成功 - 消息已发送"
 echo "✅ 步骤 5 (获取文章): 成功 - 消息已发送"
-echo "✅ 步骤 6 (更新文章): 成功 - 消息已发送 (预期CONCURRENCY_CONFLICT)"
+echo "✅ 步骤 6 (更新文章): 成功 - 消息已发送"
 echo "✅ 步骤 7 (获取文章验证): 成功 - 消息已发送"
-echo "✅ 步骤 8 (更新正文): 成功 - 消息已发送 (预期CONCURRENCY_CONFLICT)"
+echo "✅ 步骤 8 (更新正文): 成功 - 消息已发送"
 echo "✅ 步骤 9 (获取文章验证): 成功 - 消息已发送"
-echo "✅ 步骤 10 (添加评论): 成功 - 消息已发送 (预期CONCURRENCY_CONFLICT)"
+echo "✅ 步骤 10 (添加评论): 成功 - 消息已发送"
 
 echo ""
 echo "📊 测试摘要:"
@@ -202,10 +202,10 @@ echo "  ✅ 业务逻辑正确执行"
 echo "  ✅ 版本控制机制工作正常"
 
 echo ""
-echo "⚠️  预期行为说明:"
-echo "  - 步骤6/8/10显示CONCURRENCY_CONFLICT是正常的业务逻辑"
-echo "  - 这是因为文章版本控制机制正确工作"
-echo "  - 版本0的文章无法用版本1/2/3更新"
+echo "🎯 预期行为说明:"
+echo "  - 所有步骤都应该成功完成，无CONCURRENCY_CONFLICT错误"
+echo "  - 每次更新操作都使用正确的当前版本号"
+echo "  - 版本控制机制确保数据一致性"
 
 echo ""
 echo "🔍 故障排除:"

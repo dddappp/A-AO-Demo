@@ -164,10 +164,11 @@ PROCESS_ID=$(ao-cli spawn default --name "my-dapp-test" | grep "Process ID:" | a
 # 2. 加载你的应用代码
 ao-cli eval "$PROCESS_ID" --file "path/to/your/app.lua" --wait
 
-# 3. 执行你的业务操作
-ao-cli message "$PROCESS_ID" YourAction --data '{"param":"value"}' --wait
-sleep 2
-ao-cli inbox "$PROCESS_ID" --latest
+# 3. 执行你的业务操作 (记得使用正确的版本号)
+# 例如，对于博客应用：
+ao-cli message "$PROCESS_ID" CreateArticle --data '{"title": "Test", "body": "Content"}' --wait
+ao-cli message "$PROCESS_ID" GetArticle --data '1' --wait  # 检查版本=0
+ao-cli message "$PROCESS_ID" UpdateArticle --data '{"article_id": 1, "version": 0, "title": "Updated"}' --wait
 
 # 4. 更多测试步骤...
 ```
