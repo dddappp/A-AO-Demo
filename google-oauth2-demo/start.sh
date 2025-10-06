@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Google OAuth2 Demo 启动脚本
-echo "=== Google OAuth2 Demo 启动脚本 ==="
+# Google + GitHub OAuth2 Demo 启动脚本
+echo "=== Google + GitHub OAuth2 Demo 启动脚本 ==="
 
 # 项目根目录
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,9 +34,21 @@ echo "设置环境变量并启动 Spring Boot 应用..."
 export GOOGLE_CLIENT_ID="$CLIENT_ID"
 export GOOGLE_CLIENT_SECRET="$CLIENT_SECRET"
 
+# GitHub环境变量设置（可以从环境变量或配置文件读取）
+# 注意：GitHub OAuth App需要手动创建，无法从现有文件读取
+export GITHUB_CLIENT_ID="${GITHUB_CLIENT_ID:-your-github-client-id}"
+export GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET:-your-github-client-secret}"
+
+if [ "$GITHUB_CLIENT_ID" = "your-github-client-id" ] || [ "$GITHUB_CLIENT_SECRET" = "your-github-client-secret" ]; then
+    echo "警告: GitHub客户端ID和密钥未设置，请设置GITHUB_CLIENT_ID和GITHUB_CLIENT_SECRET环境变量"
+    echo "       或者在GitHub开发者设置中创建OAuth App并设置这些变量"
+fi
+
 echo "环境变量设置完成:"
 echo "  GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
 echo "  GOOGLE_CLIENT_SECRET=***"
+echo "  GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID"
+echo "  GITHUB_CLIENT_SECRET=***"
 
 # 编译并启动应用
 echo "编译项目..."
@@ -50,6 +62,8 @@ fi
 
 echo "启动 Spring Boot 应用..."
 echo "应用将在 http://localhost:8081 上运行"
+echo "Google登录: http://localhost:8081/oauth2/authorization/google"
+echo "GitHub登录: http://localhost:8081/oauth2/authorization/github"
 echo "按 Ctrl+C 停止应用"
 echo ""
 

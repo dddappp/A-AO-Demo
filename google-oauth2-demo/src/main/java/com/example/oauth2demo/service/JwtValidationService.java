@@ -97,6 +97,68 @@ public class JwtValidationService {
         return result;
     }
 
+    // 新增：验证GitHub访问令牌的方法
+    public Map<String, Object> validateGitHubToken(String accessToken) throws Exception {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // 使用访问令牌调用GitHub用户信息API进行验证
+            String authorizationHeader = "Bearer " + accessToken;
+
+            // 创建HTTP请求头
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("Authorization", authorizationHeader);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("X-GitHub-Api-Version", "2022-11-28");
+
+            org.springframework.http.HttpEntity<?> entity = new org.springframework.http.HttpEntity<>(headers);
+
+            // 调用GitHub API
+            org.springframework.http.ResponseEntity<Map> response = restTemplate.exchange(
+                "https://api.github.com/user",
+                org.springframework.http.HttpMethod.GET,
+                entity,
+                Map.class
+            );
+
+            if (response.getStatusCode() == org.springframework.http.HttpStatus.OK && response.getBody() != null) {
+                Map<String, Object> userInfo = response.getBody();
+
+                result.put("valid", true);
+                result.put("login", userInfo.get("login"));
+                result.put("id", userInfo.get("id"));
+                result.put("name", userInfo.get("name"));
+                result.put("email", userInfo.get("email"));
+                result.put("avatar_url", userInfo.get("avatar_url"));
+                result.put("html_url", userInfo.get("html_url"));
+                result.put("public_repos", userInfo.get("public_repos"));
+                result.put("followers", userInfo.get("followers"));
+                result.put("following", userInfo.get("following"));
+                result.put("verified", true); // 如果API调用成功，说明令牌有效
+
+                System.out.println("GitHub token validation successful for user: " + userInfo.get("login"));
+            } else {
+                result.put("valid", false);
+                result.put("error", "Invalid access token");
+            }
+
+        } catch (org.springframework.web.client.HttpClientErrorException.Unauthorized e) {
+            result.put("valid", false);
+            result.put("error", "Access token unauthorized");
+            throw new Exception("GitHub access token is invalid or expired");
+        } catch (org.springframework.web.client.HttpClientErrorException.Forbidden e) {
+            result.put("valid", false);
+            result.put("error", "Access token forbidden - insufficient scopes");
+            throw new Exception("GitHub access token lacks required permissions");
+        } catch (Exception e) {
+            result.put("valid", false);
+            result.put("error", e.getMessage());
+            throw e;
+        }
+
+        return result;
+    }
+
     private PublicKey getGooglePublicKey(String keyId) throws Exception {
         System.out.println("Fetching Google JWKS from: " + GOOGLE_JWKS_URL);
 

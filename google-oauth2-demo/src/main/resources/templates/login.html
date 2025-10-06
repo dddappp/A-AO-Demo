@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google OAuth2 Demo - 登录</title>
+    <title>OAuth2 Demo - 登录</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -37,6 +37,20 @@
         .google-btn:hover {
             background-color: #c23321;
         }
+        .github-btn {
+            display: inline-block;
+            background-color: #24292e;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin: 10px 0;
+        }
+        .github-btn:hover {
+            background-color: #1a1e22;
+        }
         .description {
             color: #666;
             line-height: 1.6;
@@ -55,15 +69,20 @@
 </head>
 <body>
     <div class="container">
-        <h1>Google 账户登录</h1>
+        <h1>选择登录方式</h1>
 
         <div class="description">
-            <p>点击下面的按钮使用您的 Google 账户登录。</p>
-            <p>登录成功后，您将被重定向到测试页面，可以验证 ID Token。</p>
+            <p>请选择您喜欢的登录方式：</p>
         </div>
 
+        <!-- Google登录选项 -->
         <a href="/oauth2/authorization/google" class="google-btn">
             使用 Google 账户登录
+        </a>
+
+        <!-- GitHub登录选项 -->
+        <a href="/oauth2/authorization/github" class="github-btn">
+            使用 GitHub 账户登录
         </a>
 
         <div>

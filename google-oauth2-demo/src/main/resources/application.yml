@@ -17,6 +17,13 @@ spring:
               - profile
               - email
             redirect-uri: https://api.u2511175.nyat.app:55139/oauth2/callback
+          github:
+            client-id: ${GITHUB_CLIENT_ID:your-github-client-id}
+            client-secret: ${GITHUB_CLIENT_SECRET:your-github-client-secret}
+            scope:
+              - user:email
+              - read:user
+            redirect-uri: https://api.u2511175.nyat.app:55139/oauth2/callback
         provider:
           google:
             authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
@@ -24,6 +31,11 @@ spring:
             user-info-uri: https://openidconnect.googleapis.com/v1/userinfo
             user-name-attribute: sub
             jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+          github:
+            authorization-uri: https://github.com/login/oauth/authorize
+            token-uri: https://github.com/login/oauth/access_token
+            user-info-uri: https://api.github.com/user
+            user-name-attribute: login
 
   thymeleaf:
     cache: false

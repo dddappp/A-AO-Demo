@@ -19,7 +19,7 @@
     -->
     <meta name="_csrf" th:content="${_csrf.token}"/>
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-    <title>Google OAuth2 Demo - 测试页面</title>
+    <title>OAuth2 Demo - 测试页面</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -111,22 +111,68 @@
         .logout-link:hover {
             text-decoration: underline;
         }
+        .avatar-section {
+            margin-top: 15px;
+        }
+        .avatar-section img {
+            margin-top: 5px;
+        }
+        .github-info {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 3px solid #24292e;
+        }
+        .github-info a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        .github-info a:hover {
+            text-decoration: underline;
+        }
+        .provider-info {
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Google OAuth2 ID Token 验证测试</h1>
+        <h1>OAuth2 ID Token 验证测试</h1>
+
+        <!-- 显示当前登录的提供商 -->
+        <div class="provider-info">
+            <p><strong>登录提供商：</strong><span th:text="${provider}">未知</span></p>
+        </div>
 
         <div class="user-info">
             <h2>用户信息</h2>
-            <p><strong>姓名：</strong><span th:text="${userName}">未知</span></p>
-            <p><strong>邮箱：</strong><span th:text="${userEmail}">未知</span></p>
-            <p><strong>用户 ID：</strong><span th:text="${userId}">未知</span></p>
+            <!-- 根据提供商显示不同字段 -->
+            <p><strong>用户名：</strong><span th:text="${userName}">未知</span></p>
+            <p><strong>邮箱：</strong><span th:text="${userEmail != null ? userEmail : '未提供'}">未知</span></p>
+            <p><strong>用户ID：</strong><span th:text="${userId}">未知</span></p>
+            <!-- 显示头像（如果有） -->
+            <div th:if="${userAvatar}" class="avatar-section">
+                <p><strong>头像：</strong></p>
+                <img th:src="${userAvatar}" alt="用户头像" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ddd;">
+            </div>
+
+            <!-- GitHub特定信息 -->
+            <div th:if="${provider == 'github'}" class="github-info">
+                <p><strong>GitHub主页：</strong><a th:href="${userHtmlUrl}" th:text="${userHtmlUrl}" target="_blank">查看GitHub</a></p>
+                <p><strong>公开仓库数：</strong><span th:text="${userPublicRepos}">未知</span></p>
+                <p><strong>粉丝数：</strong><span th:text="${userFollowers}">未知</span></p>
+            </div>
         </div>
 
         <div class="actions">
-            <button id="validateBtn" class="button">验证 ID Token</button>
-            <button id="manualValidateBtn" class="button">手动验证 JWT</button>
+            <!-- 根据提供商显示不同的验证按钮 -->
+            <button id="validateBtn" th:if="${provider == 'google'}" class="button">验证 Google ID Token</button>
+            <button id="validateGitHubBtn" th:if="${provider == 'github'}" class="button">验证 GitHub 访问令牌</button>
             <a href="/logout" class="logout-link">登出</a>
         </div>
 
@@ -237,6 +283,66 @@
                 console.error('Error:', error);
             });
         });
+
+        // 新增：GitHub访问令牌验证逻辑
+        const githubBtn = document.getElementById('validateGitHubBtn');
+        if (githubBtn) {
+            githubBtn.addEventListener('click', function() {
+                const resultContainer = document.getElementById('resultContainer');
+                const resultDiv = document.getElementById('result');
+
+                // 显示加载状态
+                resultContainer.style.display = 'block';
+                resultDiv.className = 'result loading';
+                resultDiv.textContent = '正在验证 GitHub 访问令牌...';
+
+                // GitHub访问令牌不像Google ID Token那样存储在Cookie中
+                // 在生产环境中，访问令牌应该安全存储在服务端会话中
+                // 这里为了演示目的，使用prompt()获取用户输入
+
+                // 安全说明：在实际应用中，应该：
+                // 1. 在OAuth2成功回调时将访问令牌存储在服务端会话中
+                // 2. 验证时从服务端会话中获取令牌，而不是让用户输入
+                // 3. 绝对不要将访问令牌暴露给客户端JavaScript
+
+                // 演示用途：提示用户输入访问令牌
+                const tokenInput = prompt('请输入GitHub访问令牌进行验证：\n\n⚠️  注意：这只是演示功能。在生产环境中，令牌应安全存储在服务端。');
+                if (!tokenInput) {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '❌ 验证已取消';
+                    return;
+                }
+
+                // 发送验证请求
+                const headers = {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                };
+                headers[getCsrfHeader()] = getCsrfToken();
+
+                fetch('/api/validate-github-token', {
+                    method: 'POST',
+                    body: new URLSearchParams({
+                        'accessToken': tokenInput
+                    }),
+                    headers: headers
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        resultDiv.className = 'result success';
+                        resultDiv.textContent = '✅ GitHub验证成功!\n\n' + JSON.stringify(data.validation, null, 2);
+                    } else {
+                        resultDiv.className = 'result error';
+                        resultDiv.textContent = '❌ GitHub验证失败: ' + data.message;
+                    }
+                })
+                .catch(error => {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '❌ 请求失败: ' + error.message;
+                    console.error('Error:', error);
+                });
+            });
+        }
 
         // 手动验证按钮
         document.getElementById('manualValidateBtn').addEventListener('click', function() {
