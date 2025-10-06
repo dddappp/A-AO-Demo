@@ -190,6 +190,101 @@
     </div>
 
     <script>
+        // 全局错误处理器
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript错误:', e.error);
+            console.error('错误文件:', e.filename);
+            console.error('错误行号:', e.lineno);
+        });
+
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('未处理的Promise拒绝:', e.reason);
+        });
+
+        console.log('页面加载，开始初始化JavaScript...');
+
+        // 确保DOM加载完成
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM加载完成，开始绑定事件监听器...');
+
+            // 在DOM加载完成后重新检查GitHub按钮
+            setTimeout(function() {
+                console.log('延迟检查GitHub按钮...');
+                const githubBtn = document.getElementById('validateGitHubBtn');
+                console.log('延迟检查 - GitHub按钮元素:', githubBtn);
+                if (githubBtn) {
+                    console.log('延迟绑定 - GitHub验证按钮已找到，添加事件监听器');
+                    githubBtn.addEventListener('click', function() {
+                        console.log('GitHub验证按钮被点击 (延迟绑定)');
+                        const resultContainer = document.getElementById('resultContainer');
+                        const resultDiv = document.getElementById('result');
+
+                        // 显示加载状态
+                        resultContainer.style.display = 'block';
+                        resultDiv.className = 'result loading';
+                        resultDiv.textContent = '正在验证 GitHub 访问令牌...';
+
+                        // GitHub访问令牌不像Google ID Token那样存储在Cookie中
+                        // 在生产环境中，访问令牌应该安全存储在服务端会话中
+                        // 这里为了演示目的，使用prompt()获取用户输入
+
+                        // 安全说明：在实际应用中，应该：
+                        // 1. 在OAuth2成功回调时将访问令牌存储在服务端会话中
+                        // 2. 验证时从服务端会话中获取令牌，而不是让用户输入
+                        // 3. 绝对不要将访问令牌暴露给客户端JavaScript
+
+                        // 演示用途：提示用户输入访问令牌
+                        const tokenInput = prompt('请输入GitHub访问令牌进行验证：\n\n⚠️  注意：这只是演示功能。在生产环境中，令牌应安全存储在服务端。');
+                        console.log('用户输入的令牌:', tokenInput ? '已输入' : '取消输入');
+                        if (!tokenInput) {
+                            resultDiv.className = 'result error';
+                            resultDiv.textContent = '❌ 验证已取消';
+                            return;
+                        }
+
+                        // 发送验证请求
+                        const headers = {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        };
+                        headers[getCsrfHeader()] = getCsrfToken();
+
+                        console.log('发送GitHub验证请求到 /api/validate-github-token (延迟绑定)');
+                        console.log('CSRF Header:', getCsrfHeader());
+                        console.log('CSRF Token:', getCsrfToken() ? '已设置' : '未设置');
+
+                        fetch('/api/validate-github-token', {
+                            method: 'POST',
+                            body: new URLSearchParams({
+                                'accessToken': tokenInput
+                            }),
+                            headers: headers
+                        })
+                        .then(response => {
+                            console.log('收到响应，状态码:', response.status);
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('响应数据:', data);
+                            if (data.success) {
+                                resultDiv.className = 'result success';
+                                resultDiv.textContent = '✅ GitHub验证成功!\n\n' + JSON.stringify(data.validation, null, 2);
+                            } else {
+                                resultDiv.className = 'result error';
+                                resultDiv.textContent = '❌ GitHub验证失败: ' + data.message;
+                            }
+                        })
+                        .catch(error => {
+                            resultDiv.className = 'result error';
+                            resultDiv.textContent = '❌ 请求失败: ' + error.message;
+                            console.error('Error:', error);
+                        });
+                    });
+                } else {
+                    console.log('GitHub验证按钮不存在，可能用户不是通过GitHub登录的');
+                }
+            }, 100); // 短暂延迟确保Thymeleaf条件渲染完成
+        });
+
         /*
          * === 前端CSRF保护机制 ===
          * 
@@ -284,71 +379,6 @@
             });
         });
 
-        // 新增：GitHub访问令牌验证逻辑
-        const githubBtn = document.getElementById('validateGitHubBtn');
-        if (githubBtn) {
-            githubBtn.addEventListener('click', function() {
-                const resultContainer = document.getElementById('resultContainer');
-                const resultDiv = document.getElementById('result');
-
-                // 显示加载状态
-                resultContainer.style.display = 'block';
-                resultDiv.className = 'result loading';
-                resultDiv.textContent = '正在验证 GitHub 访问令牌...';
-
-                // GitHub访问令牌不像Google ID Token那样存储在Cookie中
-                // 在生产环境中，访问令牌应该安全存储在服务端会话中
-                // 这里为了演示目的，使用prompt()获取用户输入
-
-                // 安全说明：在实际应用中，应该：
-                // 1. 在OAuth2成功回调时将访问令牌存储在服务端会话中
-                // 2. 验证时从服务端会话中获取令牌，而不是让用户输入
-                // 3. 绝对不要将访问令牌暴露给客户端JavaScript
-
-                // 演示用途：提示用户输入访问令牌
-                const tokenInput = prompt('请输入GitHub访问令牌进行验证：\n\n⚠️  注意：这只是演示功能。在生产环境中，令牌应安全存储在服务端。');
-                if (!tokenInput) {
-                    resultDiv.className = 'result error';
-                    resultDiv.textContent = '❌ 验证已取消';
-                    return;
-                }
-
-                // 发送验证请求
-                const headers = {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                };
-                headers[getCsrfHeader()] = getCsrfToken();
-
-                fetch('/api/validate-github-token', {
-                    method: 'POST',
-                    body: new URLSearchParams({
-                        'accessToken': tokenInput
-                    }),
-                    headers: headers
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        resultDiv.className = 'result success';
-                        resultDiv.textContent = '✅ GitHub验证成功!\n\n' + JSON.stringify(data.validation, null, 2);
-                    } else {
-                        resultDiv.className = 'result error';
-                        resultDiv.textContent = '❌ GitHub验证失败: ' + data.message;
-                    }
-                })
-                .catch(error => {
-                    resultDiv.className = 'result error';
-                    resultDiv.textContent = '❌ 请求失败: ' + error.message;
-                    console.error('Error:', error);
-                });
-            });
-        }
-
-        // 手动验证按钮
-        document.getElementById('manualValidateBtn').addEventListener('click', function() {
-            const manualSection = document.getElementById('manualValidationSection');
-            manualSection.style.display = manualSection.style.display === 'none' ? 'block' : 'none';
-        });
 
         // 提交手动验证
         document.getElementById('submitManualValidation').addEventListener('click', function() {

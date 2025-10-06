@@ -655,8 +655,10 @@ export GITHUB_CLIENT_SECRET="your-github-client-secret"
 mvn clean compile
 
 # 3. 非阻塞启动应用（15秒后自动终止）
-timeout 15s mvn org.springframework.boot:spring-boot-maven-plugin:run > app.log 2>&1 &
+timeout 15s mvn spring-boot:run > app.log 2>&1 &
 sleep 10  # 等待应用完全启动
+# 当简写命令不工作时：
+# mvn org.springframework.boot:spring-boot-maven-plugin:run
 
 # 4. HTTP端点测试
 curl -s -w "Status: %{http_code}\n" http://localhost:8081/
