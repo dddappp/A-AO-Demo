@@ -222,10 +222,10 @@ AO Project Structure:
 └── deploy.sh                       # 部署脚本
 
 AO Processes (运行时):
-├── process_inventory_item (DH4EI_...)
-├── process_in_out_service (0RsO4R...)
-├── process_inventory_service (PROCESS_BOB_ID)
-└── process_blog (PROCESS_BLOG_ID)
+├── process_inventory_item (进程ID由AO平台分配)
+├── process_in_out_service (进程ID由AO平台分配)
+├── process_inventory_service (进程ID由AO平台分配)
+└── process_blog (进程ID由AO平台分配)
 ```
 
 > **说明**：
@@ -273,6 +273,183 @@ return {
 1. 模块级别的独立升级
 2. 跨模块事务监控
 3. 负载均衡和扩展
+
+## 阶段性的第一阶段实施建议
+
+### 背景思考
+
+上文描述的完整模块化方案需要对 DDDML 工具进行较大改动，包括：
+- 生成多个独立的 AO 项目目录结构
+- 重构代码组织方式
+- 复杂的共享代码管理机制
+
+考虑到 DDDML 工具的改进应该以"安全的、小步骤、逐步改进"为原则，我们可以先实现一个**最小化改动的第一阶段方案**：保持当前所有文件/目录结构完全不变，仅增加生成 4 个不同名称的模块入口 Lua 文件。
+
+### 第一阶段目标
+
+**核心理念**：不改变任何现有代码的生成逻辑和目录结构，通过新增的模块入口文件实现多进程部署的能力。
+
+#### 具体实施方案
+
+##### 1. 当前结构保持不变
+- 所有现有 Lua 文件继续生成在 `src/` 目录下
+- 代码生成逻辑完全不改变
+- 目录结构、文件名、代码内容保持现状
+
+##### 2. 新增 4 个模块入口文件
+
+在 `src/` 目录下新增以下 4 个入口文件：
+
+```lua
+-- src/main_inventory_item.lua (InventoryItem 模块入口)
+-- 加载所有 InventoryItem 相关的代码和依赖
+require("json")
+require("entity_coll")
+require("inventory_item_id")
+require("inventory_item_aggregate")
+
+-- 初始化数据表
+InventoryItemTable = InventoryItemTable or {}
+
+-- 注册 InventoryItem 相关的消息处理器
+-- (复制自 a_ao_demo.lua 中的相关处理器实现)
+```
+
+```lua
+-- src/main_in_out_service.lua (InOutService 模块入口)
+-- 加载所有 InOutService 相关的代码
+require("in_out_service_mock")
+
+-- 注册 InOutService 相关的消息处理器
+-- (注意：InOutService 当前使用 mock 实现，无需额外配置)
+```
+
+```lua
+-- src/main_inventory_service.lua (InventoryService 模块入口)
+-- 加载所有 InventoryService 相关的代码和依赖
+require("json")
+require("messaging")
+require("saga")
+require("inventory_service")
+require("inventory_service_config")
+
+-- 初始化 Saga 数据表
+SagaInstances = SagaInstances or {}
+SagaIdSequence = SagaIdSequence or { 0 }
+
+-- 初始化 Saga 系统
+saga.init(SagaInstances, SagaIdSequence)
+
+-- 注册 InventoryService 相关的消息处理器
+-- (复制自 a_ao_demo.lua 中的相关处理器实现)
+```
+
+```lua
+-- src/main_blog.lua (Blog 模块入口)
+-- 加载所有 Blog 相关的代码和依赖
+require("json")
+require("entity_coll")
+require("article_comment_id")
+require("comment_coll")
+require("article_aggregate")
+
+-- 初始化数据表
+ArticleTable = ArticleTable or {}
+ArticleIdSequence = ArticleIdSequence or { 0 }
+CommentTable = CommentTable or {}
+
+-- 初始化 Article 聚合
+article_aggregate.init(ArticleTable, ArticleIdSequence, CommentTable)
+
+-- 注册 Blog 相关的消息处理器
+-- (复制自 a_ao_demo.lua 中的相关处理器实现)
+```
+
+##### 3. DDDML 工具的微小改动
+
+只需要在 `AOLuaTransformer.cs` 中添加一个新的生成选项：
+
+```csharp
+[Option("enableModuleEntryFiles", Required = false, Default = false, HelpText = "Generate separate module entry files for multi-process deployment.")]
+public bool EnableModuleEntryFiles { get; set; }
+```
+
+当启用此选项时，额外生成上述 4 个入口文件，每个文件包含对应模块所需的 `require` 语句和处理器注册。
+
+##### 4. 部署方式
+
+**单进程部署**（向后兼容）：
+```bash
+aos process_main
+.load src/a_ao_demo.lua
+```
+
+**多进程部署**（新能力）：
+```bash
+# 启动 InventoryItem 进程
+aos process_inventory_item
+.load src/main_inventory_item.lua
+
+# 启动 InOutService 进程
+aos process_in_out_service
+.load src/main_in_out_service.lua
+
+# 启动 InventoryService 进程
+aos process_inventory_service
+.load src/main_inventory_service.lua
+
+# 启动 Blog 进程
+aos process_blog
+.load src/main_blog.lua
+```
+
+> **注意**：进程命名应与实际测试环境保持一致，可参考 `README_CN.md` 中的测试过程。
+
+### 第一阶段的优势
+
+#### 1. 改动最小化
+- DDDML 工具核心代码生成逻辑无需改变
+- 现有项目结构完全保持不变
+- 向后兼容性100%
+
+#### 2. 实施风险极低
+- 只新增文件，不修改任何现有文件
+- 如果有问题，可以简单删除新增的文件
+- 不影响现有功能
+
+#### 3. 快速验证价值
+- 可以立即验证多进程部署的可行性
+- 为后续完整模块化方案提供实践基础
+- 快速获得用户反馈
+
+#### 4. 渐进式演进路径
+```
+第一阶段 (当前) → 第二阶段 (完整模块化)
+  ↑                        ↑
+  最小改动                完整重构
+  快速验证                最佳架构
+  低风险                  最佳性能
+```
+
+### 第二阶段展望
+
+在第一阶段验证成功后，可以逐步过渡到完整的模块化架构：
+
+1. **代码目录重构**：将相关文件移动到各自的模块目录
+2. **共享代码提取**：建立 `shared/` 目录管理公共代码
+3. **依赖管理优化**：实现更智能的模块依赖分析
+4. **部署自动化**：生成完整的部署脚本和配置
+
+### 对 DDDML 工具团队的建议
+
+建议优先实现第一阶段方案，因为：
+
+1. **开发效率高**：改动量小，开发周期短
+2. **风险可控**：即使失败也不会影响现有功能
+3. **价值验证快**：可以快速证明多进程部署的价值
+4. **用户反馈及时**：帮助团队了解真实需求
+
+这个阶段性方案体现了"从小改动开始，快速迭代改进"的软件工程最佳实践。
 
 ## 对 DDDML 标准和工具设计的建议
 
