@@ -38,6 +38,39 @@ ao-cli --version
 ao-cli --help
 ```
 
+## Publishing to npm
+
+This package is published as a scoped package for security and professionalism.
+
+### For Maintainers
+
+```bash
+# 1. Login to npm
+npm login
+
+# 2. Test package
+npm run prepublishOnly
+
+# 3. Publish (scoped package requires --access public)
+npm publish --access public
+
+# 4. Update version for new releases
+npm version patch  # or minor/major
+npm publish --access public
+```
+
+### For Users
+
+```bash
+# Install globally
+npm install -g @dddappp/ao-cli
+
+# Or use with npx
+npx @dddappp/ao-cli --help
+```
+
+> **Security Note**: Always verify package downloads and check the official npm page at https://www.npmjs.com/package/@dddappp/ao-cli
+
 ## Usage
 
 ### Basic Commands
