@@ -234,6 +234,53 @@ All commands provide clean, readable output:
 > - 要测试Inbox功能，必须使用`ao-cli eval`在进程内部执行Send操作。直接使用`ao-cli message`不会让回复消息进入Inbox，因为那是外部API调用。
 > - 如果进程ID以 `-` 开头，您可以使用 `--` 分隔符或引号包裹，例如：`ao-cli load -- <pid> app.lua --wait` 或 `ao-cli load "<pid>" app.lua --wait`。
 
+## Future Improvements (TODOs)
+
+### 🔄 Planned Enhancements
+
+1. **Dependency Updates**
+   - Regularly update `@permaweb/aoconnect` and other dependencies to latest versions
+   - Add automated dependency vulnerability scanning
+
+2. **Enhanced Error Handling**
+   - Add more granular error messages for different failure scenarios
+   - Implement retry logic for network timeouts
+   - Add better validation for process IDs and message formats
+
+3. **Performance Optimizations**
+   - Add module caching to speed up repeated code loading
+   - Implement parallel processing for batch operations
+   - Add connection pooling for multiple AO operations
+
+4. **Testing Improvements**
+   - Add unit tests for individual CLI commands
+   - Implement integration tests with different AO dApps
+   - Add performance benchmarking tests
+
+5. **Developer Experience**
+   - Add shell completion scripts (bash/zsh/fish)
+   - Create VS Code extension for AO development
+   - Add interactive mode option alongside non-REPL design
+
+6. **Documentation**
+   - Add video tutorials for common use cases
+   - Create cookbook with real-world AO dApp examples
+   - Add API reference documentation
+
+7. **CI/CD Integration**
+   - Add GitHub Actions workflows for automated testing
+   - Create Docker images for easy deployment
+   - Add pre-built binaries for multiple platforms
+
+8. **Monitoring & Observability**
+   - Add metrics collection for operation performance
+   - Implement structured logging with log levels
+   - Add health check endpoints for monitoring
+
+### 🤝 Contributing
+
+We welcome contributions! Please see our contribution guidelines and feel free to submit issues or pull requests.
+
 ## Troubleshooting
 
 ### Common Issues
