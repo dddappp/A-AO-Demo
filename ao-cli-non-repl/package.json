@@ -1,19 +1,29 @@
 {
-  "name": "ao-cli-non-repl",
+  "name": "@dddappp/ao-cli",
   "version": "1.0.0",
-  "description": "Non-REPL AO CLI tool for spawning processes and sending messages",
+  "description": "Universal AO CLI tool for testing and automating AO dApps (replaces AOS REPL)",
   "main": "ao-cli.js",
   "bin": {
     "ao-cli": "./ao-cli.js"
   },
   "scripts": {
     "start": "node ao-cli.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "cd .. && ./ao-cli-non-repl/tests/run-blog-tests.sh",
+    "prepublishOnly": "npm run test"
   },
-  "keywords": ["ao", "cli", "blockchain", "arweave", "non-repl"],
-  "author": "",
+  "keywords": ["ao", "cli", "blockchain", "arweave", "automation", "non-repl"],
+  "homepage": "https://github.com/dddappp/A-AO-Demo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dddappp/A-AO-Demo.git",
+    "directory": "ao-cli-non-repl"
+  },
+  "bugs": {
+    "url": "https://github.com/dddappp/A-AO-Demo/issues"
+  },
   "license": "ISC",
   "type": "commonjs",
+  "author": "dddappp",
   "dependencies": {
     "@permaweb/aoconnect": "^0.0.90",
     "arbundles": "^0.11.2",
