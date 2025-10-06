@@ -112,38 +112,52 @@ spring:
 
 Spring Security OAuth2 通过以下机制区分提供商：
 
-**主要区分方式：`state` 参数**
-- 在用户发起OAuth2登录时，Spring Security会在`state`参数中编码提供商标识符（如`google`或`github`）
-- OAuth2提供商在回调时会原样返回这个`state`参数
-- Spring Security通过解析`state`参数来确定是哪个提供商的回调
+**核心机制：`state` 参数 + 会话存储**
+- **state参数作用**: OAuth2安全机制，用于防止CSRF攻击和关联请求上下文
+- **会话存储**: Spring Security在用户会话中存储`OAuth2AuthorizationRequest`对象，包含提供商信息
+- **关联机制**: 通过state参数将回调请求与存储的授权请求关联，确定具体提供商
 
-**工作流程**：
-1. 用户点击"使用Google账户登录" → Spring Security生成包含`registrationId=google`的state参数
-2. 用户点击"使用GitHub账户登录" → Spring Security生成包含`registrationId=github`的state参数
-3. OAuth2提供商回调时携带原样state参数 → Spring Security解析state确定提供商并处理认证
+**详细工作流程**：
+1. **发起授权**: 用户点击登录 → Spring Security创建`OAuth2AuthorizationRequest`（包含registrationId）
+2. **存储上下文**: 将授权请求对象存储在HttpSession中，并生成唯一state参数建立关联
+3. **重定向授权**: 携带state参数重定向到OAuth2提供商
+4. **提供商回调**: 提供商返回code和原样state参数
+5. **解析上下文**: Spring Security通过state参数从会话中取出对应的授权请求，确定registrationId
+
+**Spring Security源码机制**：
+- `OAuth2AuthorizationRequestRedirectFilter`: 处理授权发起，创建并存储授权请求
+- `OAuth2LoginAuthenticationFilter`: 处理回调，通过state参数解析提供商身份
+- `HttpSessionOAuth2AuthorizationRequestRepository`: 管理授权请求的会话存储
 
 **实际URL示例**：
 ```
 # Google登录发起
 GET /oauth2/authorization/google
-→ 重定向到: https://accounts.google.com/o/oauth2/auth?state=abc123...&client_id=...
+→ 创建OAuth2AuthorizationRequest(registrationId="google")
+→ 存储到session，生成state="abc123"
+→ 重定向: https://accounts.google.com/o/oauth2/auth?state=abc123...
 
 # GitHub登录发起
 GET /oauth2/authorization/github
-→ 重定向到: https://github.com/login/oauth/authorize?state=def456...&client_id=...
+→ 创建OAuth2AuthorizationRequest(registrationId="github")
+→ 存储到session，生成state="def456"
+→ 重定向: https://github.com/login/oauth/authorize?state=def456...
 
-# 回调处理（同一个URL）
+# 统一回调处理
 GET /oauth2/callback?code=auth_code&state=abc123...
-→ Spring Security通过state参数识别是Google回调
+→ 通过state="abc123"从session取出OAuth2AuthorizationRequest
+→ 确认registrationId="google" → 处理Google认证
 
 GET /oauth2/callback?code=auth_code&state=def456...
-→ Spring Security通过state参数识别是GitHub回调
+→ 通过state="def456"从session取出OAuth2AuthorizationRequest
+→ 确认registrationId="github" → 处理GitHub认证
 ```
 
-**优点**：
-- ✅ 简化URL配置管理
-- ✅ 统一的回调处理逻辑
-- ✅ 符合OAuth2安全最佳实践（state参数防CSRF攻击）
+**关键优势**：
+- ✅ **不依赖URL路径**: 无论使用统一还是分离的回调URL，都能正确区分
+- ✅ **安全可靠**: state参数提供CSRF保护，会话存储确保上下文完整性
+- ✅ **扩展性强**: 支持任意数量的OAuth2提供商
+- ✅ **遵循标准**: 完全符合OAuth2协议规范
 
 #### 2.1 SecurityConfig.java 修改
 ```java
