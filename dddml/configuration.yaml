@@ -1,8 +1,22 @@
-# configuration:
-#   sequenceNumber: 1000
-#   boundedContextName: "A.AO.Demo"
-#   metadata:
-#     EventTypeDiscriminatorName: "EventType"
-#     ServiceMethodMessagingCommandNameFormat: "{0}_{1}" # {ServiceName}_{MethodName}
-#   ao:
-#     objectVersionPropertyName: Version
+configuration:
+  sequenceNumber: 1000
+  boundedContextName: "A.AO.Demo"
+  metadata:
+    EventTypeDiscriminatorName: "EventType"
+    ServiceMethodMessagingCommandNameFormat: "{0}_{1}" # {ServiceName}_{MethodName}
+
+  defaultModule:
+    name: "A.AO.Demo"
+    requiredModules: [ "InventoryItem", "InOutService", "InventoryService", "Blog" ]
+  submodules:
+    InventoryItem:
+      requiredModules: [ ]
+    InOutService:
+      requiredModules: [ ]
+    InventoryService:
+      requiredModules: [ "InventoryItem", "InOutService" ]
+    Blog:
+      requiredModules: [ ]
+
+  ao:
+    objectVersionPropertyName: Version

@@ -7,6 +7,7 @@
 
 valueObjects:
   InventoryItemId:
+    module: "InventoryItem"
     properties:
       ProductId:
         type: number
@@ -15,6 +16,7 @@ valueObjects:
       InventoryAttributeSet:
         type: InventoryAttributeSet
   InventoryAttributeSet:
+    module: "InventoryItem"
     properties:
       Foo:
         type: string
@@ -22,6 +24,7 @@ valueObjects:
         type: string
 
   InventoryItemEntry:
+    module: "InventoryItem"
     properties:
       MovementQuantity:
         type: number
@@ -30,6 +33,7 @@ valueObjects:
 
 aggregates:
   InventoryItem:
+    module: "InventoryItem"
     id:
       name: InventoryItemId
       type: InventoryItemId
@@ -53,6 +57,7 @@ aggregates:
 
 services:
   InOutService:
+    module: "InOutService"
     abstract: true
     methods:
       CreateSingleLineInOut:
@@ -85,6 +90,7 @@ services:
             type: number
     valueObjects:
       CreateSingleLineInOutResult:
+        module: "InOutService"
         properties:
           InOutId:
             type: number
@@ -92,6 +98,7 @@ services:
             type: number
 
   InventoryService:
+    module: "InventoryService"
     requiredComponents:
       InventoryItem:
         type: InventoryItem
