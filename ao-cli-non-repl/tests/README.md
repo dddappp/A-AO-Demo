@@ -1,38 +1,71 @@
-# AO CLI 测试套件
+# AO CLI 博客测试用例
 
-这个目录包含 AO CLI 工具的测试脚本，用于精确重现 `AO-Testing-with-iTerm-MCP-Server.md` 文档中的端到端测试流程。
+> **⚠️ 重要**: AO CLI 工具已迁移到独立代码库！
+>
+> **新地址**: https://github.com/dddappp/ao-cli
+> **npm包**: `@dddappp/ao-cli`
 
-## 测试文件说明
+此文档描述了专为 A-AO-Demo 项目博客应用设计的测试用例。这些测试用例用于验证博客应用的完整功能，并精确重现 `AO-Testing-with-iTerm-MCP-Server.md` 文档中的端到端测试流程。
 
-### 脚本文件
+## 📋 测试用例概览
+
+### 保留文件
+
+此目录保留了以下文件用于 A-AO-Demo 项目的博客应用测试：
+
+```
+tests/
+├── README.md          # 此文档 - 测试用例说明
+└── run-blog-tests.sh  # 博客应用自动化测试脚本
+```
+
+### 脚本功能说明
 
 #### `run-blog-tests.sh`
-自动化测试脚本，使用简单的 shell 命令精确重现 AO-Testing-with-iTerm-MCP-Server.md 中的完整测试流程。
+专为 A-AO-Demo 项目博客应用设计的自动化测试脚本，使用 AO CLI 工具精确重现 `AO-Testing-with-iTerm-MCP-Server.md` 文档中的完整测试流程。
 
-**特性**:
-- 精确重现原始 MCP + iTerm 测试流程
-- 完整实现 `Send(message)` → `sleep N` → `Inbox[#Inbox]` 测试模式
-- 每个消息发送后都通过 `ao-cli inbox --latest` 检查收件箱状态
-- 验证回复消息是否正确进入Inbox
-- 智能项目根目录检测（自动查找 `src/a_ao_demo.lua`）
-- 完整环境检查和错误处理
-- 详细的步骤化输出和计时
+**核心特性**:
+- 🎯 精确重现原始 MCP + iTerm 测试流程
+- 🔄 完整实现 `Send(message)` → `sleep N` → `Inbox[#Inbox]` 测试模式
+- 📬 每个消息发送后都通过 `ao-cli inbox --latest` 检查收件箱状态
+- ✅ 验证回复消息是否正确进入 Inbox
+- 🔍 智能项目根目录检测（自动查找 `src/a_ao_demo.lua`）
+- 🛡️ 完整环境检查和错误处理
+- 📊 详细的步骤化输出和计时
 
 **测试流程** (完全对应原始文档):
 1. **生成 AO 进程** (`ao-cli spawn default --name "blog-test-$(date +%s)"`)
 2. **加载博客应用代码** (`ao-cli load $PROCESS_ID $APP_FILE --wait`)
-3. **获取文章序号** (`ao-cli message $PROCESS_ID GetArticleIdSequence --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
-4. **创建文章** (`ao-cli message $PROCESS_ID CreateArticle --data '{"title":"title_1","body":"body_1"}' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
-5. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
-6. **更新文章** (`ao-cli message $PROCESS_ID UpdateArticle --data '{"article_id":1,"version":0,"title":"new_title_1","body":"new_body_1"}' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
-7. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
-8. **更新正文** (`ao-cli message $PROCESS_ID UpdateArticleBody --data '{"article_id":1,"version":1,"body":"updated_body_manual"}' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
-9. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
-10. **添加评论** (`ao-cli message $PROCESS_ID AddComment --data '{"article_id":1,"version":2,"commenter":"alice","body":"comment_body_manual"}' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
+3. **获取文章序号** (`ao-cli message $PROCESS_ID GetArticleIdSequence --wait` + Inbox检查)
+4. **创建文章** (`ao-cli message $PROCESS_ID CreateArticle --data '{"title":"title_1","body":"body_1"}' --wait` + Inbox检查)
+5. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + Inbox检查)
+6. **更新文章** (`ao-cli message $PROCESS_ID UpdateArticle --data '{"article_id":1,"version":0,"title":"new_title_1","body":"new_body_1"}' --wait` + Inbox检查)
+7. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + Inbox检查)
+8. **更新正文** (`ao-cli message $PROCESS_ID UpdateArticleBody --data '{"article_id":1,"version":1,"body":"updated_body_manual"}' --wait` + Inbox检查)
+9. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + Inbox检查)
+10. **添加评论** (`ao-cli message $PROCESS_ID AddComment --data '{"article_id":1,"version":2,"commenter":"alice","body":"comment_body_manual"}' --wait` + Inbox检查)
 
 **Inbox验证**: 每个消息发送后都会验证回复消息是否正确进入Inbox，包含业务处理结果。
 
-**使用方法**:
+## 🚀 运行测试
+
+### 前提条件
+
+1. 获取并安装独立的 AO CLI 工具：
+   ```bash
+   git clone https://github.com/dddappp/ao-cli.git
+   cd ao-cli
+   npm install
+   npm link
+   ao-cli --version
+   ```
+
+2. 确保 A-AO-Demo 项目结构完整：
+   - 项目根目录包含 `src/a_ao_demo.lua` (博客应用代码)
+   - 项目根目录包含 `README.md` (项目标识文件)
+
+### 执行测试
+
 ```bash
 # 在项目根目录运行
 ./ao-cli-non-repl/tests/run-blog-tests.sh
@@ -45,7 +78,8 @@ cd any/subdirectory
 AO_PROJECT_ROOT=/path/to/project ./ao-cli-non-repl/tests/run-blog-tests.sh
 ```
 
-**输出示例**:
+### 预期输出示例
+
 ```
 === AO 博客应用自动化测试脚本 (使用 ao-cli 工具) ===
 基于 AO-Testing-with-iTerm-MCP-Server.md 文档的测试流程
@@ -61,171 +95,90 @@ AO_PROJECT_ROOT=/path/to/project ./ao-cli-non-repl/tests/run-blog-tests.sh
 === 步骤 3: 获取文章序号 ===
 ✅ Operation completed successfully
 ✅ Found messages in inbox!
-=== 步骤 4: 创建文章 ===
-✅ Operation completed successfully
-✅ Found messages in inbox!
 ...
 === 测试完成 ===
 ⏱️ 总耗时: 45 秒
 ✅ 所有测试步骤执行完毕
 ```
 
-## 运行测试
+## 📚 相关文档和资源
 
-### 前提条件
+### AO CLI 独立工具
+- **GitHub 仓库**: https://github.com/dddappp/ao-cli
+- **npm 包**: `@dddappp/ao-cli`
+- **完整文档**: 请访问独立仓库的 README.md
 
-1. 安装 Node.js 和 npm
-2. 安装 AO CLI 工具：
+### A-AO-Demo 项目
+- **博客应用源码**: `src/a_ao_demo.lua`
+- **测试文档**: `docs/AO-Testing-with-iTerm-MCP-Server.md`
+- **项目主页**: 项目根目录的 README.md
+
+### AO 生态系统
+- **官方文档**: https://ao.arweave.dev/
+- **社区资源**: https://github.com/permaweb/ao
+
+## 🔍 测试验证要点
+
+### 核心验证目标
+这些测试用例主要验证以下关键机制：
+
+- ✅ **Inbox 机制完整性**: Send() → sleep → Inbox[#Inbox] 完整流程
+- ✅ **进程内部消息处理**: 验证进程内部 Send 操作会进入 Inbox
+- ✅ **外部 API 行为**: 确认外部 message 调用不会污染 Inbox
+- ✅ **业务逻辑正确性**: 博客应用的核心 CRUD 操作
+- ✅ **版本控制机制**: 乐观锁和并发控制验证
+
+### 技术验证细节
+
+#### Inbox 行为模式
+- **Inbox 是进程级状态**: 存储在 WASM 内存中的全局变量
+- **进程内部 Send**: `ao-cli eval "Send()"` 会让回复进入 Inbox
+- **外部 API 调用**: `ao-cli message` 结果直接返回，不进入 Inbox
+- **混合测试验证**: 结合两种方式验证 Inbox 机制的完整性
+
+#### 博客应用业务流程
+1. 文章序号生成和获取
+2. 文章创建、读取、更新
+3. 版本控制和并发安全
+4. 评论系统集成
+5. 完整的状态管理和数据持久化
+
+## 🛠️ 故障排除
+
+### 常见问题解决
+
+1. **找不到 ao-cli 命令**
    ```bash
-   cd ao-cli-non-repl
-   npm install
-   npm link
+   # 确保已安装独立版本
+   git clone https://github.com/dddappp/ao-cli.git
+   cd ao-cli && npm install && npm link
    ```
 
-3. 确保有有效的 AO 钱包文件 (`~/.aos.json`)
-
-4. 对于博客测试，确保项目根目录包含：
-   - `src/a_ao_demo.lua` (博客应用代码)
-   - `README.md` (项目标识文件)
-
-### 运行博客完整测试
-
-```bash
-# 使用自动化脚本（推荐）
-./ao-cli-non-repl/tests/run-blog-tests.sh
-
-# 或手动执行单个步骤
-ao-cli spawn default --name test-process
-ao-cli eval <process-id> --file src/a_ao_demo.lua --wait
-ao-cli message <process-id> GetArticleIdSequence --wait
-sleep 2
-ao-cli inbox <process-id> --latest
-```
-
-## 与原始 MCP 测试的对应关系
-
-| 原始 MCP + iTerm                                            | AO CLI shell 脚本                                     | 说明       |
-| ----------------------------------------------------------- | ----------------------------------------------------- | ---------- |
-| `aos test-blog-xxx`                                         | `ao-cli spawn default --name "blog-test-$(date +%s)"` | 生成进程   |
-| `.load ./src/a_ao_demo.lua`                                 | `ao-cli load $PID $APP_FILE --wait`                   | 加载代码   |
-| `Send({ Target = ao.id, Action = "GetArticleIdSequence" })` | `ao-cli message $PID GetArticleIdSequence --wait`     | 发送消息   |
-| `read_terminal_output`                                      | `sleep N`                                             | 等待处理   |
-| `Inbox[#Inbox]`                                             | `ao-cli inbox $PID --latest`                          | 检查 inbox |
-
-## 测试验证
-
-### 成功指标
-
-- ✅ 进程成功创建并返回有效的进程 ID
-- ✅ 应用代码成功加载（load 返回成功）
-- ✅ 所有消息发送成功并收到确认（message --wait）
-- ✅ 每次消息发送后都能通过 `ao-cli inbox --latest` 检查收件箱状态
-- ✅ 完整的 Send() → sleep → Inbox[#Inbox] 流程实现
-- ✅ Inbox中包含所有业务回复消息（GetArticleIdSequence、CreateArticle等的结果）
-- ✅ Inbox子命令功能完全验证
-
-### Inbox机制说明
-
-在AO架构中，Inbox有特定的含义和行为：
-
-#### **Inbox 的本质**
-- **Inbox 是进程内部的全局变量**，存储在进程WASM内存中
-- **不是网络级别的消息队列**，而是进程级别的接收消息缓存
-- **每当进程接收到消息时，都会被插入到Inbox中**
-
-#### **Inbox 内容分类**
-Inbox 包含发送给进程的所有消息：
-- 系统初始化消息（Type=Process）
-- 其他进程发送的业务消息
-- **进程自身处理业务逻辑后的回复消息** ← 关键发现
-- 定时任务消息等
-
-#### **外部API vs 进程内部操作**
-
-**外部API调用**（`ao-cli message`）：
-- 通过aoconnect SDK发送消息到AO网络
-- 消息不会作为"接收消息"进入进程Inbox
-- 结果通过API直接返回
-
-**进程内部操作**（`ao-cli eval "Send()"`）：
-- 在进程WASM内部执行Lua代码
-- Send函数发送消息时，进程会接收到回复副本
-- 回复消息被handler处理并插入Inbox
-
-#### **Inbox 完整性验证**
-- Inbox是进程的消息队列，记录所有接收到的消息
-- 包括外部消息和内部处理产生的回复消息
-- 通过 `ao-cli inbox --latest` 可以查看最新消息
-
-#### **测试验证结果**
-- Inbox length 从 1 增加到 2，证明新消息进入
-- 通过 `ao-cli eval --data "Send(...)"` 在进程内部发送消息
-- 回复消息确实会进入进程的Inbox
-- Inbox子命令功能完全正常工作
-- **这证明了Inbox机制的完整性和正确性**
-
-### 故障排除
-
-#### 常见问题
-
-1. **"ao-cli command not found"**
+2. **钱包文件问题**
    ```bash
-   cd ao-cli-non-repl && npm link
-   ```
-
-2. **"Wallet file not found"**
-   ```bash
-   # 确保有 ~/.aos.json 文件
+   # 检查钱包文件是否存在
    ls -la ~/.aos.json
+   # 如不存在，请先运行 aos 创建钱包
    ```
 
-3. **"Project root directory not found"**
+3. **项目根目录检测失败**
    ```bash
    # 手动指定项目路径
-   AO_PROJECT_ROOT=/path/to/project ./run-blog-tests.sh
+   AO_PROJECT_ROOT=/path/to/project ./ao-cli-non-repl/tests/run-blog-tests.sh
    ```
 
-4. **应用代码加载失败**
-   - 检查 `src/a_ao_demo.lua` 是否存在
-   - 确保应用代码语法正确
+4. **测试执行缓慢**
+   - 调整等待时间：`AO_WAIT_TIME=3 ./run-blog-tests.sh`
+   - 检查网络连接到 AO 测试网
 
-5. **消息发送失败**
-   - 验证进程 ID 正确
-   - 检查消息格式和参数
+## 📋 维护说明
 
-6. **inbox 检查无消息**
-   - 增加 sleep 时间
-   - 检查应用代码是否正确处理消息
+这些测试用例专为 A-AO-Demo 项目的博客应用设计。如需：
 
-## 扩展测试
+- **修改业务逻辑**: 请同时更新 `src/a_ao_demo.lua` 和测试脚本
+- **添加新功能**: 在测试脚本中添加相应的验证步骤
+- **版本控制**: 确保测试中的版本号与应用逻辑保持同步
 
-### 为你的 AO dApp 创建测试
+## 🔗 历史说明
 
-基于这个脚本模板，你可以为任何 AO dApp 创建类似的测试：
-
-```bash
-# 1. 创建进程
-PROCESS_ID=$(ao-cli spawn default --name "my-dapp-test" | grep "Process ID:" | awk '{print $3}')
-
-# 2. 加载你的应用代码
-ao-cli eval "$PROCESS_ID" --file "path/to/your/app.lua" --wait
-
-# 3. 执行你的业务操作 (记得使用正确的版本号)
-# 例如，对于博客应用：
-ao-cli message "$PROCESS_ID" CreateArticle --data '{"title": "Test", "body": "Content"}' --wait
-ao-cli message "$PROCESS_ID" GetArticle --data '1' --wait  # 检查版本=0
-ao-cli message "$PROCESS_ID" UpdateArticle --data '{"article_id": 1, "version": 0, "title": "Updated"}' --wait
-
-# 4. 更多测试步骤...
-```
-
-### 自定义测试脚本
-
-复制 `run-blog-tests.sh` 并修改为适应你的应用：
-
-```bash
-cp run-blog-tests.sh run-my-dapp-tests.sh
-# 编辑脚本中的操作和数据
-```
-
-这样你就可以为任何 AO dApp 创建精确的端到端测试，完全对应 aos REPL 的交互模式！
+此测试用例最初基于 AO CLI 工具的完整实现，现已分离为独立的工具包。这些保留的测试用例确保 A-AO-Demo 项目的博客应用功能能够持续得到验证和维护。
