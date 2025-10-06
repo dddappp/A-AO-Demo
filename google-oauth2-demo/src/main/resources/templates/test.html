@@ -234,7 +234,7 @@
                         // 3. 绝对不要将访问令牌暴露给客户端JavaScript
 
                         // 演示用途：提示用户输入访问令牌
-                        const tokenInput = prompt('请输入GitHub访问令牌进行验证：\n\n⚠️  注意：这只是演示功能。在生产环境中，令牌应安全存储在服务端。');
+                        const tokenInput = prompt('请输入GitHub访问令牌进行验证：\n\n获取令牌步骤：\n1. 访问 https://github.com/settings/tokens\n2. 生成 "Personal access token (classic)"\n3. 选择作用域：user:email, read:user\n4. 复制生成的令牌\n\n⚠️  安全警告：\n- 这只是演示功能！\n- 生产环境中令牌应安全存储在服务端\n- 绝对不要在客户端JavaScript中处理令牌');
                         console.log('用户输入的令牌:', tokenInput ? '已输入' : '取消输入');
                         if (!tokenInput) {
                             resultDiv.className = 'result error';
