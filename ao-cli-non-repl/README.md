@@ -53,6 +53,8 @@ npm run prepublishOnly
 
 # 3. Publish (scoped package requires --access public)
 npm publish --access public
+# View the package
+# npm view @dddappp/ao-cli
 
 # 4. Update version for new releases
 npm version patch  # or minor/major
