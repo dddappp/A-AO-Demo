@@ -983,37 +983,62 @@ mvn spring-boot:run
 - GitHub：访问令牌为不透明字符串，**不应存储在客户端**，应安全存储在服务端会话中
 
 ### 1.1 GitHub访问令牌安全处理
-GitHub OAuth2 返回不透明的访问令牌（不透明字符串），而不是像Google那样的JWT格式ID Token。因此：
+GitHub OAuth2 返回不透明的访问令牌（不透明字符串），而不是像Google那样的JWT格式ID Token。
 
-**安全处理原则：**
-- **不要将GitHub访问令牌存储在Cookie中**（避免XSS攻击）
-- **不要将访问令牌暴露给客户端JavaScript**（避免令牌泄露）
-- 访问令牌应存储在服务端会话或加密数据库中
-- 令牌验证通过调用GitHub API进行在线验证
+**安全存储策略：**
+- ✅ **HttpOnly Cookie存储**：将访问令牌存储在HttpOnly Cookie中
+- ✅ **防止XSS攻击**：`httpOnly=true` 使JavaScript无法访问
+- ✅ **HTTPS传输保护**：`secure=true` 确保只在HTTPS下传输
+- ✅ **自动过期**：设置1小时过期时间，与会话同步
+- ✅ **自动清理**：登出时清除令牌Cookie
 
-**生产环境建议：**
+**实现代码：**
 ```java
 // 在OAuth2成功处理器中存储访问令牌
-@Autowired
-private HttpSession session;
-
 @Override
 public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                   Authentication authentication) throws IOException {
+    // 处理GitHub用户
     if (authentication.getPrincipal() instanceof OAuth2User oauth2User) {
-        OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
-            "github", authentication.getName());
-        String accessToken = client.getAccessToken().getTokenValue();
+        OAuth2AuthorizedClient authorizedClient = authorizedClientService
+            .loadAuthorizedClient("github", authentication.getName());
 
-        // 安全存储在服务端会话中
-        session.setAttribute("github_access_token", accessToken);
+        if (authorizedClient != null && authorizedClient.getAccessToken() != null) {
+            String accessToken = authorizedClient.getAccessToken().getTokenValue();
+
+            // 安全存储在HttpOnly Cookie中
+            Cookie accessTokenCookie = new Cookie("github_access_token", accessToken);
+            accessTokenCookie.setHttpOnly(true);
+            accessTokenCookie.setSecure(true);
+            accessTokenCookie.setPath("/");
+            accessTokenCookie.setMaxAge(3600); // 1小时过期
+
+            response.addCookie(accessTokenCookie);
+        }
     }
     response.sendRedirect("/test");
 }
 ```
 
-**演示与生产差异说明：**
-当前实现使用`prompt()`获取用户输入仅用于演示目的。在生产环境中，应从服务端会话安全获取访问令牌。
+**验证时自动获取：**
+```java
+// 从Cookie自动获取令牌进行验证
+String accessToken = null;
+if (request.getCookies() != null) {
+    for (Cookie cookie : request.getCookies()) {
+        if ("github_access_token".equals(cookie.getName())) {
+            accessToken = cookie.getValue();
+            break;
+        }
+    }
+}
+```
+
+**安全优势对比：**
+- ✅ **服务端会话存储**：完全安全，但需要会话管理
+- ✅ **HttpOnly Cookie存储**：安全便捷，自动处理过期
+- ❌ **LocalStorage存储**：易受XSS攻击，不推荐
+- ❌ **用户手动输入**：演示用途，不适合生产
 
 ### 2. 权限范围
 - Google：`openid profile email`

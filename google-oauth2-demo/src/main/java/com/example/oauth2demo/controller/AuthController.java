@@ -147,17 +147,25 @@ public class AuthController {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // 从请求参数获取访问令牌（前端传递）
-            String accessToken = request.getParameter("accessToken");
+            // 从Cookie中获取GitHub访问令牌（自动获取，不需要用户输入）
+            String accessToken = null;
+            if (request.getCookies() != null) {
+                for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                    if ("github_access_token".equals(cookie.getName())) {
+                        accessToken = cookie.getValue();
+                        break;
+                    }
+                }
+            }
 
             if (accessToken == null || accessToken.trim().isEmpty()) {
                 response.put("success", false);
-                response.put("message", "未提供访问令牌");
+                response.put("message", "未找到GitHub访问令牌，请重新登录");
                 return ResponseEntity.badRequest().body(response);
             }
 
             System.out.println("=== GitHub Token Validation Request ===");
-            System.out.println("Access Token: " + accessToken.substring(0, Math.min(20, accessToken.length())) + "...");
+            System.out.println("Access Token found in cookie: " + accessToken.substring(0, Math.min(20, accessToken.length())) + "...");
 
             // 验证GitHub访问令牌
             Map<String, Object> validationResult = jwtValidationService.validateGitHubToken(accessToken);

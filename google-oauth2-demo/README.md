@@ -698,24 +698,40 @@ Status: 302
 
 ### GitHub 访问令牌验证说明
 
-**演示功能说明**：
-- GitHub验证按钮会弹出输入框要求手动输入访问令牌
-- 这是为了演示目的，实际生产环境中令牌应安全存储在服务端
+**自动验证机制**：
+- ✅ GitHub访问令牌自动存储在HttpOnly Cookie中（安全存储）
+- ✅ 验证按钮点击后自动从Cookie获取令牌进行验证
+- ✅ 无需用户手动输入，体验与Google验证一致
 
-**获取GitHub个人访问令牌**：
-1. 访问：`https://github.com/settings/tokens`
-2. 点击 `"Generate new token (classic)"`
-3. 填写令牌描述（如："OAuth2 Demo Test"）
-4. 选择权限：
-   - `user:email` (读取邮箱)
-   - `read:user` (读取用户信息)
-5. 点击 `"Generate token"`
-6. **重要**：立即复制生成的令牌（只显示一次）
+**令牌存储安全**：
+- GitHub访问令牌存储在 `github_access_token` HttpOnly Cookie中
+- Cookie设置为 `secure=true`（HTTPS）和 `httpOnly=true`（防止XSS）
+- 过期时间为1小时，与会话保持一致
+- 登出时自动清除令牌Cookie
 
-**安全提醒**：
-- 个人访问令牌具有完整访问权限，请妥善保管
-- 测试完成后请删除测试令牌
-- 生产环境中绝对不要让用户手动输入令牌
+**技术实现**：
+```java
+// 登录成功后自动存储
+Cookie accessTokenCookie = new Cookie("github_access_token", accessToken);
+accessTokenCookie.setHttpOnly(true);
+accessTokenCookie.setSecure(true);
+accessTokenCookie.setMaxAge(3600);
+
+// 验证时自动从Cookie获取
+String accessToken = null;
+for (Cookie cookie : request.getCookies()) {
+    if ("github_access_token".equals(cookie.getName())) {
+        accessToken = cookie.getValue();
+        break;
+    }
+}
+```
+
+**安全优势**：
+- 令牌对客户端JavaScript不可见
+- 防止XSS攻击窃取令牌
+- 自动过期机制
+- HTTPS传输保护
 
 ---
 

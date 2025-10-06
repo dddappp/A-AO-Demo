@@ -7,11 +7,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -39,32 +42,61 @@ public class SecurityConfig {
         return new RestTemplate();
     }
 
+    @Autowired
+    private OAuth2AuthorizedClientService authorizedClientService;
+
     @Bean
     public AuthenticationSuccessHandler oauth2SuccessHandler() {
         return new AuthenticationSuccessHandler() {
             @Override
             public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                               Authentication authentication) throws IOException {
+                System.out.println("=== OAuth2 Authentication Success ===");
+
+                // 处理Google用户（OpenID Connect）
                 if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
-                    // 获取ID Token
                     String idToken = oidcUser.getIdToken().getTokenValue();
-                    
-                    // 创建HTTP Only Cookie存储ID Token
+
+                    // 创建HTTP Only Cookie存储Google ID Token
                     Cookie idTokenCookie = new Cookie("id_token", idToken);
                     idTokenCookie.setHttpOnly(true);
                     idTokenCookie.setSecure(true); // HTTPS环境下设置为true
                     idTokenCookie.setPath("/");
                     idTokenCookie.setMaxAge(3600); // 1小时过期
-                    
+
                     response.addCookie(idTokenCookie);
-                    
-                    System.out.println("=== OAuth2 Authentication Success ===");
+
+                    System.out.println("Provider: Google");
                     System.out.println("User: " + oidcUser.getFullName());
                     System.out.println("Email: " + oidcUser.getEmail());
                     System.out.println("ID Token stored in cookie");
                 }
-                
-                // 重定向到默认成功URL
+                // 处理GitHub用户（OAuth2）
+                else if (authentication.getPrincipal() instanceof OAuth2User oauth2User) {
+                    // 获取OAuth2AuthorizedClient来访问访问令牌
+                    OAuth2AuthorizedClient authorizedClient = authorizedClientService
+                        .loadAuthorizedClient("github", authentication.getName());
+
+                    if (authorizedClient != null && authorizedClient.getAccessToken() != null) {
+                        String accessToken = authorizedClient.getAccessToken().getTokenValue();
+
+                        // 创建HTTP Only Cookie存储GitHub访问令牌
+                        Cookie accessTokenCookie = new Cookie("github_access_token", accessToken);
+                        accessTokenCookie.setHttpOnly(true);
+                        accessTokenCookie.setSecure(true); // HTTPS环境下设置为true
+                        accessTokenCookie.setPath("/");
+                        accessTokenCookie.setMaxAge(3600); // 1小时过期
+
+                        response.addCookie(accessTokenCookie);
+
+                        System.out.println("Provider: GitHub");
+                        System.out.println("User: " + oauth2User.getAttribute("login"));
+                        System.out.println("Name: " + oauth2User.getAttribute("name"));
+                        System.out.println("GitHub access token stored in cookie");
+                    }
+                }
+
+                // 重定向到测试页面
                 response.sendRedirect("/test");
             }
         };
@@ -118,7 +150,7 @@ public class SecurityConfig {
                 .logoutSuccessUrl("/")
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
-                .deleteCookies("id_token", "JSESSIONID")
+                .deleteCookies("id_token", "github_access_token", "JSESSIONID")
                 .permitAll()
             );
 

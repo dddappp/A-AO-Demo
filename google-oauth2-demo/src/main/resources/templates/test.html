@@ -224,23 +224,11 @@
                         resultDiv.className = 'result loading';
                         resultDiv.textContent = '正在验证 GitHub 访问令牌...';
 
-                        // GitHub访问令牌不像Google ID Token那样存储在Cookie中
-                        // 在生产环境中，访问令牌应该安全存储在服务端会话中
-                        // 这里为了演示目的，使用prompt()获取用户输入
+                        // GitHub访问令牌现在自动存储在HttpOnly Cookie中
+                        // 后端会从cookie中安全获取令牌进行验证
+                        // 这样既安全又方便用户使用
 
-                        // 安全说明：在实际应用中，应该：
-                        // 1. 在OAuth2成功回调时将访问令牌存储在服务端会话中
-                        // 2. 验证时从服务端会话中获取令牌，而不是让用户输入
-                        // 3. 绝对不要将访问令牌暴露给客户端JavaScript
-
-                        // 演示用途：提示用户输入访问令牌
-                        const tokenInput = prompt('请输入GitHub访问令牌进行验证：\n\n获取令牌步骤：\n1. 访问 https://github.com/settings/tokens\n2. 生成 "Personal access token (classic)"\n3. 选择作用域：user:email, read:user\n4. 复制生成的令牌\n\n⚠️  安全警告：\n- 这只是演示功能！\n- 生产环境中令牌应安全存储在服务端\n- 绝对不要在客户端JavaScript中处理令牌');
-                        console.log('用户输入的令牌:', tokenInput ? '已输入' : '取消输入');
-                        if (!tokenInput) {
-                            resultDiv.className = 'result error';
-                            resultDiv.textContent = '❌ 验证已取消';
-                            return;
-                        }
+                        console.log('准备验证GitHub访问令牌（从cookie自动获取）');
 
                         // 发送验证请求
                         const headers = {
@@ -252,13 +240,10 @@
                         console.log('CSRF Header:', getCsrfHeader());
                         console.log('CSRF Token:', getCsrfToken() ? '已设置' : '未设置');
 
-                        fetch('/api/validate-github-token', {
-                            method: 'POST',
-                            body: new URLSearchParams({
-                                'accessToken': tokenInput
-                            }),
-                            headers: headers
-                        })
+                fetch('/api/validate-github-token', {
+                    method: 'POST',
+                    headers: headers
+                })
                         .then(response => {
                             console.log('收到响应，状态码:', response.status);
                             return response.json();
