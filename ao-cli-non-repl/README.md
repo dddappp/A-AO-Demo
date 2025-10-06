@@ -57,6 +57,10 @@ ao-cli spawn <module-id> --name "my-process"
 ao-cli load <process-id> path/to/app.lua --wait
 ```
 
+> **注意**：如果进程ID以 `-` 开头，您可以使用以下任一种方法：
+> - 使用 `--` 分隔符：`ao-cli load -- <process-id> path/to/app.lua --wait`
+> - 或者引号包裹：`ao-cli load "<process-id>" path/to/app.lua --wait`
+
 #### Send Messages
 ```bash
 # Send a message and wait for result
@@ -66,6 +70,10 @@ ao-cli message <process-id> ActionName --data '{"key": "value"}' --wait
 ao-cli message <process-id> ActionName --data "hello"
 ```
 
+> **注意**：如果进程ID以 `-` 开头，您可以使用以下任一种方法：
+> - 使用 `--` 分隔符：`ao-cli message -- <process-id> ActionName ...`
+> - 或者引号包裹：`ao-cli message "<process-id>" ActionName ...`
+
 #### Evaluate Lua Code
 ```bash
 # Evaluate code from file
@@ -74,6 +82,10 @@ ao-cli eval <process-id> --file script.lua --wait
 # Evaluate code string
 ao-cli eval <process-id> --code 'return "hello"' --wait
 ```
+
+> **注意**：如果进程ID以 `-` 开头，您可以使用以下任一种方法：
+> - 使用 `--` 分隔符：`ao-cli eval -- <process-id> --file script.lua --wait`
+> - 或者引号包裹：`ao-cli eval "<process-id>" --file script.lua --wait`
 
 #### Check Inbox
 ```bash
@@ -86,6 +98,12 @@ ao-cli inbox <process-id> --all
 # Wait for new messages
 ao-cli inbox <process-id> --wait --timeout 30
 ```
+
+> **📋 Inbox机制说明**：Inbox是进程内部的全局变量，记录所有接收到的消息。要让消息进入Inbox，需要在进程内部执行Send操作（使用`ao-cli eval`），外部API调用不会让消息进入Inbox。
+>
+> **注意**：如果进程ID以 `-` 开头，您可以使用以下任一种方法：
+> - 使用 `--` 分隔符：`ao-cli inbox -- <process-id> --latest`
+> - 或者引号包裹：`ao-cli inbox "<process-id>" --latest`
 
 ### Advanced Usage
 
@@ -203,13 +221,18 @@ All commands provide clean, readable output:
 
 ## Comparison with AOS REPL
 
-| Operation | AOS REPL | AO CLI |
-|-----------|----------|--------|
-| Spawn | `aos my-process` | `ao-cli spawn default --name my-process` |
-| Load Code | `.load app.lua` | `ao-cli load <pid> app.lua --wait` |
-| Send Message | `Send({Action="Test"})` | `ao-cli message <pid> Test --wait` |
-| Check Inbox | `Inbox[#Inbox]` | `ao-cli inbox <pid> --latest` |
-| Eval Code | `eval code` | `ao-cli eval <pid> --code "code" --wait` |
+| Operation               | AOS REPL                | AO CLI                                   |
+| ------------------------ | ----------------------- | ---------------------------------------- |
+| Spawn                    | `aos my-process`        | `ao-cli spawn default --name my-process` |
+| Load Code                | `.load app.lua`         | `ao-cli load <pid> app.lua --wait`       |
+| Send Message             | `Send({Action="Test"})` | `ao-cli message <pid> Test --wait`       |
+| Send Message (Inbox测试) | `Send({Action="Test"})` | `ao-cli eval <pid> --data "Send({Action='Test'})" --wait` |
+| Check Inbox              | `Inbox[#Inbox]`         | `ao-cli inbox <pid> --latest`            |
+| Eval Code                | `eval code`             | `ao-cli eval <pid> --code "code" --wait` |
+
+> **💡 重要说明**：
+> - 要测试Inbox功能，必须使用`ao-cli eval`在进程内部执行Send操作。直接使用`ao-cli message`不会让回复消息进入Inbox，因为那是外部API调用。
+> - 如果进程ID以 `-` 开头，您可以使用 `--` 分隔符或引号包裹，例如：`ao-cli load -- <pid> app.lua --wait` 或 `ao-cli load "<pid>" app.lua --wait`。
 
 ## Troubleshooting
 

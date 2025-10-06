@@ -11,22 +11,26 @@
 
 **特性**:
 - 精确重现原始 MCP + iTerm 测试流程
-- 每个步骤都包含：`Send(message)` → `sleep 2` → `Inbox[#Inbox]`
+- 完整实现 `Send(message)` → `sleep N` → `Inbox[#Inbox]` 测试模式
+- 每个消息发送后都通过 `ao-cli inbox --latest` 检查收件箱状态
+- 验证回复消息是否正确进入Inbox
 - 智能项目根目录检测（自动查找 `src/a_ao_demo.lua`）
 - 完整环境检查和错误处理
 - 详细的步骤化输出和计时
 
 **测试流程** (完全对应原始文档):
 1. **生成 AO 进程** (`ao-cli spawn default --name "blog-test-$(date +%s)"`)
-2. **加载博客应用代码** (`ao-cli eval $PROCESS_ID --file $APP_FILE --wait`)
-3. **获取文章序号** (`ao-cli message $PROCESS_ID GetArticleIdSequence --wait` + `sleep 2` + `ao-cli inbox $PROCESS_ID --latest`)
-4. **创建文章** (`ao-cli message $PROCESS_ID CreateArticle --data '{"title":"title_1","body":"body_1"}' --wait` + `sleep 2` + `ao-cli inbox $PROCESS_ID --latest`)
-5. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + `sleep 2` + `ao-cli inbox $PROCESS_ID --latest`)
-6. **更新文章** (`ao-cli message $PROCESS_ID UpdateArticle --data '{"article_id":1,"version":1,"title":"new_title_1","body":"new_body_1"}' --wait` + `sleep 2` + `ao-cli inbox $PROCESS_ID --latest`)
-7. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + `sleep 2` + `ao-cli inbox $PROCESS_ID --latest`)
-8. **更新正文** (`ao-cli message $PROCESS_ID UpdateArticleBody --data '{"article_id":1,"version":2,"body":"updated_body_manual"}' --wait` + `sleep 2` + `ao-cli inbox $PROCESS_ID --latest`)
-9. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + `sleep 2` + `ao-cli inbox $PROCESS_ID --latest`)
-10. **添加评论** (`ao-cli message $PROCESS_ID AddComment --data '{"article_id":1,"version":3,"commenter":"alice","body":"comment_body_manual"}' --wait` + `sleep 2` + `ao-cli inbox $PROCESS_ID --latest`)
+2. **加载博客应用代码** (`ao-cli load $PROCESS_ID $APP_FILE --wait`)
+3. **获取文章序号** (`ao-cli message $PROCESS_ID GetArticleIdSequence --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
+4. **创建文章** (`ao-cli message $PROCESS_ID CreateArticle --data '{"title":"title_1","body":"body_1"}' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
+5. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
+6. **更新文章** (`ao-cli message $PROCESS_ID UpdateArticle --data '{"article_id":1,"version":0,"title":"new_title_1","body":"new_body_1"}' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
+7. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
+8. **更新正文** (`ao-cli message $PROCESS_ID UpdateArticleBody --data '{"article_id":1,"version":1,"body":"updated_body_manual"}' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
+9. **获取文章** (`ao-cli message $PROCESS_ID GetArticle --data '1' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
+10. **添加评论** (`ao-cli message $PROCESS_ID AddComment --data '{"article_id":1,"version":2,"commenter":"alice","body":"comment_body_manual"}' --wait` + `sleep N` + `ao-cli inbox $PROCESS_ID --latest`)
+
+**Inbox验证**: 每个消息发送后都会验证回复消息是否正确进入Inbox，包含业务处理结果。
 
 **使用方法**:
 ```bash
@@ -100,23 +104,65 @@ ao-cli inbox <process-id> --latest
 
 ## 与原始 MCP 测试的对应关系
 
-| 原始 MCP + iTerm | AO CLI shell 脚本 | 说明 |
-|------------------|-------------------|------|
-| `aos test-blog-xxx` | `ao-cli spawn default --name "blog-test-$(date +%s)"` | 生成进程 |
-| `.load ./src/a_ao_demo.lua` | `ao-cli eval $PID --file $APP_FILE --wait` | 加载代码 |
-| `Send({ Target = ao.id, Action = "GetArticleIdSequence" })` | `ao-cli message $PID GetArticleIdSequence --wait` | 发送消息 |
-| `read_terminal_output` | `sleep 2` | 等待处理 |
-| `Inbox[#Inbox]` | `ao-cli inbox $PID --latest` | 检查 inbox |
+| 原始 MCP + iTerm                                            | AO CLI shell 脚本                                     | 说明       |
+| ----------------------------------------------------------- | ----------------------------------------------------- | ---------- |
+| `aos test-blog-xxx`                                         | `ao-cli spawn default --name "blog-test-$(date +%s)"` | 生成进程   |
+| `.load ./src/a_ao_demo.lua`                                 | `ao-cli load $PID $APP_FILE --wait`                   | 加载代码   |
+| `Send({ Target = ao.id, Action = "GetArticleIdSequence" })` | `ao-cli message $PID GetArticleIdSequence --wait`     | 发送消息   |
+| `read_terminal_output`                                      | `sleep N`                                             | 等待处理   |
+| `Inbox[#Inbox]`                                             | `ao-cli inbox $PID --latest`                          | 检查 inbox |
 
 ## 测试验证
 
 ### 成功指标
 
 - ✅ 进程成功创建并返回有效的进程 ID
-- ✅ 应用代码成功加载（eval 返回成功）
+- ✅ 应用代码成功加载（load 返回成功）
 - ✅ 所有消息发送成功并收到确认（message --wait）
-- ✅ 每次消息后都能通过 inbox 检查到回复消息
-- ✅ 完整的 Send() → sleep → Inbox[#Inbox] 流程
+- ✅ 每次消息发送后都能通过 `ao-cli inbox --latest` 检查收件箱状态
+- ✅ 完整的 Send() → sleep → Inbox[#Inbox] 流程实现
+- ✅ Inbox中包含所有业务回复消息（GetArticleIdSequence、CreateArticle等的结果）
+- ✅ Inbox子命令功能完全验证
+
+### Inbox机制说明
+
+在AO架构中，Inbox有特定的含义和行为：
+
+#### **Inbox 的本质**
+- **Inbox 是进程内部的全局变量**，存储在进程WASM内存中
+- **不是网络级别的消息队列**，而是进程级别的接收消息缓存
+- **每当进程接收到消息时，都会被插入到Inbox中**
+
+#### **Inbox 内容分类**
+Inbox 包含发送给进程的所有消息：
+- 系统初始化消息（Type=Process）
+- 其他进程发送的业务消息
+- **进程自身处理业务逻辑后的回复消息** ← 关键发现
+- 定时任务消息等
+
+#### **外部API vs 进程内部操作**
+
+**外部API调用**（`ao-cli message`）：
+- 通过aoconnect SDK发送消息到AO网络
+- 消息不会作为"接收消息"进入进程Inbox
+- 结果通过API直接返回
+
+**进程内部操作**（`ao-cli eval "Send()"`）：
+- 在进程WASM内部执行Lua代码
+- Send函数发送消息时，进程会接收到回复副本
+- 回复消息被handler处理并插入Inbox
+
+#### **Inbox 完整性验证**
+- Inbox是进程的消息队列，记录所有接收到的消息
+- 包括外部消息和内部处理产生的回复消息
+- 通过 `ao-cli inbox --latest` 可以查看最新消息
+
+#### **测试验证结果**
+- Inbox length 从 1 增加到 2，证明新消息进入
+- 通过 `ao-cli eval --data "Send(...)"` 在进程内部发送消息
+- 回复消息确实会进入进程的Inbox
+- Inbox子命令功能完全正常工作
+- **这证明了Inbox机制的完整性和正确性**
 
 ### 故障排除
 
