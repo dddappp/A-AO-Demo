@@ -115,6 +115,20 @@ echo "   - 使用 ao-cli inbox --latest 检查收件箱状态和回复消息"
 echo "   - 验证消息处理结果是否正确进入Inbox"
 echo ""
 
+# 初始化步骤状态跟踪变量
+STEP_SUCCESS_COUNT=0
+STEP_TOTAL_COUNT=10
+STEP_1_SUCCESS=false
+STEP_2_SUCCESS=false
+STEP_3_SUCCESS=false
+STEP_4_SUCCESS=false
+STEP_5_SUCCESS=false
+STEP_6_SUCCESS=false
+STEP_7_SUCCESS=false
+STEP_8_SUCCESS=false
+STEP_9_SUCCESS=false
+STEP_10_SUCCESS=false
+
 # 执行测试
 START_TIME=$(date +%s)
 
@@ -154,20 +168,6 @@ echo ""
 # 设置等待时间（可以根据需要调整）
 WAIT_TIME="${AO_WAIT_TIME:-3}"
 echo "等待时间设置为: ${WAIT_TIME} 秒"
-
-# 初始化步骤状态跟踪变量
-STEP_SUCCESS_COUNT=0
-STEP_TOTAL_COUNT=10
-STEP_1_SUCCESS=false
-STEP_2_SUCCESS=false
-STEP_3_SUCCESS=false
-STEP_4_SUCCESS=false
-STEP_5_SUCCESS=false
-STEP_6_SUCCESS=false
-STEP_7_SUCCESS=false
-STEP_8_SUCCESS=false
-STEP_9_SUCCESS=false
-STEP_10_SUCCESS=false
 
 # 3. 获取文章序号
 echo "=== 步骤 3: 获取文章序号 ==="
