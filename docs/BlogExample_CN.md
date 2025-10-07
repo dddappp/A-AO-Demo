@@ -28,9 +28,9 @@
 在代码库的根目录执行：
 
 ```shell
-docker run \
+docker run --rm \
 -v .:/myapp \
-wubuku/dddappp-ao:master \
+wubuku/dddappp-ao:latest \
 --dddmlDirectoryPath /myapp/dddml \
 --boundedContextName A.AO.Demo \
 --aoLuaProjectDirectoryPath /myapp/src

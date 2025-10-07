@@ -289,9 +289,9 @@ but we don't intend to implement it ourselves, expecting "others" to implement i
 In repository root directory, run:
 
 ```shell
-docker run \
+docker run --rm \
 -v .:/myapp \
-wubuku/dddappp-ao:master \
+wubuku/dddappp-ao:latest \
 --dddmlDirectoryPath /myapp/dddml \
 --boundedContextName A.AO.Demo \
 --aoLuaProjectDirectoryPath /myapp/src
@@ -319,11 +319,11 @@ making sure you use the latest version of the image.
 
 ```shell
 # If you have already run it, you may need to Clean Up Exited Docker Containers first
-docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:master")
+docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:latest")
 # remove the image
-docker image rm wubuku/dddappp-ao:master
+docker image rm wubuku/dddappp-ao:latest
 # pull the image
-docker pull wubuku/dddappp-ao:master
+docker pull wubuku/dddappp-ao:latest
 ```
 
 ### Filling in the business logic

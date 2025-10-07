@@ -253,7 +253,7 @@ aos process_alice
 在代码库的根目录执行：
 
 ```shell
-docker run \
+docker run --rm \
 -v .:/myapp \
 wubuku/dddappp-ao:latest \
 --dddmlDirectoryPath /myapp/dddml \
@@ -273,6 +273,32 @@ wubuku/dddappp-ao:latest \
 
 执行完上面的命令后，你会在 `./src` 目录下看到 dddappp 工具为你生成的“成吨”的代码。
 
+---
+
+如果想要按 DDDML 模块生成多个 AO Lua 项目（进程）代码，参考文件 [dddml/configuration.yaml](./dddml/configuration.yaml) 进行配置。
+
+然后在代码库的根目录，启用 `enableMultipleAOLuaProjects` 选项生成代码：
+
+```shell
+docker run --rm \
+-v .:/myapp \
+wubuku/dddappp-ao:latest \
+--dddmlDirectoryPath /myapp/dddml \
+--boundedContextName A.AO.Demo \
+--aoLuaProjectDirectoryPath /myapp/src \
+--exposeBaseDddmlFiles \
+--enableMultipleAOLuaProjects
+```
+
+这将会为每个 DDDML 模块生成独立的 AO Lua 主文件：
+
+- **`inventory_item_main.lua`**：库存项目聚合进程，管理库存数据和操作
+- **`inventory_service_main.lua`**：库存服务进程，实现 Saga 协调器，编排跨进程业务流程
+- **`in_out_service_main.lua`**：出入库服务进程（抽象服务，由外部实现提供）
+- **`blog_main.lua`**：博客聚合进程，管理文章和评论数据
+- **`a_ao_demo_main.lua`**：默认模块进程，包含基础框架，目前是基本是个空文件。因为我们没有将有用的对象（聚合、服务）放到这个模块中。
+
+每个模块进程都是独立的 AO 进程，支持多进程并发执行和跨进程 Saga 事务。
 
 #### 更新 Docker 镜像
 
@@ -281,11 +307,11 @@ wubuku/dddappp-ao:latest \
 
 ```shell
 # If you have already run it, you may need to Clean Up Exited Docker Containers first
-docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:master")
+docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:latest")
 # remove the image
-docker image rm wubuku/dddappp-ao:master
+docker image rm wubuku/dddappp-ao:latest
 # pull the image
-docker pull wubuku/dddappp-ao:master
+docker pull wubuku/dddappp-ao:latest
 ```
 
 
@@ -593,7 +619,82 @@ Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action =
 Inbox[#Inbox]
 ```
 
-如果没有什么意外，这个 Saga 实例的执行状态应该是“已完成”。
+如果没有什么意外，这个 Saga 实例的执行状态应该是"已完成"。
+
+
+### 使用分模块进程进行多进程测试
+
+如果启用了 `--enableMultipleAOLuaProjects` 选项生成了分模块代码，可以按照以下方式进行真正的多进程测试：
+
+#### 1. 启动多个 AO 进程
+
+为每个模块启动独立的 AO 进程：
+
+```bash
+# 终端 1: 启动库存聚合进程
+aos process_inventory_item
+.load src/inventory_item_main.lua
+
+# 终端 2: 启动出入库服务进程（使用mock实现）
+aos process_in_out_service
+.load src/in_out_service_mock.lua  # 注意：这里需要先加载mock代码
+# .load src/in_out_service_main.lua
+
+# 终端 3: 启动库存服务进程（Saga协调器）
+aos process_inventory_service
+.load src/inventory_service_main.lua
+
+# 终端 4: 启动博客进程
+# aos process_blog
+# .load src/blog_main.lua
+```
+
+#### 2. 配置进程间通信
+
+在 `inventory_service_config.lua` 中配置各模块进程的目标地址：
+
+```lua
+return {
+    inventory_item = {
+        get_target = function()
+            return "INVENTORY_ITEM_PROCESS_ID"  -- 库存聚合进程ID
+        end,
+    },
+    in_out = {
+        get_target = function()
+            return "IN_OUT_SERVICE_PROCESS_ID"  -- 出入库服务进程ID
+        end,
+    }
+}
+```
+
+#### 3. 执行跨进程 Saga 测试
+
+在库存服务进程中启动 Saga：
+
+```lua
+Send({ Target = "INVENTORY_SERVICE_PROCESS_ID", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "test", quantity = 100 }) })
+```
+
+Saga 将自动跨进程调用：
+1. **InventoryService进程** → **InventoryItem进程**：查询库存状态
+2. **InventoryService进程** → **InOutService进程**：创建出入库单
+3. **InventoryService进程** → **InventoryItem进程**：添加库存条目
+4. **InventoryService进程** → **InOutService进程**：完成出入库单
+
+#### 4. 验证多进程执行
+
+检查各进程的 Saga 状态：
+
+```lua
+# 在InventoryService进程中查看Saga状态
+Send({ Target = "INVENTORY_SERVICE_PROCESS_ID", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = 1 }) })
+
+# 在InventoryItem进程中查看库存变化
+Send({ Target = "INVENTORY_ITEM_PROCESS_ID", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "test" }) })
+```
+
+这种多进程架构展示了 DDDML 工具的强大能力：将复杂的业务逻辑分解为多个独立的、可协同工作的进程，实现真正的分布式架构。
 
 
 ## 延伸阅读

@@ -30,9 +30,9 @@ For developers with some experience in OOP (Object-Oriented Programming), what t
 In repository root directory, run:
 
 ```shell
-docker run \
+docker run --rm \
 -v .:/myapp \
-wubuku/dddappp-ao:master \
+wubuku/dddappp-ao:latest \
 --dddmlDirectoryPath /myapp/dddml \
 --boundedContextName A.AO.Demo \
 --aoLuaProjectDirectoryPath /myapp/src
