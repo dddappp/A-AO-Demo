@@ -1,22 +1,45 @@
+#%DDDML 0.1
+---
 configuration:
   sequenceNumber: 1000
-  boundedContextName: "A.AO.Demo"
-  metadata:
-    EventTypeDiscriminatorName: "EventType"
-    ServiceMethodMessagingCommandNameFormat: "{0}_{1}" # {ServiceName}_{MethodName}
+  # boundedContextName: "A.AO.Demo"
+  # metadata:
 
   defaultModule:
     name: "A.AO.Demo"
-    requiredModules: [ "InventoryItem", "InOutService", "InventoryService", "Blog" ]
+    requiredModules:
+      ["InventoryItem", "InOutService", "InventoryService", "Blog"]
   submodules:
     InventoryItem:
-      requiredModules: [ ]
+      requiredModules: []
     InOutService:
-      requiredModules: [ ]
+      requiredModules: []
     InventoryService:
-      requiredModules: [ "InventoryItem", "InOutService" ]
+      requiredModules: ["InventoryItem", "InOutService"]
     Blog:
-      requiredModules: [ ]
+      requiredModules: []
 
   ao:
     objectVersionPropertyName: Version
+    # NOTE: The `mainFileNameFormat` option sets the format for AO Lua Main file names.
+    # NOTE: 选项 `mainFileNameFormat` 用来设置 AO Lua Main 文件名的 format。
+    mainFileNameFormat: "{0}_main.lua"
+    # This can be left unset as it's the default value.
+    # 这里不设置为 `{0}_main.lua` 也可以，因为默认就是这个。
+    # Phase 1 of DDDML tool enhancement for generating code by module (process). When `EnableMultipleAOLuaProjects` is enabled,
+    # a Lua Main file will be generated for each module in the source directory. For this demo, it will generate:
+    # 改进 DDDML 工具支持*按模块生成项目（进程）代码*的第一阶段，在启用 `EnableMultipleAOLuaProjects` 选项时，
+    # 在生成的 Lua 源代码目录中，会为每个模块生成一个 Lua Main 文件。对于当前 Demo 来说，会生成：
+    # - a_ao_demo_main.lua
+    # - inventory_item_main.lua
+    # - in_out_service_main.lua
+    # - inventory_service_main.lua
+    # - blog_main.lua
+
+    # NOTE: The `mainFileName` option sets the AO Lua Main file name.
+    # NOTE: 选项 `mainFileName` 用来设置 AO Lua Main 文件名。
+    mainFileName: "a_ao_demo.lua"
+    # Can be left unset as it's the default (converted from boundedContextName to lowercase, dots to underscores).
+    # 也可以不设置，因为默认就是这个（从 boundedContextName 转换为小写，点号转换为下划线）
+    # Currently effective only when generating code without module separation (single process).
+    # 目前在*不分模块生成项目（进程）代码*时这个设置才会生效。

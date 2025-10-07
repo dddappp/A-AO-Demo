@@ -255,10 +255,11 @@ aos process_alice
 ```shell
 docker run \
 -v .:/myapp \
-wubuku/dddappp-ao:master \
+wubuku/dddappp-ao:latest \
 --dddmlDirectoryPath /myapp/dddml \
 --boundedContextName A.AO.Demo \
---aoLuaProjectDirectoryPath /myapp/src
+--aoLuaProjectDirectoryPath /myapp/src \
+--exposeBaseDddmlFiles
 ```
 
 上面的命令行参数实际上还是挺直白的：
