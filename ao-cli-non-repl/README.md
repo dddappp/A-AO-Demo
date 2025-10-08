@@ -1,4 +1,4 @@
-# AO CLI 非REPL模式 - 博客测试用例
+# AO CLI 非REPL模式
 
 > **⚠️ 重要更新**: AO CLI 工具已迁移到独立的代码库！
 >
@@ -18,22 +18,31 @@ AO CLI 工具已完全迁移到独立代码库，包含：
 
 ## 🏠 此目录内容
 
-此目录保留了原始的博客应用测试用例，供 A-AO-Demo 项目使用：
+此目录保留了 A-AO-Demo 项目的完整测试套件，包括博客应用测试和 SAGA 跨进程测试：
 
 ### 文件结构
 ```
 ao-cli-non-repl/
-├── README.md           # 此文档 - 迁移说明
+├── README.md           # 此文档 - 项目测试概览
 └── tests/
-    ├── README.md       # 博客测试用例详细文档
-    └── run-blog-tests.sh # 博客应用自动化测试脚本
+    ├── README.md       # 详细测试文档和使用指南
+    ├── run-blog-tests.sh   # 博客应用自动化测试脚本
+    └── run-saga-tests.sh   # SAGA跨进程自动化测试脚本 ⭐
 ```
 
-### 测试用例功能
-- 完整的博客应用端到端测试
+### 测试套件功能
+
+#### 博客应用测试
+- 完整的博客应用端到端测试（文章、评论、版本控制）
 - 精确重现 `AO-Testing-with-iTerm-MCP-Server.md` 文档流程
 - Send() → sleep → Inbox[#Inbox] 完整测试模式
-- 智能项目根目录检测和环境检查
+- Inbox机制验证和业务逻辑测试
+
+#### SAGA 跨进程测试 ⭐
+- 多进程架构下的分布式事务测试
+- 库存管理和 SAGA 模式实现验证
+- 跨进程消息传递和最终一致性保证
+- 动态配置和运行时参数设置
 
 ## 🚀 使用说明
 
@@ -54,23 +63,49 @@ npm link
 ao-cli --version
 ```
 
-### 在 A-AO-Demo 项目中使用测试用例
+### 在 A-AO-Demo 项目中运行测试
 
-此目录保留的测试用例专门用于测试当前项目的博客应用：
+此目录的测试套件专门用于验证 A-AO-Demo 项目的完整功能：
 
 ```bash
-# 使用保留的博客测试脚本
+# 博客应用测试 - 验证基础功能和Inbox机制
 ./ao-cli-non-repl/tests/run-blog-tests.sh
 
-# 查看测试文档
+# SAGA跨进程测试 - 验证分布式事务 ⭐
+./ao-cli-non-repl/tests/run-saga-tests.sh
+
+# 带自定义参数的测试
+AO_WAIT_TIME=5 AO_SAGA_WAIT_TIME=15 ./ao-cli-non-repl/tests/run-saga-tests.sh
+
+# 模拟运行（验证脚本逻辑）
+AO_DRY_RUN=true ./ao-cli-non-repl/tests/run-saga-tests.sh
+
+# 查看详细测试文档
 cat ./ao-cli-non-repl/tests/README.md
 ```
 
+#### 环境准备
+
+运行测试前请确保：
+- 安装了 AO CLI 工具（见上文）
+- A-AO-Demo 项目代码完整
+- aos 进程正在运行
+- 网络代理（如需要，详见脚本注释）
+
+#### 测试覆盖
+
+- ✅ **进程管理**: 自动生成、配置、清理 AO 进程
+- ✅ **代码加载**: 动态加载和验证 Lua 代码
+- ✅ **消息传递**: 进程内和跨进程消息传递
+- ✅ **Inbox机制**: Send() → sleep → Inbox[#Inbox] 完整流程
+- ✅ **业务逻辑**: 博客应用和库存管理功能
+- ✅ **分布式事务**: SAGA 模式和最终一致性
+- ✅ **错误处理**: 超时、重试和故障恢复
+
 ## 📋 测试用例说明
 
-### 博客应用测试流程
-
-保留的 `run-blog-tests.sh` 脚本实现了完整的博客应用测试：
+### 博客应用测试
+`run-blog-tests.sh` 脚本实现完整的博客应用功能测试：
 
 1. **生成 AO 进程** (`ao-cli spawn`)
 2. **加载博客应用代码** (`ao-cli load`)
@@ -81,13 +116,32 @@ cat ./ao-cli-non-repl/tests/README.md
 7. **更新正文** (`ao-cli message` + Inbox检查)
 8. **添加评论** (`ao-cli message` + Inbox检查)
 
-### Inbox 机制验证
+### SAGA 跨进程测试 ⭐
+`run-saga-tests.sh` 脚本实现多进程分布式事务测试：
 
-测试用例重点验证 AO 的 Inbox 机制：
-- Send() → sleep → Inbox[#Inbox] 完整流程
-- 进程内部消息发送会进入 Inbox
-- 外部 API 调用不会进入 Inbox
-- Inbox 子命令功能验证
+1. **生成聚合服务进程** (`ao-cli spawn`)
+2. **加载聚合和出入库服务代码** (`ao-cli load`)
+3. **生成业务服务进程** (`ao-cli spawn`)
+4. **加载业务服务代码** (`ao-cli load`)
+5. **动态配置进程间通信** (`ao-cli eval`)
+6. **创建测试数据** (`ao-cli message`)
+7. **执行 SAGA 事务** (`ao-cli eval`)
+8. **验证执行结果** (库存更新和事务状态)
+
+### 核心验证机制
+
+#### Inbox 机制
+- **Send() → sleep → Inbox[#Inbox]**: 完整的消息处理流程
+- **进程内部 vs 外部调用**: 区分 Inbox 填充行为
+- **Eval vs Message**: 不同的消息传递模式验证
+
+#### 跨进程架构
+- **动态配置**: 运行时设置进程间通信目标
+- **消息路由**: 自动的请求-响应匹配
+- **事务协调**: SAGA 模式的分布式事务处理
+- **最终一致性**: 跨进程状态同步验证
+
+**关键发现**: 通过 Eval 在进程内部执行 Send，且当回复消息没有被 Handler 处理时，才会进入进程的 Inbox。
 
 ## 📖 相关文档
 
@@ -95,6 +149,19 @@ cat ./ao-cli-non-repl/tests/README.md
 - **A-AO-Demo 项目**: 当前项目根目录的 README.md
 - **AO 官方文档**: https://ao.arweave.dev/
 
-## 🔗 迁移历史
+## 🔗 迁移历史和项目进展
 
-此目录原本包含完整的 AO CLI 工具实现，现已迁移至独立代码库以便更好地维护和发布。
+此目录原本包含完整的 AO CLI 工具实现，现已迁移至独立代码库。保留的测试套件专注于验证 A-AO-Demo 项目的核心功能，特别是复杂的分布式事务场景。
+
+### 最新进展
+- ✅ **SAGA 跨进程测试**: 新增完整的分布式事务自动化测试
+- ✅ **Inbox 机制验证**: 深度测试 AO 的消息处理机制
+- ✅ **多进程架构**: 验证跨进程通信和状态同步
+- ✅ **动态配置**: 运行时参数设置和环境适应性
+
+### 测试覆盖
+- **基础功能**: 博客应用、版本控制、乐观锁
+- **高级功能**: SAGA 模式、最终一致性、补偿事务
+- **系统特性**: Inbox 机制、多进程通信、错误处理
+
+这些测试确保 A-AO-Demo 项目作为 AO 平台复杂应用的参考实现。

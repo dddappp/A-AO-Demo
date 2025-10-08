@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# 注意：视环境不同，可能需要在运行脚本前设置网络代理，例如：
+# export HTTPS_PROXY=http://127.0.0.1:1235 HTTP_PROXY=http://127.0.0.1:1235 ALL_PROXY=socks5://127.0.0.1:1234
+
 echo "=== AO 博客应用自动化测试脚本 (使用 ao-cli 工具) ==="
 echo "基于 AO-Testing-with-iTerm-MCP-Server.md 文档的测试流程"
 echo "完整重现: Send() → sleep → Inbox[#Inbox] 的测试模式"
