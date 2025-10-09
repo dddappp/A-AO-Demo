@@ -8,12 +8,43 @@ local X_TAGS = {
     SAGA_ID = "X-SagaId",
 }
 
-local MESSAGE_PASS_THROUGH_TAGS = {
-    X_TAGS.SAGA_ID,
-}
+-- 将Saga信息嵌入Data中，以避免Tag在转发过程中丢失
+function messaging.embed_saga_info_in_data(data, saga_id, response_action)
+    local enhanced_data = data or {}
+    enhanced_data[messaging.X_TAGS.SAGA_ID] = saga_id
+    enhanced_data[messaging.X_TAGS.RESPONSE_ACTION] = response_action
+    return enhanced_data
+end
+
+-- 从Data中提取Saga信息
+function messaging.extract_saga_info_from_data(data)
+    if type(data) == "string" then
+        data = json.decode(data)
+    end
+    return data[messaging.X_TAGS.SAGA_ID], data[messaging.X_TAGS.RESPONSE_ACTION]
+end
+
+
+-- 🆕 DDDML改进：Saga信息访问函数
+-- 基于Data嵌入机制（唯一可靠的跨进程传递方式）
+function messaging.get_saga_id(msg)
+    -- 仅从Data中提取Saga信息（跨进程安全）
+    return messaging.extract_saga_info_from_data(msg.Data)
+end
+
+function messaging.get_response_action(msg)
+    -- 仅从Data中提取响应动作（跨进程安全）
+    local _, response_action = messaging.extract_saga_info_from_data(msg.Data)
+    return response_action
+end
+
+function messaging.get_no_response_required(msg)
+    -- 🆕 DDDML改进：从Data嵌入中提取（目前未使用，保留兼容性）
+    return nil  -- 目前没有在Data中嵌入no_response_required信息
+end
+
 
 messaging.X_TAGS = X_TAGS
-messaging.MESSAGE_PASS_THROUGH_TAGS = MESSAGE_PASS_THROUGH_TAGS
 
 local string_to_boolean_mappings = {
     ["true"] = true,
@@ -44,17 +75,25 @@ end
 
 function messaging.respond(status, result_or_error, request_msg)
     local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
+
+    -- 🆕 DDDML改进：使用Data嵌入的Saga信息访问
+    local saga_id = messaging.get_saga_id(request_msg)
+    local response_action = messaging.get_response_action(request_msg)
+
     local tags = {}
-    for _, tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
-        if request_msg.Tags[tag] then
-            tags[tag] = request_msg.Tags[tag]
-        end
+    if response_action then
+        tags["Action"] = response_action
     end
-    if request_msg.Tags[X_TAGS.RESPONSE_ACTION] then
-        tags["Action"] = request_msg.Tags[X_TAGS.RESPONSE_ACTION]
+
+    -- 如果有Saga信息，将其嵌入响应Data中
+    if saga_id then
+        data = messaging.embed_saga_info_in_data(data, saga_id, response_action)
     end
+
+    -- 🆕 DDDML改进：在单进程SAGA中，响应消息发送到当前进程而不是原始发送者
+    -- 这确保了Saga的各步骤都在同一进程内协调完成
     ao.send({
-        Target = request_msg.From,
+        Target = ao.id,  -- 总是发送到当前进程，确保单进程SAGA正常工作
         Data = json.encode(data),
         Tags = tags
     })
@@ -64,7 +103,8 @@ function messaging.handle_response_based_on_tag(status, result_or_error, commit,
     if status then
         commit()
     end
-    if (not messaging.convert_to_boolean(request_msg.Tags[X_TAGS.NO_RESPONSE_REQUIRED])) then
+    -- 🆕 DDDML改进：使用多层次Tag访问函数
+    if (not messaging.convert_to_boolean(messaging.get_no_response_required(request_msg))) then
         messaging.respond(status, result_or_error, request_msg)
     else
         if not status then

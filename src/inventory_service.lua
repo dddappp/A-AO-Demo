@@ -77,24 +77,25 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
             context, -- cmd as context
             {
                 from = msg.From,
-                response_action = msg.Tags[messaging.X_TAGS.RESPONSE_ACTION],
-                no_response_required = msg.Tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED],
+                response_action = messaging.get_response_action(msg),
+                no_response_required = messaging.get_no_response_required(msg),
             },
             0
         )
-        local saga_id = saga_instance.saga_id
-        local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
-        tags[messaging.X_TAGS.SAGA_ID] = tostring(saga_id)
-        tags[messaging.X_TAGS.RESPONSE_ACTION] = ACTIONS
-            .PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK
-        return request, commit
+            local saga_id = saga_instance.saga_id
+            local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
+            -- 将Saga信息嵌入Data中而不是Tag中，以避免在转发过程中丢失
+            request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
+            return request, commit
     end))
 
     messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback(msg, env, response)
-    local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
+    -- 🆕 DDDML改进：使用多层次Tag访问函数
+    local saga_id_str = messaging.get_saga_id(msg)
+    local saga_id = tonumber(saga_id_str)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 1 or saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -143,7 +144,9 @@ end
 function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback(
     msg, env, response
 )
-    local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
+    -- 🆕 DDDML改进：使用Data嵌入的Saga信息访问
+    local saga_id_str = messaging.get_saga_id(msg)
+    local saga_id = tonumber(saga_id_str)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 2 or not saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -189,7 +192,8 @@ end
 
 
 function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_callback(msg, env, response)
-    local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
+    -- 🆕 DDDML改进：使用多层次Tag访问函数
+    local saga_id = tonumber(messaging.get_saga_id(msg))
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 2 or saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -254,7 +258,8 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_add_inventory_item_entry_callback(msg, env, response)
-    local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
+    -- 🆕 DDDML改进：使用多层次Tag访问函数
+    local saga_id = tonumber(messaging.get_saga_id(msg))
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 4 or saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -322,7 +327,8 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback(msg, env, response)
-    local saga_id = tonumber(msg.Tags[messaging.X_TAGS.SAGA_ID])
+    -- 🆕 DDDML改进：使用多层次Tag访问函数
+    local saga_id = tonumber(messaging.get_saga_id(msg))
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 6 or saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
