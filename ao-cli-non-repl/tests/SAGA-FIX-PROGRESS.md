@@ -22,21 +22,25 @@ Data = "{"result":{"version":0,"quantity":100,"inventory_item_id":{"location":"y
 
 测试呈现出来的问题是：
 因为尝试使用消息的 Tags 来传递的 Saga 信息发生丢失（被 ao 新版本过滤掉了），导致 Saga 无法推进到下一步。
-比如，如果回复的消息的 Action 丢失，就会导致无法触发（接收消息的进程中的） handler 的处理逻辑，而未被处理的消息就会出现在 Inbox 中。
-
-我们在 @SAGA-TECHNICAL-ANALYSIS.md 中分析了这个问题。
-所以才导致了本次任务的一系列的代码修改——尝试使用在消息的 Data 中嵌入 Saga 消息以代替在 Tags 中包含 Saga 信息的“旧做法”。
+比如，如果回复的消息中没有 Action 信息，就会导致无法触发（接收消息的进程中的） handler 的处理逻辑，而未被处理的消息就会出现在 Inbox 中。
 
 > NOTE：如果要想让消息出现在一个进程 Inbox 里，可以在该进程（我们后面称之为“原进程”）内用 eval 的方式来发送消息。
 > 这样收到消息的进程就会从消息的 From 字段中看到发送消息的进程 ID，然后将执行结果回复给这个 ID 指向的进程。
 > 如果收到消息的进程（原进程）没有 handler 可以处理消息，消息就会出现在原进程的 Inbox 中。
 > 可以查看示例 @ao-cli-non-repl/tests/run-blog-tests.sh
 
+我们在 @SAGA-TECHNICAL-ANALYSIS.md 中分析了这个问题。
+所以才导致了本次任务的一系列的代码修改——尝试使用在消息的 Data 中嵌入 Saga 消息以代替在 Tags 中包含 Saga 信息的“旧做法”。
+
 综上所述：
 - **原始状态**: README_CN.md描述的alice-bob两进程SAGA测试曾经通过
 - **当前问题**: AO版本更新后，Tag过滤机制导致SAGA无法推进
 - **核心原因**: 自定义Tag（如X-SagaId）在跨进程传递时被AO系统过滤
 - **解决方案**: 使用Data嵌入替代Tag传递Saga信息
+
+实现过程中我们需要注意两个关键点：
+- Saga ID（`X-SagaID`）是否在 Saga 的执行过程中是否被正确“维护”（没有中途丢失）？
+- 接收消息的进程是否可以获取到“回复消息的 Action”（`X-ResponseAction`），以及在发送回复消息时是否正确设置了 Action？
 
 ## 🔍 关键发现记录
 
