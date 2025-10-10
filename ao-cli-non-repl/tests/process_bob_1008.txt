@@ -1,0 +1,157 @@
+Last login: Wed Oct  8 18:40:02 on ttys098
+(base) yangjiefeng@yangjiefengdeMac-Mini ~ % export HTTPS_PROXY=http://127.0.0.1:1235  HTTP_PROXY=http://127.0.0.1:1235  ALL_PROXY=socks5://127.0.0.1:1234
+
+(base) yangjiefeng@yangjiefengdeMac-Mini ~ % aos process_bob_1008  
+          _____                   _______                   _____          
+         /\    \                 /::\    \                 /\    \         
+        /::\    \               /::::\    \               /::\    \        
+       /::::\    \             /::::::\    \             /::::\    \       
+      /::::::\    \           /::::::::\    \           /::::::\    \      
+     /:::/\:::\    \         /:::/~~\:::\    \         /:::/\:::\    \     
+    /:::/__\:::\    \       /:::/    \:::\    \       /:::/__\:::\    \    
+   /::::\   \:::\    \     /:::/    / \:::\    \      \:::\   \:::\    \   
+  /::::::\   \:::\    \   /:::/____/   \:::\____\   ___\:::\   \:::\    \  
+ /:::/\:::\   \:::\    \ |:::|    |     |:::|    | /\   \:::\   \:::\    \ 
+/:::/  \:::\   \:::\____\|:::|____|     |:::|    |/::\   \:::\   \:::\____\
+\::/    \:::\  /:::/    / \:::\    \   /:::/    / \:::\   \:::\   \::/    /
+ \/____/ \:::\/:::/    /   \:::\    \ /:::/    /   \:::\   \:::\   \/____/ 
+          \::::::/    /     \:::\    /:::/    /     \:::\   \:::\    \     
+           \::::/    /       \:::\__/:::/    /       \:::\   \:::\____\    
+           /:::/    /         \::::::::/    /         \:::\  /:::/    /    
+          /:::/    /           \::::::/    /           \:::\/:::/    /     
+         /:::/    /             \::::/    /             \::::::/    /      
+        /:::/    /               \::/____/               \::::/    /       
+        \::/    /                 ~~                      \::/    /        
+         \/____/                                           \/____/         
+                                                                           
+Welcome to AOS: Your operating system for AO, the decentralized open access supercomputer.
+Type ".load-blueprint chat" to join the community chat and ask questions!
+✔ Please select › aos
+
+AOS Client Version: 2.0.9. 2025
+Type "Ctrl-C" twice to exit
+
+Your AOS process:  cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg
+
+
+process_bob_1008@aos-2.0.4[Inbox:1]> .load /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/a_ao_demo.lua
+Loading...  /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/a_ao_demo.lua
+
+The following files will be deployed:
+/Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src
+├── entity_coll.lua
+├── messaging.lua
+├── saga.lua
+├── article_comment_id.lua
+├── inventory_attribute_set.lua
+├── inventory_item_id.lua
+├── article.lua
+├── article_update_body_logic.lua
+├── article_create_logic.lua
+├── article_update_logic.lua
+├── article_add_comment_logic.lua
+├── article_update_comment_logic.lua
+├── article_remove_comment_logic.lua
+├── comment_coll.lua
+├── article_aggregate.lua
+├── inventory_item.lua
+├── inventory_item_add_inventory_item_entry_logic.lua
+├── inventory_item_aggregate.lua
+├── saga_messaging.lua
+├── inventory_service_local.lua
+├── inventory_service_config.lua
+├── inventory_service.lua
+└── a_ao_demo.lua  MAIN 
+{
+  data: '',
+  test: '{}',
+  prompt: '\x1B[32mprocess_bob_1008\x1B[90m@\x1B[34maos-2.0.4\x1B[90m[Inbox:\x1B[31m1\x1B[90m]\x1B[0m> '
+}
+process_bob_1008@aos-2.0.4[Inbox:1]> INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg"
+{
+  data: '',
+  test: '{}',
+  prompt: '\x1B[32mprocess_bob_1008\x1B[90m@\x1B[34maos-2.0.4\x1B[90m[Inbox:\x1B[31m1\x1B[90m]\x1B[0m> '
+}
+process_bob_1008@aos-2.0.4[Inbox:1]> INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg"
+{
+  data: '',
+  test: '{}',
+  prompt: '\x1B[32mprocess_bob_1008\x1B[90m@\x1B[34maos-2.0.4\x1B[90m[Inbox:\x1B[31m1\x1B[90m]\x1B[0m> '
+}
+process_bob_1008@aos-2.0.4[Inbox:1]> INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID
+M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg
+process_bob_1008@aos-2.0.4[Inbox:1]> INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID
+M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg
+process_bob_1008@aos-2.0.4[Inbox:1]> json = require("json")
+{
+  data: '',
+  test: '{}',
+  prompt: '\x1B[32mprocess_bob_1008\x1B[90m@\x1B[34maos-2.0.4\x1B[90m[Inbox:\x1B[31m1\x1B[90m]\x1B[0m> '
+}
+
+New Message From M20...jpg: Data = {"result":{"version"
+process_bob_1008@aos-2.0.4[Inbox:2]> Inbox[#Inbox]
+{
+   Epoch = 0,
+   Cron = false,
+   Anchor = "00000000000000000000000000000004",
+   Timestamp = 1759922161272,
+   Read-Only = false,
+   Hash-Chain = "w1P9tkfM3ZiDqlMt6A9uXLVcRa8WCHZfU3WUWBb4fFI",
+   forward = function: 0x4123180,
+   Nonce = 9,
+   TagArray = {
+    {
+       value = "ao.TN.1",
+       name = "Variant"
+    },
+    {
+       value = "4",
+       name = "Reference"
+    },
+    {
+       value = "ao",
+       name = "Data-Protocol"
+    },
+    {
+       value = "Message",
+       name = "Type"
+    },
+    {
+       value = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg",
+       name = "From-Process"
+    },
+    {
+       value = "ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s",
+       name = "From-Module"
+    },
+    {
+       value = "0N6GPOHYPPH3GHQH7UJht4dpuqw4iITEQcNncaSo5ak",
+       name = "Pushed-For"
+    }
+   },
+   Id = "spsgxutNq5-rocP3ykXkV49iWP9hcAwAxEX3HtDG36A",
+   Data = "{"result":{"version":0,"quantity":100,"inventory_item_id":{"location":"y","product_id":1},"entries":[{"movement_quantity":100}]}}",
+   reply = function: 0x4123100,
+   Pushed-For = "0N6GPOHYPPH3GHQH7UJht4dpuqw4iITEQcNncaSo5ak",
+   Reference = "4",
+   Owner = "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY",
+   Tags = {
+     From-Process = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg",
+     Reference = "4",
+     Variant = "ao.TN.1",
+     Pushed-For = "0N6GPOHYPPH3GHQH7UJht4dpuqw4iITEQcNncaSo5ak",
+     Type = "Message",
+     From-Module = "ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s",
+     Data-Protocol = "ao"
+  },
+   Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg",
+   Block-Height = 1769768,
+   From = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg",
+   Signature = "RJj0auX_5_jxn2i78EIYzRW3-628fWm2qO6d_QbAxqjsQ53Rubo8CJajiF1qC0ah5SepQ5R94YStWdIAzfto1INjwSYsfyVrZH5Bc_Nf8bVlr-Vj6Q02wt_s6L9ZrHZhMcnQaD5DLhtmLNvbe0ZhRk6spjVR9xCk8XNGWHfQCmWTvD5i1bVvWKGAx-lrbXfdXBpM0uVUQ5B4x1aT86JrH2Ca-T0cxE-IS2VvTep6Ib8OTn3dUAnjBgA6i6Bh3bthrzE4yL6c8NIW1UicgPXyKgeKkSLSn1Rs8tYiS3LBYq82tNPkel4rIj37dC7cxq9lt8JnFCuDiIA9BMRrNV-DNZM9Mk8fag4_q9hAa77QAH_l8e7eqsAQO4GejrVcwuh5hFmOqaCBXznVXPKILXqClTSLAhkVSnjZgUkOU6Vz-giNmmaU2yrbo3izFMmLlmj3yfE959NJbLBP0H0ktlFDQ4aXAVbeIR6jIKAFoeE3ObijLn3913In2eilS6QoiXhJFHQWGtyTv2N38XCtsbBFEjGvOo3Ci8WcivGK0dCPz3cJVjRWyFusE67s5Z5QcP-0gL6nlskPqDaPmJP_QWgZSHzCipi0O9qNx4eEfj6MZ4JrB_LCx-NPeKCzepEhOqYV3q6qORJvWtLVaAUNGSEtHhAibAvL7eCUFdxs5fpFq_c",
+   Forwarded-By = "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY"
+}
+
+
+process_bob_1008@aos-2.0.4[Inbox:2]> 

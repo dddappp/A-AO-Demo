@@ -1,0 +1,309 @@
+Last login: Wed Oct  8 18:40:15 on ttys099
+(base) yangjiefeng@yangjiefengdeMac-Mini ~ % export HTTPS_PROXY=http://127.0.0.1:1235  HTTP_PROXY=http://127.0.0.1:1235  ALL_PROXY=socks5://127.0.0.1:1234
+
+(base) yangjiefeng@yangjiefengdeMac-Mini ~ % aos process_alice_1008
+          _____                   _______                   _____          
+         /\    \                 /::\    \                 /\    \         
+        /::\    \               /::::\    \               /::\    \        
+       /::::\    \             /::::::\    \             /::::\    \       
+      /::::::\    \           /::::::::\    \           /::::::\    \      
+     /:::/\:::\    \         /:::/~~\:::\    \         /:::/\:::\    \     
+    /:::/__\:::\    \       /:::/    \:::\    \       /:::/__\:::\    \    
+   /::::\   \:::\    \     /:::/    / \:::\    \      \:::\   \:::\    \   
+  /::::::\   \:::\    \   /:::/____/   \:::\____\   ___\:::\   \:::\    \  
+ /:::/\:::\   \:::\    \ |:::|    |     |:::|    | /\   \:::\   \:::\    \ 
+/:::/  \:::\   \:::\____\|:::|____|     |:::|    |/::\   \:::\   \:::\____\
+\::/    \:::\  /:::/    / \:::\    \   /:::/    / \:::\   \:::\   \::/    /
+ \/____/ \:::\/:::/    /   \:::\    \ /:::/    /   \:::\   \:::\   \/____/ 
+          \::::::/    /     \:::\    /:::/    /     \:::\   \:::\    \     
+           \::::/    /       \:::\__/:::/    /       \:::\   \:::\____\    
+           /:::/    /         \::::::::/    /         \:::\  /:::/    /    
+          /:::/    /           \::::::/    /           \:::\/:::/    /     
+         /:::/    /             \::::/    /             \::::::/    /      
+        /:::/    /               \::/____/               \::::/    /       
+        \::/    /                 ~~                      \::/    /        
+         \/____/                                           \/____/         
+                                                                           
+Welcome to AOS: Your operating system for AO, the decentralized open access supercomputer.
+Type ".load-blueprint chat" to join the community chat and ask questions!
+
+AOS Client Version: 2.0.9. 2025
+Type "Ctrl-C" twice to exit
+
+Your AOS process:  M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg
+
+
+process_alice_1008@aos-2.0.4[Inbox:1]> .load /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/a_ao_demo.lua
+Loading...  /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/a_ao_demo.lua
+
+The following files will be deployed:
+/Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src
+├── entity_coll.lua
+├── messaging.lua
+├── saga.lua
+├── article_comment_id.lua
+├── inventory_attribute_set.lua
+├── inventory_item_id.lua
+├── article.lua
+├── article_update_body_logic.lua
+├── article_create_logic.lua
+├── article_update_logic.lua
+├── article_add_comment_logic.lua
+├── article_update_comment_logic.lua
+├── article_remove_comment_logic.lua
+├── comment_coll.lua
+├── article_aggregate.lua
+├── inventory_item.lua
+├── inventory_item_add_inventory_item_entry_logic.lua
+├── inventory_item_aggregate.lua
+├── saga_messaging.lua
+├── inventory_service_local.lua
+├── inventory_service_config.lua
+├── inventory_service.lua
+└── a_ao_demo.lua  MAIN 
+{
+  data: '',
+  test: '{}',
+  prompt: '\x1B[32mprocess_alice_1008\x1B[90m@\x1B[34maos-2.0.4\x1B[90m[Inbox:\x1B[31m1\x1B[90m]\x1B[0m> '
+}
+process_alice_1008@aos-2.0.4[Inbox:1]> .load /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/in_out_service_mock.lua
+Loading...  /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/in_out_service_mock.lua
+
+The following files will be deployed:
+/Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src
+├── messaging.lua
+└── in_out_service_mock.lua  MAIN 
+{
+  data: '',
+  test: '{}',
+  prompt: '\x1B[32mprocess_alice_1008\x1B[90m@\x1B[34maos-2.0.4\x1B[90m[Inbox:\x1B[31m1\x1B[90m]\x1B[0m> '
+}
+process_alice_1008@aos-2.0.4[Inbox:1]> Send({ Target = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "y" }, movement_quantity = 100}) })
+
+
+
+error:
+attempt to index a nil value (global 'json')
+   |
+ 1 |    Send({ Target = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "y" }, movement_quantity = 100}) })
+   |
+This error occurred while aos was evaluating the submitted code.
+process_alice_1008@aos-2.0.4[Inbox:1]> json = require("json")
+{
+  data: '',
+  test: '{}',
+  prompt: '\x1B[32mprocess_alice_1008\x1B[90m@\x1B[34maos-2.0.4\x1B[90m[Inbox:\x1B[31m1\x1B[90m]\x1B[0m> '
+}
+process_alice_1008@aos-2.0.4[Inbox:1]> Send({ Target = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "y" }, movement_quantity = 100}) })
+{
+   onReply = function: 0x4102e40,
+   receive = function: 0x417d1c0,
+   output = "Message added to outbox"
+}
+
+New Message From M20...jpg: Data = {"result":{"movement
+process_alice_1008@aos-2.0.4[Inbox:2]> Inbox[#Inbox]
+{
+   Epoch = 0,
+   Cron = false,
+   Anchor = "00000000000000000000000000000002",
+   Timestamp = 1759921809956,
+   Read-Only = false,
+   Hash-Chain = "cVyY8SjifoftYEWqJrRZSXrDxvrPpydtJ72TRQ_5nlY",
+   forward = function: 0x40e0480,
+   Nonce = 8,
+   TagArray = {
+    {
+       value = "ao.TN.1",
+       name = "Variant"
+    },
+    {
+       value = "2",
+       name = "Reference"
+    },
+    {
+       value = "ao",
+       name = "Data-Protocol"
+    },
+    {
+       value = "Message",
+       name = "Type"
+    },
+    {
+       value = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg",
+       name = "From-Process"
+    },
+    {
+       value = "ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s",
+       name = "From-Module"
+    },
+    {
+       value = "DFU-bkQ-7uCrNvG-ZoI8iU3EHm_LQXDFpkAdOgitsbE",
+       name = "Pushed-For"
+    }
+   },
+   Id = "xpE47fomMEt5das7Av_CYyQFeHqGCmgGHMLGgJmJzYU",
+   Data = "{"result":{"movement_quantity":100,"event_type":"InventoryItemEntryAdded","inventory_item_id":{"location":"y","product_id":1}}}",
+   reply = function: 0x40e0400,
+   Pushed-For = "DFU-bkQ-7uCrNvG-ZoI8iU3EHm_LQXDFpkAdOgitsbE",
+   Reference = "2",
+   Owner = "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY",
+   Tags = {
+     From-Process = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg",
+     Reference = "2",
+     Variant = "ao.TN.1",
+     Pushed-For = "DFU-bkQ-7uCrNvG-ZoI8iU3EHm_LQXDFpkAdOgitsbE",
+     Type = "Message",
+     From-Module = "ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s",
+     Data-Protocol = "ao"
+  },
+   Target = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg",
+   Block-Height = 1769766,
+   From = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg",
+   Signature = "N7yOXdcAPSKNfEaxnio1fNd5wbjCPNxD-lT0hFMNyPtaSKdVpcPU0JQthc-B6yf27KBTs7cNdGu7ZFMoyq305-FR5JbIBx96-mF_XkOL97xuG4ncRf6XdsAxqORqsqr9yyPyHVcm_3LgZC7fm1He9_RbNmYiYLWNaFpaXU2QNZRiavEGGzMfgpfZ6r4yyAE3BkMjgBMdGr_BzNzUusltw0OLpP_4iFUCtrhcn5FFUv8r16_mFEEoiKvRUJcROkdicVRpDsIGihGlkvptTrQY3Sti14K3komhBTOtyEmomgOssHg3OzrRV2t-iL2sxTmEgwHLzkcNmpO00xEfVOzgZnL96UAAjnT6gHJkipPmIJv6pXp1V4hKzIgGuSc9F5qvJfB7inZOpUPYn4NfbJo5jvcOAvbsLA25hSWS-tWix1Uqf0R80iyjEgQc35rkjmnApyrk1pmECU2YZJ1YH7-i0ZTGy0-KGtFLu6uUuUFwu8d_cdwnUHl7aGudkJ2Vzo-l9MHvSSjwKqio-5rKt_qze1GdN7ouAkC7u-Y_iP0MgTbzs2EheWqy8qmrBp5mDLFvfora2aUQePDgnf0uytN9w9yLIiqPMidqtxOzO1P1c4IPowOul6ZKN9Ig4G-PdmiHTalD5u_YseQzBKuT5BaXJR5xt5Mz9YczePlRj3HQrOI",
+   Forwarded-By = "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY"
+}
+process_alice_1008@aos-2.0.4[Inbox:2]> Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "y", quantity = 119 }) })
+{
+   onReply = function: 0x41304c0,
+   receive = function: 0x41a0340,
+   output = "Message added to outbox"
+}
+
+process_alice_1008@aos-2.0.4[Inbox:2]> Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetSagaIdSequence" } })
+{
+   onReply = function: 0x420d4a0,
+   receive = function: 0x41cf2e0,
+   output = "Message added to outbox"
+}
+New Message From cDS...QOg: Data = {"result":[1]}
+process_alice_1008@aos-2.0.4[Inbox:3]> Inbox[#Inbox]
+{
+   Epoch = 0,
+   Cron = false,
+   Anchor = "00000000000000000000000000000002",
+   Timestamp = 1759922509552,
+   Read-Only = false,
+   Hash-Chain = "C0NAmvf4CyTeZ0RyZWxvla1q5exCM8QaADm_nWvBcXA",
+   forward = function: 0x412a360,
+   Nonce = 13,
+   TagArray = {
+    {
+       value = "ao.TN.1",
+       name = "Variant"
+    },
+    {
+       value = "2",
+       name = "Reference"
+    },
+    {
+       value = "ao",
+       name = "Data-Protocol"
+    },
+    {
+       value = "Message",
+       name = "Type"
+    },
+    {
+       value = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg",
+       name = "From-Process"
+    },
+    {
+       value = "ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s",
+       name = "From-Module"
+    },
+    {
+       value = "wxu5R64VWJfmSyvJxkVVdS1L1nY5v4cbTLBbLUI9vA4",
+       name = "Pushed-For"
+    }
+   },
+   Id = "1y-OvFVu_Ro59V-gNVPQb83KKGUn9Y0AJaxJSfKznLo",
+   Data = "{"result":[1]}",
+   reply = function: 0x412a320,
+   Pushed-For = "wxu5R64VWJfmSyvJxkVVdS1L1nY5v4cbTLBbLUI9vA4",
+   Reference = "2",
+   Owner = "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY",
+   Tags = {
+     From-Process = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg",
+     Reference = "2",
+     Variant = "ao.TN.1",
+     Pushed-For = "wxu5R64VWJfmSyvJxkVVdS1L1nY5v4cbTLBbLUI9vA4",
+     Type = "Message",
+     From-Module = "ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s",
+     Data-Protocol = "ao"
+  },
+   Target = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg",
+   Block-Height = 1769768,
+   From = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg",
+   Signature = "b36AN7vPCnttm3OqEoV6nxTvvm10FTr28MV0zaHCxWVJ4bfOeul49kYKg6-Ni14NFT5O19CjCQbrg4rLMBnL40SUYPWtK78KN9Es5FLmLAgUSu8Nc7cLt54-wLYpGZAAjAXoaAbiiZMAoi9s3-qvo7OCiekbd-U-cSycmWS51SIxHXitQbREVWmIQaWhSo4xiKFTQEBJf2yrJW1vIwwLEGUmKWHMlgE5ddV-jK7AO8aGMwVC9vzGGk-DjobkcQ_WUiranKaO8Rv8ozT6qtHs-wRHlH-8RJzictbfZJYfXIfQJX68i2RuaGVhEZqcRXpJVF5Mzu1-piV2Js8VwfL0BCNA6QRX7X24kGRno_spju9zvNCMCA5PFLehCoWTmefVqr640A7lQRU4LZiCO67cHzLwe1r7IzIMiU8wTBKUCcDS4yLLV2rOtQTIM3wt4OCVrHV0zJgGywylYujJ3k-cXzgrSD5CImZPKhpAzT_5Cxb6vVGNNa0bbkwfp6O3oPtnRqMze_DgxXdmA3MuttePiLzyjS6TB68GLXyt2SwNzdJMMEmk4VLwskwcVRQQNCpr4xZ6i2lvvnRz1PDVV2ZFTS9n-hc3X0yVjsKPt08LdYszPFudQN2EJi3KM2xBP-9jqm5NdtnBiNReUHAHciaC8wdGRVyJ9ef9cv76AMjKQ3s",
+   Forwarded-By = "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY"
+}
+process_alice_1008@aos-2.0.4[Inbox:3]> Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = 1 }) })
+{
+   onReply = function: 0x419b600,
+   receive = function: 0x4119180,
+   output = "Message added to outbox"
+}
+New Message From cDS...QOg: Data = {"result":{"saga_id"
+process_alice_1008@aos-2.0.4[Inbox:4]> Inbox[#Inbox]
+{
+   Epoch = 0,
+   Cron = false,
+   Anchor = "00000000000000000000000000000003",
+   Timestamp = 1759923219552,
+   Read-Only = false,
+   Hash-Chain = "YRw-AK4MkzwBMAz1-UDA-lUj6KD8KiBN3NrnThrwdaY",
+   forward = function: 0x4119520,
+   Nonce = 16,
+   TagArray = {
+    {
+       value = "ao.TN.1",
+       name = "Variant"
+    },
+    {
+       value = "3",
+       name = "Reference"
+    },
+    {
+       value = "ao",
+       name = "Data-Protocol"
+    },
+    {
+       value = "Message",
+       name = "Type"
+    },
+    {
+       value = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg",
+       name = "From-Process"
+    },
+    {
+       value = "ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s",
+       name = "From-Module"
+    },
+    {
+       value = "WmzME8PMjzOjRQNU-0iU5K7GbcmbXekMK8RR7ta5FSw",
+       name = "Pushed-For"
+    }
+   },
+   Id = "-a7p1HDBr2C6AAnRc8gT4siOdFLU3W6RdmO0u5ci9gw",
+   Data = "{"result":{"saga_id":1,"current_step":1,"saga_type":"InventoryService_ProcessInventorySurplusOrShortage","participants":[[{"target":"M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg","tags":{"X-SagaId":"1","X-ResponseAction":"InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback","Action":"GetInventoryItem"}}]],"original_message":{"from":"M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg"},"completed":false,"context":{"inventory_item_id":{"location":"y","product_id":1},"product_id":1,"location":"y","quantity":119},"compensations":[],"compensating":false}}",
+   reply = function: 0x4206600,
+   Pushed-For = "WmzME8PMjzOjRQNU-0iU5K7GbcmbXekMK8RR7ta5FSw",
+   Reference = "3",
+   Owner = "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY",
+   Tags = {
+     From-Process = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg",
+     Reference = "3",
+     Variant = "ao.TN.1",
+     Pushed-For = "WmzME8PMjzOjRQNU-0iU5K7GbcmbXekMK8RR7ta5FSw",
+     Type = "Message",
+     From-Module = "ISShJH1ij-hPPt9St5UFFr_8Ys3Kj5cyg7zrMGt7H9s",
+     Data-Protocol = "ao"
+  },
+   Target = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg",
+   Block-Height = 1769773,
+   From = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg",
+   Signature = "eeKZOb9pobtFqyDuZ9VjnzaDrV3VkcgEs86cOeD1MycWe3KMILzal9dAA8xU05SOvDipI-NynOISTU-Y8frznL-cGibjmgGAxqeY_8eefrVBL6STFYx8AgyiaN5VtyJsyVIgoKMIKzbz_TFpymPD7n3msncr7uD8owQm7zXQfgHp_KmlEe4THrd0Yq1W0yk11dMtww8Q5KvKDuQLaBUO0DQorfl9BUC0oYD6Q72wYDylwuYhzvyyaMXgm9bnGABs0ozQgg9kv2KrhyImdhgRB4VlN_56WWsv3PyzN-rRDAfET4tGc8n8n4DKsQI8kDq5R8WLFdwNBt3lz8CDNrq1PNQGia0apdZad7TYVE9NZzSQCyo09J_sD-lMYBsYqx_-1lsZEL1N903Dt6nnS6VUsgsn4n9dP9652uxA7AO9hZPPxV3dTonh-Nsd7HygK6gc8VCR8JQQn7gt94V0bVFXals9JSuFKmt0VL5xJtbulIPeKgrP1sLSBK597YctoMaZyEmoAbU5FNW3A13IjYtQn4E6HpLv40wqO_xs2ofVaXYNVa_BFJRiF6w4psHR9_F1u6bUT_y03tZ9snY0JFrNTsWaxQFYCaZ82X83xZO6hiuC7eq9taku1HpCRPmLRVhlITeVsF6kTq9vC2bv33t_Emc9NHMqROuYqB1hDjhV5NY",
+   Forwarded-By = "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY"
+}
+process_alice_1008@aos-2.0.4[Inbox:4]> 

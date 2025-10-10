@@ -116,18 +116,23 @@ STEP_4_SUCCESS=false   # 在alice进程中创建库存项目
 STEP_5_SUCCESS=false   # 在bob进程中执行SAGA
 STEP_6_SUCCESS=false   # 验证SAGA执行结果
 
+# 初始化结果变量
+INVENTORY_UPDATED=""
+SAGA_COMPLETED=""
+SAGA_ID=""
+
 echo "🚀 开始执行SAGA跨进程测试..."
 echo "精确重现 README_CN.md 中的测试流程："
-echo "  1. 生成 alice 进程 (加载库存聚合和出入库服务)"
-echo "  2. 生成 bob 进程 (加载库存聚合和库存服务)"
-echo "  3. 配置进程间通信"
+echo "  1. 生成 alice 进程 (加载库存聚合和出入库服务mock)"
+echo "  2. 生成 bob 进程 (加载库存服务，作为SAGA协调器)"
+echo "  3. 配置bob进程的进程间通信（指向alice）"
 echo "  4. 在 alice 进程中创建库存项目"
-echo "  5. 在 alice 进程中执行 SAGA"
+echo "  5. 从 alice 进程向 bob 进程发送消息，触发 SAGA"
 echo "  6. 验证 SAGA 执行结果"
 echo ""
 echo "🎯 SAGA执行流程: ProcessInventorySurplusOrShortage"
-echo "   - 查询库存项目 → 创建出入库单 → 添加库存条目 → 完成出入库单"
-echo "   - 技术实现：单进程内完成所有步骤，通过Data嵌入传递Saga信息"
+echo "   - alice向bob发送消息触发SAGA → bob查询alice的库存 → bob在alice创建出入库单 → bob在alice添加库存条目 → bob在alice完成出入库单"
+echo "   - 技术实现：跨进程SAGA，通过Data嵌入传递Saga信息，解决AO Tag过滤问题"
 echo ""
 echo "🔧 核心技术解决方案:"
 echo "   • AO Tag过滤问题：AO系统会过滤自定义Tag，影响Saga信息传递"
@@ -138,7 +143,7 @@ echo ""
 
 # 设置等待时间（可以根据需要调整）
 WAIT_TIME="${AO_WAIT_TIME:-5}"
-SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-10}"
+SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-60}"
 echo "等待时间设置为: 普通操作 ${WAIT_TIME} 秒, SAGA执行 ${SAGA_WAIT_TIME} 秒"
 
 # 检查是否为dry-run模式
@@ -186,6 +191,7 @@ START_TIME=$(date +%s)
 
 # 1. 生成alice进程并加载代码
 echo "=== 步骤 1: 生成alice进程并加载代码 ==="
+echo "alice进程将提供：库存聚合服务 + 出入库服务mock"
 echo "正在生成alice进程..."
 
 # 检查是否可以连接到AO网络
@@ -210,7 +216,7 @@ if [ -z "$ALICE_PROCESS_ID" ]; then
     exit 1
 fi
 
-echo "正在加载a_ao_demo.lua到alice进程..."
+echo "正在加载a_ao_demo.lua到alice进程（提供库存聚合服务）..."
 if run_ao_cli load "$ALICE_PROCESS_ID" "$APP_FILE" --wait; then
     echo "✅ a_ao_demo.lua加载成功"
 else
@@ -220,7 +226,7 @@ else
     exit 1
 fi
 
-echo "正在加载in_out_service_mock.lua到alice进程..."
+echo "正在加载in_out_service_mock.lua到alice进程（提供出入库服务mock）..."
 if run_ao_cli load "$ALICE_PROCESS_ID" "$IN_OUT_SERVICE_FILE" --wait; then
     echo "✅ in_out_service_mock.lua加载成功"
     STEP_1_SUCCESS=true
@@ -236,6 +242,7 @@ echo ""
 
 # 2. 生成bob进程并加载代码
 echo "=== 步骤 2: 生成bob进程并加载代码 ==="
+echo "bob进程将作为SAGA协调器，包含库存服务逻辑"
 echo "正在生成bob进程..."
 BOB_PROCESS_ID=$(ao-cli spawn default --name "bob-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
 echo "bob进程 ID: '$BOB_PROCESS_ID'"
@@ -247,9 +254,10 @@ if [ -z "$BOB_PROCESS_ID" ]; then
     exit 1
 fi
 
-echo "正在加载a_ao_demo.lua到bob进程..."
+echo "正在加载a_ao_demo.lua到bob进程（包含库存服务和SAGA协调逻辑）..."
 if run_ao_cli load "$BOB_PROCESS_ID" "$APP_FILE" --wait; then
     echo "✅ a_ao_demo.lua加载成功"
+    echo "✅ bob进程现在包含InventoryService及SAGA协调器"
     STEP_2_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 步骤2成功，当前成功计数: $STEP_SUCCESS_COUNT"
@@ -261,13 +269,15 @@ else
 fi
 echo ""
 
-# 3. 配置进程间通信
-echo "=== 步骤 3: 配置进程间通信 ==="
-echo "⚠️  跨进程消息传递不稳定，采用alice进程内完整SAGA方案"
-echo "设置alice进程的服务都指向自己（单进程内完成所有操作）..."
-if run_ao_cli eval "$ALICE_PROCESS_ID" --data "INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = '$ALICE_PROCESS_ID'" --wait && \
-   run_ao_cli eval "$ALICE_PROCESS_ID" --data "INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = '$ALICE_PROCESS_ID'" --wait; then
+# 3. 配置bob进程的进程间通信
+echo "=== 步骤 3: 配置bob进程的进程间通信 ==="
+echo "🎯 配置两进程SAGA：bob进程作为协调器，调用alice进程的服务"
+echo "设置bob进程的服务Target指向alice进程..."
+if run_ao_cli eval "$BOB_PROCESS_ID" --data "INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = '$ALICE_PROCESS_ID'" --wait && \
+   run_ao_cli eval "$BOB_PROCESS_ID" --data "INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = '$ALICE_PROCESS_ID'" --wait; then
     echo "✅ 进程间通信配置成功"
+    echo "   📡 alice进程 ($ALICE_PROCESS_ID): 提供库存聚合和出入库服务"
+    echo "   🎯 bob进程 ($BOB_PROCESS_ID): SAGA协调器，调用alice的服务"
     STEP_3_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 步骤3成功，当前成功计数: $STEP_SUCCESS_COUNT"
@@ -280,7 +290,7 @@ echo ""
 
 # 4. 在alice进程中创建库存项目
 echo "=== 步骤 4: 在alice进程中创建库存项目 ==="
-if run_ao_cli eval "$ALICE_PROCESS_ID" "Send({ Target = ao.id, Tags = { Action = 'AddInventoryItemEntry' }, Data = '{\\"inventory_item_id\\": {\\"product_id\\": 1, \\"location\\": \\"y\\"}, \\"movement_quantity\\": 100}' })" --wait; then
+if ao-cli message "$ALICE_PROCESS_ID" "AddInventoryItemEntry" --data '{"inventory_item_id": {"product_id": 1, "location": "y"}, "movement_quantity": 100}' --wait >/dev/null 2>&1; then
     echo "✅ 库存项目创建成功"
     STEP_4_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
@@ -292,69 +302,83 @@ else
 fi
 echo ""
 
-# 5. 在alice进程中执行SAGA
-echo "=== 步骤 5: 在alice进程中执行SAGA ==="
-echo "⚠️  单进程SAGA方案：所有操作在alice进程内完成"
-echo "📋 使用ao-cli message发送外部消息来触发alice进程的SAGA handler"
-echo "   注意：ao-cli eval的Send命令不会触发handlers，必须使用外部消息"
-if ao-cli message "$ALICE_PROCESS_ID" "InventoryService_ProcessInventorySurplusOrShortage" --data '{"product_id": 1, "location": "y", "quantity": 119}' --wait; then
+# 5. 从alice向bob发送消息，触发SAGA
+echo "=== 步骤 5: 从alice向bob发送消息，触发SAGA ==="
+echo "🎯 重现README_CN.md：使用eval在alice进程内执行Send()"
+echo "📋 Send({ Target = bob, ...})发送给bob，bob的SAGA handlers处理响应消息"
+echo "   SAGA流程：alice→bob创建SAGA → bob→alice查询库存 → bob→alice创建出入库单 → bob→alice更新库存 → bob→alice完成出入库单"
+echo "   注意：SAGA的callback消息由handlers处理，不会进入Inbox"
+if run_ao_cli eval "$ALICE_PROCESS_ID" --data "json = require('json'); Send({ Target = '$BOB_PROCESS_ID', Tags = { Action = 'InventoryService_ProcessInventorySurplusOrShortage' }, Data = json.encode({ product_id = 1, location = 'y', quantity = 119 }) })" --wait; then
     STEP_5_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
-    echo "✅ SAGA执行消息发送成功"
+    echo "✅ SAGA触发消息已添加到alice的outbox"
+    echo "⏳ SAGA将通过AO网络异步执行..."
 else
     STEP_5_SUCCESS=false
-    echo "❌ SAGA执行消息发送失败"
+    echo "❌ SAGA触发消息发送失败"
     exit 1
-fi
-
-echo ""
-sleep "$SAGA_WAIT_TIME"
-echo "📬 检查alice进程的Inbox中是否有SAGA完成消息..."
-if run_ao_cli eval "$ALICE_PROCESS_ID" --data "if #Inbox > 0 then print('Latest inbox message:'); print(Inbox[#Inbox].Data) else print('No inbox messages') end" --wait 2>/dev/null; then
-    echo "✅ Inbox检查完成"
-else
-    echo "⚠️ Inbox检查失败"
 fi
 echo ""
 
 # 6. 验证SAGA执行结果
 echo "=== 步骤 6: 验证SAGA执行结果 ==="
-echo "检查SAGA消息是否被处理（通过Inbox长度变化验证）..."
+echo "等待SAGA异步执行完成..."
 
-# 记录发送SAGA消息前的Inbox长度
-INITIAL_INBOX_LENGTH=$(run_ao_cli eval "$ALICE_PROCESS_ID" "print(#Inbox)" --wait 2>/dev/null | grep -o '[0-9]*' | tail -1 || echo "1")
+# 等待SAGA执行完成 (增加额外等待时间)
+echo "等待 $SAGA_WAIT_TIME 秒基础时间..."
+sleep "$SAGA_WAIT_TIME"
 
-echo "发送SAGA消息前的Inbox长度: $INITIAL_INBOX_LENGTH"
+echo "额外等待 30 秒以确保异步操作完成..."
+sleep 30
 
-if ao-cli message "$ALICE_PROCESS_ID" "InventoryService_ProcessInventorySurplusOrShortage" --data '{"product_id": 1, "location": "y", "quantity": 119}' --wait; then
-    echo "✅ SAGA执行消息发送成功"
-else
-    STEP_6_SUCCESS=false
-    echo "❌ SAGA执行消息发送失败"
-    exit 1
-fi
+echo "再次额外等待 30 秒..."
+sleep 30
+
+echo "🔍 检查库存更新状态..."
+INVENTORY_BEFORE=$(run_ao_cli eval "$ALICE_PROCESS_ID" --data "json = require('json'); entity_coll = require('entity_coll'); local key = json.encode({1, 'y', {}}); local inv = entity_coll.get(InventoryItemTable, key); return inv and inv.quantity or 'nil'" --wait || echo "nil")
+echo "SAGA执行后的库存数量: $INVENTORY_BEFORE"
 
 echo ""
-sleep "$SAGA_WAIT_TIME"
-echo "📬 检查alice进程的Inbox是否有新的响应消息..."
+echo "🔍 检查bob进程中的SAGA实例状态..."
+# 通过发送消息查询SAGA ID序列
+SAGA_ID_SEQ=$(run_ao_cli message "$BOB_PROCESS_ID" "GetSagaIdSequence" --data "{}" --wait 2>/dev/null | grep -o '"result":\[[0-9]*\]' | grep -o '[0-9]*' || echo "0")
+echo "SAGA ID序列: $SAGA_ID_SEQ"
 
-# 检查Inbox长度是否增加（表示有响应消息）
-CURRENT_INBOX_LENGTH=$(run_ao_cli eval "$ALICE_PROCESS_ID" "print(#Inbox)" --wait 2>/dev/null | grep -o '[0-9]*' | tail -1 || echo "$INITIAL_INBOX_LENGTH")
+# 如果有SAGA实例，查询最新的SAGA状态
+if [ "$SAGA_ID_SEQ" -gt 0 ]; then
+    SAGA_STATUS=$(run_ao_cli message "$BOB_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": $SAGA_ID_SEQ}" --wait 2>/dev/null | grep -o '"result":{[^}]*}' | sed 's/"result"://' || echo "error")
+    SAGA_STATUS="id=$SAGA_ID_SEQ,$SAGA_STATUS"
+else
+    SAGA_STATUS="not_found"
+fi
+echo "SAGA实例状态: $SAGA_STATUS"
 
-echo "当前Inbox长度: $CURRENT_INBOX_LENGTH"
-
-if [ "$CURRENT_INBOX_LENGTH" -gt "$INITIAL_INBOX_LENGTH" ]; then
-    echo "✅ SAGA执行成功：检测到新的响应消息（Inbox长度从 $INITIAL_INBOX_LENGTH 增加到 $CURRENT_INBOX_LENGTH）"
-    echo "✅ 这证明Data嵌入的Saga信息传递机制正常工作！"
+# 判断测试是否成功
+if [ "$INVENTORY_BEFORE" = "119" ]; then
     STEP_6_SUCCESS=true
+    INVENTORY_UPDATED=true
+    echo "✅ 库存成功更新到119"
+else
+    STEP_6_SUCCESS=false
+    INVENTORY_UPDATED=false
+    echo "❌ 库存未更新，期望119，实际: $INVENTORY_BEFORE"
+fi
+
+# 检查SAGA是否完成
+if echo "$SAGA_STATUS" | grep -q "completed=true"; then
+    SAGA_COMPLETED=true
+    SAGA_ID=$(echo "$SAGA_STATUS" | sed 's/id=\([0-9]*\),.*/\1/')
+    echo "✅ SAGA实例已完成，ID: $SAGA_ID"
+else
+    SAGA_COMPLETED=false
+    echo "❌ SAGA实例未完成，状态: $SAGA_STATUS"
+fi
+
+if $STEP_6_SUCCESS; then
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 步骤6成功，当前成功计数: $STEP_SUCCESS_COUNT"
 else
-    echo "⚠️ 未检测到新的响应消息，SAGA可能未完全执行"
-    echo "⚠️ 但消息发送成功，Data嵌入机制可能仍然有效"
-    STEP_6_SUCCESS=true  # 仍然算成功，因为我们的核心修改（Data嵌入）是正确的
-    ((STEP_SUCCESS_COUNT++))
-    echo "✅ 步骤6部分成功（消息传递确认），当前成功计数: $STEP_SUCCESS_COUNT"
+    echo "❌ 步骤6失败：SAGA执行异常"
 fi
 
 

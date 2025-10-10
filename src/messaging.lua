@@ -10,7 +10,13 @@ local X_TAGS = {
 
 -- 将Saga信息嵌入Data中，以避免Tag在转发过程中丢失
 function messaging.embed_saga_info_in_data(data, saga_id, response_action)
-    local enhanced_data = data or {}
+    -- 🔧 CRITICAL FIX: 创建副本而不是修改原对象，避免污染context中的引用
+    local enhanced_data = {}
+    if data then
+        for k, v in pairs(data) do
+            enhanced_data[k] = v
+        end
+    end
     enhanced_data[messaging.X_TAGS.SAGA_ID] = saga_id
     enhanced_data[messaging.X_TAGS.RESPONSE_ACTION] = response_action
     return enhanced_data
@@ -76,27 +82,31 @@ end
 function messaging.respond(status, result_or_error, request_msg)
     local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
 
-    -- 🆕 DDDML改进：使用Data嵌入的Saga信息访问
-    local saga_id = messaging.get_saga_id(request_msg)
-    local response_action = messaging.get_response_action(request_msg)
+    -- 🆕 DDDML改进：从Data中提取Saga信息
+    local saga_id, response_action = messaging.extract_saga_info_from_data(request_msg.Data)
 
-    local tags = {}
+    -- 使用request_msg.From作为响应目标
+    local target = request_msg.From
+
+    -- 🆕 CRITICAL FIX: Action必须在Tags中，而不是作为消息的直接属性
+    -- 否则跨进程消息会因为Action被过滤而无法触发handler
+    local message = {
+        Target = target,
+        Data = json.encode(data)
+    }
+
+    -- 如果有response_action，将其设置到Tags中的Action字段
     if response_action then
-        tags["Action"] = response_action
+        message.Tags = { Action = response_action }
     end
 
     -- 如果有Saga信息，将其嵌入响应Data中
     if saga_id then
         data = messaging.embed_saga_info_in_data(data, saga_id, response_action)
+        message.Data = json.encode(data)
     end
 
-    -- 🆕 DDDML改进：在单进程SAGA中，响应消息发送到当前进程而不是原始发送者
-    -- 这确保了Saga的各步骤都在同一进程内协调完成
-    ao.send({
-        Target = ao.id,  -- 总是发送到当前进程，确保单进程SAGA正常工作
-        Data = json.encode(data),
-        Tags = tags
-    })
+    ao.send(message)
 end
 
 function messaging.handle_response_based_on_tag(status, result_or_error, commit, request_msg)
@@ -114,11 +124,19 @@ function messaging.handle_response_based_on_tag(status, result_or_error, commit,
 end
 
 local function send(target, data, tags)
-    ao.send({
+    -- 🆕 CRITICAL FIX: 在AO中，Action必须在Tags中，不能作为消息的直接属性
+    -- 否则跨进程消息会因为Action被过滤而无法触发handler
+    local message = {
         Target = target,
-        Data = json.encode(data),
-        Tags = tags
-    })
+        Data = json.encode(data)
+    }
+
+    -- 设置Tags字段（包含Action）
+    if tags and next(tags) then
+        message.Tags = tags
+    end
+
+    ao.send(message)
 end
 
 function messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
