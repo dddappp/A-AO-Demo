@@ -10,7 +10,9 @@
 我们目前面临的问题是：在 ao 版本更新后，增加了对 Tags 的过滤，导致原来已经通过测试的 Saga 执行过程失败。
 为此我们需要找到替代方案的问题。（分析讨论参考： @SAGA-TECHNICAL-ANALYSIS.md ）
 
-从失败的测试（在修改代码，尝试使用 Data 嵌入 saga 信息前所做的测试）记录 
+> NOTE：以下测试是在提交 `615b9a11a3b1f18deea99e255f9a4ac1da1f0073` 前，所做的测试。而此后的代码修改，即是尝试使用 Data 嵌入 Saga 信息来解决问题。
+
+从失败的测试记录
 @process_alice_1008.txt @process_alice_1008.txt 
 来看：bob 进程已经开始执行 Saga，然后向 alice 进程发出了 “查询库存请求”，并且收到了回复：
 
