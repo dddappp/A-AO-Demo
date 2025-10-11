@@ -101,11 +101,13 @@ function messaging.respond(status, result_or_error, request_msg)
     end
 
     -- 如果有Saga信息，将其嵌入响应Data中
+    -- 注意：响应消息只需要嵌入saga_id，不需要嵌入response_action
+    -- 因为response_action已经设置在Tags.Action中用于触发callback
     if saga_id then
-        data = messaging.embed_saga_info_in_data(data, saga_id, response_action)
+        data = messaging.embed_saga_info_in_data(data, saga_id, nil)
         message.Data = json.encode(data)
     end
-
+    
     ao.send(message)
 end
 

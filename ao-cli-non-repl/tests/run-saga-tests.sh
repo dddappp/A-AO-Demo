@@ -142,8 +142,9 @@ echo "   • 验证成果：库存数量从100正确更新到119，证明事务�
 echo ""
 
 # 设置等待时间（可以根据需要调整）
+# SAGA需要多次跨进程往返，每次都需要网络传输时间，所以基础等待时间需要更长
 WAIT_TIME="${AO_WAIT_TIME:-5}"
-SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-60}"
+SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-120}"  # 增加到120秒，确保SAGA完全完成
 echo "等待时间设置为: 普通操作 ${WAIT_TIME} 秒, SAGA执行 ${SAGA_WAIT_TIME} 秒"
 
 # 检查是否为dry-run模式
@@ -335,13 +336,13 @@ echo "再次额外等待 30 秒..."
 sleep 30
 
 echo "🔍 检查库存更新状态..."
-INVENTORY_BEFORE=$(run_ao_cli eval "$ALICE_PROCESS_ID" --data "json = require('json'); entity_coll = require('entity_coll'); local key = json.encode({1, 'y', {}}); local inv = entity_coll.get(InventoryItemTable, key); return inv and inv.quantity or 'nil'" --wait || echo "nil")
-echo "SAGA执行后的库存数量: $INVENTORY_BEFORE"
+INVENTORY_AFTER=$(run_ao_cli eval "$ALICE_PROCESS_ID" --data "json = require('json'); entity_coll = require('entity_coll'); local key = json.encode({1, 'y', {}}); local inv = entity_coll.get(InventoryItemTable, key); return inv and inv.quantity or 'nil'" --wait 2>&1 | grep 'Data:' | tail -1 | sed 's/.*Data: "\([0-9]*\)".*/\1/' || echo "0")
+echo "SAGA执行后的库存数量: $INVENTORY_AFTER"
 
 echo ""
 echo "🔍 检查bob进程中的SAGA实例状态..."
-# 通过发送消息查询SAGA ID序列
-SAGA_ID_SEQ=$(run_ao_cli message "$BOB_PROCESS_ID" "GetSagaIdSequence" --data "{}" --wait 2>/dev/null | grep -o '"result":\[[0-9]*\]' | grep -o '[0-9]*' || echo "0")
+# 直接查询SagaIdSequence全局变量（它是一个表，第一个元素是当前序号）
+SAGA_ID_SEQ=$(run_ao_cli eval "$BOB_PROCESS_ID" --data "return SagaIdSequence[1] or 0" --wait 2>/dev/null | grep 'Data:' | tail -1 | grep -o '[0-9]*' || echo "0")
 echo "SAGA ID序列: $SAGA_ID_SEQ"
 
 # 如果有SAGA实例，查询最新的SAGA状态
@@ -354,14 +355,14 @@ fi
 echo "SAGA实例状态: $SAGA_STATUS"
 
 # 判断测试是否成功
-if [ "$INVENTORY_BEFORE" = "119" ]; then
+if [ "$INVENTORY_AFTER" = "119" ]; then
     STEP_6_SUCCESS=true
     INVENTORY_UPDATED=true
     echo "✅ 库存成功更新到119"
 else
     STEP_6_SUCCESS=false
     INVENTORY_UPDATED=false
-    echo "❌ 库存未更新，期望119，实际: $INVENTORY_BEFORE"
+    echo "❌ 库存未更新，期望119，实际: $INVENTORY_AFTER"
 fi
 
 # 检查SAGA是否完成
