@@ -1,7 +1,7 @@
 Last login: Wed Oct  8 18:40:15 on ttys099
-(base) yangjiefeng@yangjiefengdeMac-Mini ~ % export HTTPS_PROXY=http://127.0.0.1:1235  HTTP_PROXY=http://127.0.0.1:1235  ALL_PROXY=socks5://127.0.0.1:1234
+% export HTTPS_PROXY=http://127.0.0.1:1235  HTTP_PROXY=http://127.0.0.1:1235  ALL_PROXY=socks5://127.0.0.1:1234
 
-(base) yangjiefeng@yangjiefengdeMac-Mini ~ % aos process_alice_1008
+% aos process_alice_1008
           _____                   _______                   _____          
          /\    \                 /::\    \                 /\    \         
         /::\    \               /::::\    \               /::\    \        
@@ -33,11 +33,11 @@ Type "Ctrl-C" twice to exit
 Your AOS process:  M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg
 
 
-process_alice_1008@aos-2.0.4[Inbox:1]> .load /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/a_ao_demo.lua
-Loading...  /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/a_ao_demo.lua
+process_alice_1008@aos-2.0.4[Inbox:1]> .load /PATH/TO/dddappp/A-AO-Demo/src/a_ao_demo.lua
+Loading...  /PATH/TO/dddappp/A-AO-Demo/src/a_ao_demo.lua
 
 The following files will be deployed:
-/Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src
+/PATH/TO/dddappp/A-AO-Demo/src
 ├── entity_coll.lua
 ├── messaging.lua
 ├── saga.lua
@@ -66,11 +66,11 @@ The following files will be deployed:
   test: '{}',
   prompt: '\x1B[32mprocess_alice_1008\x1B[90m@\x1B[34maos-2.0.4\x1B[90m[Inbox:\x1B[31m1\x1B[90m]\x1B[0m> '
 }
-process_alice_1008@aos-2.0.4[Inbox:1]> .load /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/in_out_service_mock.lua
-Loading...  /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/in_out_service_mock.lua
+process_alice_1008@aos-2.0.4[Inbox:1]> .load /PATH/TO/dddappp/A-AO-Demo/src/in_out_service_mock.lua
+Loading...  /PATH/TO/dddappp/A-AO-Demo/src/in_out_service_mock.lua
 
 The following files will be deployed:
-/Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src
+/PATH/TO/dddappp/A-AO-Demo/src
 ├── messaging.lua
 └── in_out_service_mock.lua  MAIN 
 {

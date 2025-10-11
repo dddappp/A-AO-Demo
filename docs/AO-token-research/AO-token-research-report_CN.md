@@ -2331,8 +2331,8 @@ end
 
 ### 11.4 技术验证来源
 
-- **Wander 钱包源码验证**: `/Users/yangjiefeng/Documents/wanderwallet/Wander/src/tokens/aoTokens/ao.ts`
-- **消息传递实现**: `/Users/yangjiefeng/Documents/wanderwallet/Wander/src/routes/popup/swap/utils/swap.utils.ts`
+- **Wander 钱包源码验证**: `/PATH/TO/wanderwallet/Wander/src/tokens/aoTokens/ao.ts`
+- **消息传递实现**: `/PATH/TO/wanderwallet/Wander/src/routes/popup/swap/utils/swap.utils.ts`
 - **AO 协议标准**: aoconnect 库的 message() 函数实现
 - **实际测试验证**: 基于 AO Legacy 网络的实际部署测试
 
@@ -2444,13 +2444,13 @@ end
 
 **直接属性访问：**
 ```lua
--- 来源: /Users/yangjiefeng/Documents/ao/lua-examples/ao-standard-token/token.lua
+-- 来源: /PATH/TO/ao/lua-examples/ao-standard-token/token.lua
 local qty = tonumber(msg.Tags.Quantity)
 ```
 
 **Tags 访问：**
 ```lua
--- 来源: /Users/yangjiefeng/Documents/ao/lua-examples/ao-standard-token/token.lua
+-- 来源: /PATH/TO/ao/lua-examples/ao-standard-token/token.lua
 assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
 ```
 
@@ -2460,7 +2460,7 @@ assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
 
 **转换函数：**
 ```javascript
-// 来源: /Users/yangjiefeng/Documents/ao/servers/cu/src/domain/logger.js
+// 来源: /PATH/TO/ao/servers/cu/src/domain/logger.js
 function capitalize (str) {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
@@ -2492,21 +2492,21 @@ Send({ Target = "...", Action = "Get-NFT", TokenId = "1" })
 
 **2. AOS 调用 aoconnect 发送 Eval 消息：**
 ```javascript
-// 来源: /Users/yangjiefeng/Documents/aos-repo/src/evaluate.js
+// 来源: /PATH/TO/aos-repo/src/evaluate.js
 return of({ processId, wallet, tags: [{ name: 'Action', value: 'Eval' }], data: line })
 ```
 - AOS 将包含 Send 调用的 Lua 代码作为 `data` 发送到 AO 进程
 
 **3. aoconnect 将消息上链：**
 ```javascript
-// 来源: /Users/yangjiefeng/Documents/ao/connect/src/client/hb.js
+// 来源: /PATH/TO/ao/connect/src/client/hb.js
 if (tags) tags.forEach(t => { obj[t.name.toLowerCase()] = t.value })
 ```
 - aoconnect 将参数名转换为全小写并提交到 Arweave 网络
 
 **4. AO 节点处理消息：**
 ```javascript
-// 来源: /Users/yangjiefeng/Documents/ao/servers/su/src/domain/core/json.rs
+// 来源: /PATH/TO/ao/servers/su/src/domain/core/json.rs
 MessageInner {
   tags: Vec<Tag>,
   target: Option<String>,
@@ -2517,7 +2517,7 @@ MessageInner {
 
 **5. AO 节点参数名转换：**
 ```javascript
-// 来源: /Users/yangjiefeng/Documents/ao/servers/cu/src/domain/logger.js
+// 来源: /PATH/TO/ao/servers/cu/src/domain/logger.js
 function capitalize (str) {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
@@ -2528,7 +2528,7 @@ function capitalize (str) {
 
 **6. AO 进程执行 Lua 代码：**
 ```lua
-// 来源: /Users/yangjiefeng/Documents/ao/lua-examples/ao-standard-token/token.lua
+// 来源: /PATH/TO/ao/lua-examples/ao-standard-token/token.lua
 ao.send({
   Target = msg.From,
   Tags = { Action = 'Debit-Notice', Recipient = msg.Tags.Recipient, Quantity = tostring(qty) }

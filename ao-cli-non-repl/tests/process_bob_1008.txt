@@ -1,7 +1,7 @@
 Last login: Wed Oct  8 18:40:02 on ttys098
-(base) yangjiefeng@yangjiefengdeMac-Mini ~ % export HTTPS_PROXY=http://127.0.0.1:1235  HTTP_PROXY=http://127.0.0.1:1235  ALL_PROXY=socks5://127.0.0.1:1234
+% export HTTPS_PROXY=http://127.0.0.1:1235  HTTP_PROXY=http://127.0.0.1:1235  ALL_PROXY=socks5://127.0.0.1:1234
 
-(base) yangjiefeng@yangjiefengdeMac-Mini ~ % aos process_bob_1008  
+% aos process_bob_1008  
           _____                   _______                   _____          
          /\    \                 /::\    \                 /\    \         
         /::\    \               /::::\    \               /::\    \        
@@ -34,11 +34,11 @@ Type "Ctrl-C" twice to exit
 Your AOS process:  cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg
 
 
-process_bob_1008@aos-2.0.4[Inbox:1]> .load /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/a_ao_demo.lua
-Loading...  /Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src/a_ao_demo.lua
+process_bob_1008@aos-2.0.4[Inbox:1]> .load /PATH/TO/dddappp/A-AO-Demo/src/a_ao_demo.lua
+Loading...  /PATH/TO/dddappp/A-AO-Demo/src/a_ao_demo.lua
 
 The following files will be deployed:
-/Users/yangjiefeng/Documents/dddappp/A-AO-Demo/src
+/PATH/TO/dddappp/A-AO-Demo/src
 ├── entity_coll.lua
 ├── messaging.lua
 ├── saga.lua

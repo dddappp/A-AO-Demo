@@ -26,13 +26,13 @@
 **源码分析**：通过研究AO和AOS源码，我们理解了Tag处理机制的实现原理：
 
 **证据来源**：
-- **AO源码位置**：`/Users/yangjiefeng/Documents/permaweb/ao/dev-cli/src/starters/lua/ao.lua:14-25`
-- **AOS源码位置**：`/Users/yangjiefeng/Documents/permaweb/aos/hyper/src/process.lua:354-357`
-- **实际应用证据**：`/Users/yangjiefeng/Documents/permaweb/aos/blueprints/chat.lua:173`
+- **AO源码位置**：`/PATH/TO/permaweb/ao/dev-cli/src/starters/lua/ao.lua:14-25`
+- **AOS源码位置**：`/PATH/TO/permaweb/aos/hyper/src/process.lua:354-357`
+- **实际应用证据**：`/PATH/TO/permaweb/aos/blueprints/chat.lua:173`
 
 **AO的Tag处理机制**：
 ```lua
--- 文件：/Users/yangjiefeng/Documents/permaweb/ao/dev-cli/src/starters/lua/ao.lua
+-- 文件：/PATH/TO/permaweb/ao/dev-cli/src/starters/lua/ao.lua
 nonForwardableTags = {
     'Data-Protocol', 'Variant', 'From-Process', 'From-Module', 'Type',
     'From', 'Owner', 'Anchor', 'Target', 'Tags', 'TagArray', 'Hash-Chain',
@@ -44,14 +44,14 @@ nonForwardableTags = {
 
 **AOS的Tag处理策略**：
 ```lua
--- 文件：/Users/yangjiefeng/Documents/permaweb/aos/hyper/src/process.lua:354-357
+-- 文件：/PATH/TO/permaweb/aos/hyper/src/process.lua:354-357
 msg.TagArray = msg.Tags  -- 保存原始完整Tags
 msg.Tags = Tab(msg)      -- 重新构建，只包含非nonForwardable的tag
 ```
 
 **实际应用中的Tag使用**：
 ```lua
--- 文件：/Users/yangjiefeng/Documents/permaweb/aos/blueprints/chat.lua:173
+-- 文件：/PATH/TO/permaweb/aos/blueprints/chat.lua:173
 for i = 1, #m.TagArray do  -- 应用代码使用TagArray而非被过滤的msg.Tags
 ```
 
@@ -59,13 +59,13 @@ for i = 1, #m.TagArray do  -- 应用代码使用TagArray而非被过滤的msg.Ta
 **源码分析**：通过研究AO/AOS源码，我们理解了消息路由与Tag访问的分离机制：
 
 **证据来源**：
-- **消息路由证据**：`/Users/yangjiefeng/Documents/permaweb/aos/hyper/src/utils.lua:106-111`
-- **TagArray证据**：`/Users/yangjiefeng/Documents/permaweb/aos/blueprints/chat.lua:173`
+- **消息路由证据**：`/PATH/TO/permaweb/aos/hyper/src/utils.lua:106-111`
+- **TagArray证据**：`/PATH/TO/permaweb/aos/blueprints/chat.lua:173`
 - **测试证据**：`ao-cli-non-repl/tests/process_alice_1008.txt`
 
 **消息路由机制**：
 ```lua
--- 文件：/Users/yangjiefeng/Documents/permaweb/aos/hyper/src/utils.lua:106-111
+-- 文件：/PATH/TO/permaweb/aos/hyper/src/utils.lua:106-111
 function utils.matchesSpec(msg, pattern)
   if type(spec) == 'string' and msg.action and msg.action == spec then
     return true  -- 路由基于msg.action，不依赖Tag内容
@@ -79,7 +79,7 @@ end
 
 **TagArray的使用证据**：
 ```lua
--- 文件：/Users/yangjiefeng/Documents/permaweb/aos/blueprints/chat.lua:173
+-- 文件：/PATH/TO/permaweb/aos/blueprints/chat.lua:173
 for i = 1, #m.TagArray do  -- 应用代码使用TagArray而非被过滤的msg.Tags
 ```
 
