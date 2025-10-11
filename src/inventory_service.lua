@@ -86,8 +86,12 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
             0
         )
             local saga_id = saga_instance.saga_id
-            local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
+            local _inventory_item_id = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
             -- 🆕 DDDML改进：将Saga信息嵌入Data中而不是Tag中，以避免在转发过程中丢失
+            -- 现在GetInventoryItem需要JSON对象格式：{"inventory_item_id": {...}}
+            local request = {
+                inventory_item_id = _inventory_item_id
+            }
             request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
             return request, commit
     end))

@@ -144,7 +144,7 @@ echo ""
 # 设置等待时间（可以根据需要调整）
 # SAGA需要多次跨进程往返，每次都需要网络传输时间，所以基础等待时间需要更长
 WAIT_TIME="${AO_WAIT_TIME:-5}"
-SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-120}"  # 增加到120秒，确保SAGA完全完成
+SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-45}"  # 确保SAGA完全完成
 echo "等待时间设置为: 普通操作 ${WAIT_TIME} 秒, SAGA执行 ${SAGA_WAIT_TIME} 秒"
 
 # 检查是否为dry-run模式
@@ -329,14 +329,15 @@ echo "等待SAGA异步执行完成..."
 echo "等待 $SAGA_WAIT_TIME 秒基础时间..."
 sleep "$SAGA_WAIT_TIME"
 
-echo "额外等待 30 秒以确保异步操作完成..."
-sleep 30
-
-echo "再次额外等待 30 秒..."
-sleep 30
+# 视网络状况，可以多等待一些时间
+#echo "额外等待 30 秒以确保异步操作完成..."
+#sleep 30
+#echo "再次额外等待 30 秒..."
+#sleep 30
 
 echo "🔍 检查库存更新状态..."
-INVENTORY_AFTER=$(run_ao_cli eval "$ALICE_PROCESS_ID" --data "json = require('json'); entity_coll = require('entity_coll'); local key = json.encode({1, 'y', {}}); local inv = entity_coll.get(InventoryItemTable, key); return inv and inv.quantity or 'nil'" --wait 2>&1 | grep 'Data:' | tail -1 | sed 's/.*Data: "\([0-9]*\)".*/\1/' || echo "0")
+# 现在GetInventoryItem需要JSON对象格式
+INVENTORY_AFTER=$(run_ao_cli message "$ALICE_PROCESS_ID" "GetInventoryItem" --data '{"inventory_item_id": {"product_id": 1, "location": "y"}}' --wait 2>&1 | grep '"quantity"' | grep -o '[0-9]*' | head -1 || echo "0")
 echo "SAGA执行后的库存数量: $INVENTORY_AFTER"
 
 echo ""

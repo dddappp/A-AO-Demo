@@ -117,7 +117,7 @@ Send({ Target = ao.id, Tags = { Action = "GetArticleIdSequence" } })
 查看序号为 `1` 的文章的内容（在输出消息的 `Data` 属性中）：
 
 ```lua
-Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode({ article_id = 1 }) })
 
 Inbox[#Inbox]
 ```
@@ -132,7 +132,7 @@ Send({ Target = ao.id, Tags = { Action = "UpdateArticle" }, Data = json.encode({
 再次查看序号为 `1` 的文章的内容：
 
 ```lua
-Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode({ article_id = 1 }) })
 
 Inbox[#Inbox]
 ```
@@ -154,7 +154,7 @@ Send({ Target = ao.id, Tags = { Action = "AddComment" }, Data = json.encode({ ar
 查看评论信息：
 
 ```lua
-Send({ Target = ao.id, Tags = { Action = "GetComment" }, Data = json.encode({ article_id = 1, comment_seq_id = 1 }) })
+Send({ Target = ao.id, Tags = { Action = "GetComment" }, Data = json.encode({ article_comment_id = { article_id = 1, comment_seq_id = 1 } }) })
 
 Inbox[#Inbox]
 ```

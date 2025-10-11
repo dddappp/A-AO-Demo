@@ -443,11 +443,11 @@ Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action =
 查看库存项目的内容：
 
 ```lua
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" } }) })
 
 Inbox[#Inbox]
 
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } } }) })
 
 Inbox[#Inbox]
 ```
@@ -483,7 +483,7 @@ Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action =
 查询库存项目的版本号：
 
 ```lua
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" } }) })
 -- Inbox[#Inbox]
 ```
 
@@ -618,7 +618,7 @@ Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action =
 查看进程 `__PROCESS_ALICE__` 中的库存项目：
 
 ```lua
-Send({ Target = "__PROCESS_ALICE__", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "y" }) })
+Send({ Target = "__PROCESS_ALICE__", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "y" } }) })
 
 Inbox[#Inbox]
 ```
@@ -716,7 +716,7 @@ Saga 将自动跨进程调用：
 Send({ Target = "INVENTORY_SERVICE_PROCESS_ID", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = 1 }) })
 
 # 在InventoryItem进程中查看库存变化
-Send({ Target = "INVENTORY_ITEM_PROCESS_ID", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "test" }) })
+Send({ Target = "INVENTORY_ITEM_PROCESS_ID", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "test" } }) })
 ```
 
 这种多进程架构展示了 DDDML 工具的强大能力：将复杂的业务逻辑分解为多个独立的、可协同工作的进程，实现真正的分布式架构。

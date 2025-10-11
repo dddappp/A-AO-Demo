@@ -137,7 +137,7 @@ mcp_iterm-mcp_read_terminal_output linesOfOutput=5
 #### 5.3 获取并验证文章
 ```bash
 # 获取文章详情
-mcp_iterm-mcp_write_to_terminal command="Send({ Target = ao.id, Tags = { Action = \"GetArticle\" }, Data = json.encode(1) })"
+mcp_iterm-mcp_write_to_terminal command="Send({ Target = ao.id, Tags = { Action = \"GetArticle\" }, Data = json.encode({ article_id = 1 }) })"
 mcp_iterm-mcp_read_terminal_output linesOfOutput=10
 
 # 查看文章数据（应该包含 title, body, version: 0 等字段）
@@ -170,7 +170,7 @@ mcp_iterm-mcp_read_terminal_output linesOfOutput=5
 #### 5.6 添加评论
 ```bash
 # 先获取当前文章版本（现在应该是 2）
-mcp_iterm-mcp_write_to_terminal command="Send({ Target = ao.id, Tags = { Action = \"GetArticle\" }, Data = json.encode(1) })"
+mcp_iterm-mcp_write_to_terminal command="Send({ Target = ao.id, Tags = { Action = \"GetArticle\" }, Data = json.encode({ article_id = 1 }) })"
 mcp_iterm-mcp_read_terminal_output linesOfOutput=10
 mcp_iterm-mcp_write_to_terminal command="print(Inbox[#Inbox].Data)"
 mcp_iterm-mcp_read_terminal_output linesOfOutput=10
@@ -187,7 +187,7 @@ mcp_iterm-mcp_read_terminal_output linesOfOutput=5
 #### 5.7 获取评论
 ```bash
 # 获取刚添加的评论
-mcp_iterm-mcp_write_to_terminal command="Send({ Target = ao.id, Tags = { Action = \"GetComment\" }, Data = json.encode({ article_id = 1, comment_seq_id = 1 }) })"
+mcp_iterm-mcp_write_to_terminal command="Send({ Target = ao.id, Tags = { Action = \"GetComment\" }, Data = json.encode({ article_comment_id = { article_id = 1, comment_seq_id = 1 } }) })"
 mcp_iterm-mcp_read_terminal_output linesOfOutput=10
 
 # 查看评论详情

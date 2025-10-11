@@ -67,7 +67,8 @@ saga.init(SagaInstances, SagaIdSequence)
 
 local function get_article(msg, env, response)
     local status, result = pcall((function()
-        local article_id = json.decode(msg.Data)
+        local cmd = json.decode(msg.Data)  -- 解析JSON对象
+        local article_id = cmd.article_id   -- 提取ID
         local _state = entity_coll.get(ArticleTable, article_id)
         return _state
     end))
@@ -76,7 +77,8 @@ end
 
 local function get_comment(msg, env, response)
     local status, result = pcall((function()
-        local _article_comment_id = json.decode(msg.Data)
+        local cmd = json.decode(msg.Data)  -- 解析JSON对象
+        local _article_comment_id = cmd.article_comment_id  -- 提取值对象
         local _key = json.encode(article_comment_id.to_key_array(_article_comment_id))
         local _state = entity_coll.get(CommentTable, _key)
         return _state
@@ -138,14 +140,14 @@ local function get_inventory_item(msg, env, response)
         local saga_id = messaging.get_saga_id(msg)
         local response_action = messaging.get_response_action(msg)
 
-        -- 从Data中提取实际的业务数据
-        local data = json.decode(msg.Data)
-        local _inventory_item_id = data
+        -- 从Data中提取实际的业务数据（现在是JSON对象格式）
+        local cmd = json.decode(msg.Data)
+        local _inventory_item_id = cmd.inventory_item_id  -- 提取值对象
 
-        -- 如果有Saga信息，则移除Saga相关字段
+        -- 如果有Saga信息，则移除Saga相关字段（从cmd中移除）
         if saga_id then
-            _inventory_item_id[messaging.X_TAGS.SAGA_ID] = nil
-            _inventory_item_id[messaging.X_TAGS.RESPONSE_ACTION] = nil
+            cmd[messaging.X_TAGS.SAGA_ID] = nil
+            cmd[messaging.X_TAGS.RESPONSE_ACTION] = nil
         end
 
         local _key = json.encode(inventory_item_id.to_key_array(_inventory_item_id))

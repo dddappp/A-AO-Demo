@@ -133,7 +133,7 @@ Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action =
 View the contents of the article with ID `1` (in the `Data` property of the output message):
 
 ```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode({ article_id = 1 }) })
 
 Inbox[#Inbox]
 ```
@@ -147,7 +147,7 @@ Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action =
 View the contents of the article with ID `1` again:
 
 ```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode(1) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetArticle" }, Data = json.encode({ article_id = 1 }) })
 
 Inbox[#Inbox]
 ```

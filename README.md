@@ -483,11 +483,11 @@ Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action =
 View the state of the inventory items:
 
 ```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" } }) })
 
 Inbox[#Inbox]
 
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } } }) })
 
 Inbox[#Inbox]
 ```
@@ -524,7 +524,7 @@ Inbox[#Inbox]
 Query the version of the inventory item:
 
 ```lua
-Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "x" }) })
+Send({ Target = "0RsO4RGoYdu_SJP_EUyjniiiF4wEMANF2bKMqWTWzow", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" } }) })
 
 Inbox[#Inbox]
 ```
@@ -617,7 +617,7 @@ View the state of the inventory items in the `__PROCESS_ALICE__` process:
 
 
 ```lua
-Send({ Target = "__PROCESS_ALICE__", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ product_id = 1, location = "y" }) })
+Send({ Target = "__PROCESS_ALICE__", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "y" } }) })
 
 Inbox[#Inbox]
 ```
