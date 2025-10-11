@@ -8,9 +8,16 @@ local X_TAGS = {
     SAGA_ID = "X-SagaId",
 }
 
--- 将Saga信息嵌入Data中，以避免Tag在转发过程中丢失
+local MESSAGE_PASS_THROUGH_TAGS = {
+    X_TAGS.SAGA_ID,
+}
+
+messaging.X_TAGS = X_TAGS
+messaging.MESSAGE_PASS_THROUGH_TAGS = MESSAGE_PASS_THROUGH_TAGS
+
+-- Embed saga information in data to avoid tag loss during forwarding
 function messaging.embed_saga_info_in_data(data, saga_id, response_action)
-    -- 🔧 CRITICAL FIX: 创建副本而不是修改原对象，避免污染context中的引用
+    -- CRITICAL FIX: Create a copy instead of modifying the original object to avoid polluting context references
     local enhanced_data = {}
     if data then
         for k, v in pairs(data) do
@@ -22,7 +29,7 @@ function messaging.embed_saga_info_in_data(data, saga_id, response_action)
     return enhanced_data
 end
 
--- 从Data中提取Saga信息
+-- Extract saga information from data
 function messaging.extract_saga_info_from_data(data)
     if type(data) == "string" then
         data = json.decode(data)
@@ -30,27 +37,23 @@ function messaging.extract_saga_info_from_data(data)
     return data[messaging.X_TAGS.SAGA_ID], data[messaging.X_TAGS.RESPONSE_ACTION]
 end
 
-
--- 🆕 DDDML改进：Saga信息访问函数
--- 基于Data嵌入机制（唯一可靠的跨进程传递方式）
+-- DDDML Enhancement: Saga information access functions
+-- Based on data embedding mechanism (the only reliable cross-process transmission method)
 function messaging.get_saga_id(msg)
-    -- 仅从Data中提取Saga信息（跨进程安全）
+    -- Extract saga information only from data (cross-process safe)
     return messaging.extract_saga_info_from_data(msg.Data)
 end
 
 function messaging.get_response_action(msg)
-    -- 仅从Data中提取响应动作（跨进程安全）
+    -- Extract response action only from data (cross-process safe)
     local _, response_action = messaging.extract_saga_info_from_data(msg.Data)
     return response_action
 end
 
 function messaging.get_no_response_required(msg)
-    -- 🆕 DDDML改进：从Data嵌入中提取（目前未使用，保留兼容性）
-    return nil  -- 目前没有在Data中嵌入no_response_required信息
+    -- DDDML Enhancement: Extract from data embedding (not used yet, for compatibility)
+    return nil  -- Currently no_response_required is not embedded in data
 end
-
-
-messaging.X_TAGS = X_TAGS
 
 local string_to_boolean_mappings = {
     ["true"] = true,
@@ -82,40 +85,31 @@ end
 function messaging.respond(status, result_or_error, request_msg)
     local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
 
-    -- 🆕 DDDML改进：从Data中提取Saga信息
-    local saga_id, response_action = messaging.extract_saga_info_from_data(request_msg.Data)
+    local saga_id = messaging.get_saga_id(request_msg)
+    local response_action = messaging.get_response_action(request_msg)
 
-    -- 使用request_msg.From作为响应目标
-    local target = request_msg.From
-
-    -- 🆕 CRITICAL FIX: Action必须在Tags中，而不是作为消息的直接属性
-    -- 否则跨进程消息会因为Action被过滤而无法触发handler
-    local message = {
-        Target = target,
-        Data = json.encode(data)
-    }
-
-    -- 如果有response_action，将其设置到Tags中的Action字段
+    local tags = {}
     if response_action then
-        message.Tags = { Action = response_action }
+        tags["Action"] = response_action
     end
 
-    -- 如果有Saga信息，将其嵌入响应Data中
-    -- 注意：响应消息只需要嵌入saga_id，不需要嵌入response_action
-    -- 因为response_action已经设置在Tags.Action中用于触发callback
+    -- Embed saga information in response data if available
+    -- Note: Response messages only embed saga_id, not response_action
     if saga_id then
         data = messaging.embed_saga_info_in_data(data, saga_id, nil)
-        message.Data = json.encode(data)
     end
-    
-    ao.send(message)
+
+    ao.send({
+        Target = request_msg.From,
+        Data = json.encode(data),
+        Tags = tags
+    })
 end
 
 function messaging.handle_response_based_on_tag(status, result_or_error, commit, request_msg)
     if status then
         commit()
     end
-    -- 🆕 DDDML改进：使用多层次Tag访问函数
     if (not messaging.convert_to_boolean(messaging.get_no_response_required(request_msg))) then
         messaging.respond(status, result_or_error, request_msg)
     else
@@ -126,19 +120,11 @@ function messaging.handle_response_based_on_tag(status, result_or_error, commit,
 end
 
 local function send(target, data, tags)
-    -- 🆕 CRITICAL FIX: 在AO中，Action必须在Tags中，不能作为消息的直接属性
-    -- 否则跨进程消息会因为Action被过滤而无法触发handler
-    local message = {
+    ao.send({
         Target = target,
-        Data = json.encode(data)
-    }
-
-    -- 设置Tags字段（包含Action）
-    if tags and next(tags) then
-        message.Tags = tags
-    end
-
-    ao.send(message)
+        Data = json.encode(data),
+        Tags = tags
+    })
 end
 
 function messaging.commit_send_or_error(status, request_or_error, commit, target, tags)

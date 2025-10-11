@@ -1,3 +1,4 @@
+local json = require("json")
 local saga = require("saga")
 local messaging = require("messaging")
 
@@ -6,22 +7,29 @@ local saga_messaging = {}
 
 local function respond_original_requester(saga_instance, result_or_error, is_error)
     local original_message_from = saga_instance.original_message and saga_instance.original_message.from or nil
-    local response_action = saga_instance.original_message and saga_instance.original_message.response_action or nil
-    
     if is_error and not result_or_error then
         result_or_error = saga_instance.error or "INTERNAL_ERROR"
     end
-    
-    -- 🆕 DDDML改进：构造包含Saga信息的模拟消息，用于messaging.respond提取
-    -- response_action会被嵌入到Data中，然后设置到响应消息的Tags.Action中
-    local mock_msg_data = {}
-    if response_action then
-        mock_msg_data[messaging.X_TAGS.RESPONSE_ACTION] = response_action
+
+    -- Construct response data with embedded saga information
+    local data = not is_error and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) }
+
+    -- Embed saga information if available
+    -- Note: Response messages only embed saga_id, not response_action
+    if saga_instance.saga_id then
+        data = messaging.embed_saga_info_in_data(data, tostring(saga_instance.saga_id), nil)
     end
-    
-    messaging.handle_response_based_on_tag(not is_error, result_or_error, function() end, {
-        From = original_message_from,
-        Data = require("json").encode(mock_msg_data),
+
+    -- Send response directly instead of using handle_response_based_on_tag
+    local tags = {}
+    if saga_instance.original_message and saga_instance.original_message.response_action then
+        tags["Action"] = saga_instance.original_message.response_action
+    end
+
+    ao.send({
+        Target = original_message_from,
+        Data = json.encode(data),
+        Tags = tags
     })
 end
 

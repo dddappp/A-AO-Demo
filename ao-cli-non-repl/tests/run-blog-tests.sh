@@ -169,7 +169,7 @@ fi
 echo ""
 
 # 设置等待时间（可以根据需要调整）
-WAIT_TIME="${AO_WAIT_TIME:-3}"
+WAIT_TIME="${AO_WAIT_TIME:-6}"
 echo "等待时间设置为: ${WAIT_TIME} 秒"
 
 # **NOTE**：如果要想让消息出现在一个进程 Inbox 里，可以在该进程（我们后面称之为“原进程”）内用 eval 的方式来发送消息。

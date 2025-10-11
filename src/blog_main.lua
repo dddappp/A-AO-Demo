@@ -53,8 +53,8 @@ saga.init(SagaInstances, SagaIdSequence)
 
 local function get_article(msg, env, response)
     local status, result = pcall((function()
-        local cmd = json.decode(msg.Data)  -- 解析JSON对象
-        local article_id = cmd.article_id   -- 提取ID
+        local cmd = json.decode(msg.Data)
+        local article_id = cmd.article_id
         local _state = entity_coll.get(ArticleTable, article_id)
         return _state
     end))
@@ -63,8 +63,8 @@ end
 
 local function get_comment(msg, env, response)
     local status, result = pcall((function()
-        local cmd = json.decode(msg.Data)  -- 解析JSON对象
-        local _article_comment_id = cmd.article_comment_id  -- 提取值对象
+        local cmd = json.decode(msg.Data)
+        local _article_comment_id = cmd.article_comment_id
         local _key = json.encode(article_comment_id.to_key_array(_article_comment_id))
         local _state = entity_coll.get(CommentTable, _key)
         return _state

@@ -63,9 +63,6 @@ local inventory_item_config = inventory_service_config.inventory_item;
 local in_out_config = inventory_service_config.in_out;
 
 
--- 全局调试变量
-DEBUG_SAGA_START_ATTEMPTS = DEBUG_SAGA_START_ATTEMPTS or {}
-
 function inventory_service.process_inventory_surplus_or_shortage(msg, env, response)
     local cmd = json.decode(msg.Data)
 
@@ -74,36 +71,34 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_get_inventory_item_action() }
 
-    local status, request_or_error, commit = pcall((function()
-        local saga_instance, commit = saga.create_saga_instance(ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE, target,
+    local status, result = pcall((function()
+        local saga_instance, commit = saga.create_saga_instance(
+            ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE,
+            target,
             tags,
-            context, -- cmd as context
+            context,
             {
                 from = msg.From,
-                response_action = messaging.get_response_action(msg),
-                no_response_required = messaging.get_no_response_required(msg),
+                response_action = nil  -- No final callback needed for this test scenario
             },
-            0
+            nil  -- Allow dynamic steps based on callbacks
         )
-            local saga_id = saga_instance.saga_id
-            local _inventory_item_id = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
-            -- 🆕 DDDML改进：将Saga信息嵌入Data中而不是Tag中，以避免在转发过程中丢失
-            -- 现在GetInventoryItem需要JSON对象格式：{"inventory_item_id": {...}}
-            local request = {
-                inventory_item_id = _inventory_item_id
-            }
-            request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
-            return request, commit
+        local saga_id = saga_instance.saga_id
+        local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
+        -- Embed saga information in request data instead of tags
+        request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
+        return {request = request, commit = commit}
     end))
 
-    messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
+    if status then
+        messaging.commit_send_or_error(status, result.request, result.commit, target, tags)
+    else
+        messaging.commit_send_or_error(status, result, function() end, target, tags)
+    end
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback(msg, env, response)
-    -- 🆕 DDDML改进：使用多层次Tag访问函数
-    local saga_id_str = messaging.get_saga_id(msg)
-    local saga_id = tonumber(saga_id_str)
-    
+    local saga_id = tonumber(messaging.get_saga_id(msg))
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 1 or saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -139,12 +134,11 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
             movement_quantity = context.movement_quantity,
         }
         local commit = saga.move_saga_instance_forward(saga_id, 1, target, tags, context)
-        -- 🆕 DDDML改进：将Saga信息嵌入Data中而不是Tag中，以避免在转发过程中丢失
+        -- Embed saga information in request data instead of tags
         request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK)
-        
         return request, commit
     end))
-    
+
     messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 end
 
@@ -152,9 +146,7 @@ end
 function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback(
     msg, env, response
 )
-    -- 🆕 DDDML改进：使用Data嵌入的Saga信息访问
-    local saga_id_str = messaging.get_saga_id(msg)
-    local saga_id = tonumber(saga_id_str)
+    local saga_id = tonumber(messaging.get_saga_id(msg))
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 2 or not saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -182,7 +174,7 @@ local function process_inventory_surplus_or_shortage_compensate_create_single_li
         }
 
         local commit = saga.rollback_saga_instance(saga_id, pre_local_step_count + 1, target, tags, context, _err)
-        -- 🆕 DDDML改进：将Saga信息嵌入Data中而不是Tag中，以避免在转发过程中丢失
+        -- Embed saga information in request data instead of tags
         request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK)
         return request, commit
     end))
@@ -199,7 +191,6 @@ end
 
 
 function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_callback(msg, env, response)
-    -- 🆕 DDDML改进：使用多层次Tag访问函数
     local saga_id = tonumber(messaging.get_saga_id(msg))
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 2 or saga_instance.compensating) then
@@ -249,7 +240,7 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
             version = context.item_version,
         }
         local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, target, tags, context)
-        -- 🆕 DDDML改进：将Saga信息嵌入Data中而不是Tag中，以避免在转发过程中丢失
+        -- Embed saga information in request data instead of tags
         request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK)
         return request, commit
     end))
@@ -264,7 +255,6 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_add_inventory_item_entry_callback(msg, env, response)
-    -- 🆕 DDDML改进：使用多层次Tag访问函数
     local saga_id = tonumber(messaging.get_saga_id(msg))
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 4 or saga_instance.compensating) then
@@ -317,7 +307,7 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
             version = context.in_out_version,
         }
         local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, target, tags, context)
-        -- 🆕 DDDML改进：将Saga信息嵌入Data中而不是Tag中，以避免在转发过程中丢失
+        -- Embed saga information in request data instead of tags
         request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK)
         return request, commit
     end))
@@ -332,7 +322,6 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback(msg, env, response)
-    -- 🆕 DDDML改进：使用多层次Tag访问函数
     local saga_id = tonumber(messaging.get_saga_id(msg))
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 6 or saga_instance.compensating) then
