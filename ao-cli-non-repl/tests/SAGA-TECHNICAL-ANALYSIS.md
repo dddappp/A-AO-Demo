@@ -429,11 +429,43 @@ if run_ao_cli eval "$ALICE_PROCESS_ID" --data "INVENTORY_SERVICE_INVENTORY_ITEM_
 
 **研究意义**：这项研究帮助开发者理解AO系统的设计理念，并提供了平滑迁移的解决方案，为AO生态的分布式应用开发提供了重要参考。
 
+## 🎉 最终解决方案总结
+
+### ✅ 核心发现与修复
+
+**问题根源**：`messaging.respond`函数逻辑错误
+- 错误地将`response_action`重新嵌入响应Data中
+- 导致响应Data结构混乱，Saga协调失败
+
+**正确实现**：
+```lua
+-- 响应消息只需嵌入saga_id，不需要response_action
+if saga_id then
+    data = messaging.embed_saga_info_in_data(data, saga_id, nil)  -- 第三个参数为nil
+    message.Data = json.encode(data)
+end
+```
+
+**关键原则**：
+1. **请求消息**：嵌入`saga_id` + `response_action`
+2. **响应消息**：只嵌入`saga_id`，`response_action`仅设置在`Tags.Action`中
+3. **Action tag**：不会被过滤，用于handler匹配
+4. **自定义tag**：会被过滤，必须用Data嵌入
+
+### 🎯 验证成果
+
+- ✅ SAGA完全成功：current_step=6, completed=true
+- ✅ 库存正确更新：从100更新到119
+- ✅ 跨进程通信正常：alice↔bob消息传递无误
+- ✅ Data嵌入策略有效：绕过AO Tag过滤机制
+
 ## 🔧 DDDML工具改进建议
 
 ### 问题背景
 
 通过深入分析AO系统的Tag处理机制，我们发现DDDML工具生成的Saga相关代码需要适应AO系统的双重Tag处理架构。当前生成的代码大量使用`msg.Tags[messaging.X_TAGS.SAGA_ID]`等模式，但在跨进程消息传递时，这些自定义Tag会被AO系统过滤，导致Saga框架无法正常工作。
+
+**重要提示**：本次修复证明了Data嵌入策略的正确性，但也暴露了一个关键细节——**请求和响应的Saga信息嵌入策略不同**。这是DDDML代码生成时需要特别注意的。
 
 ### 核心改进需求
 
@@ -464,25 +496,53 @@ end
 - **Data嵌入优势**：Data字段在传递过程中保持完整，不会被过滤
 - **解决方案**：将Saga信息嵌入Data中，确保跨进程传递的可靠性
 
-#### 2. 消息发送策略升级
+#### 2. 消息发送策略升级 ⭐ 关键改进
 
-**当前问题**：简单地将Saga信息放入Tags中发送
+**当前问题**：简单地将Saga信息放入Tags中发送，且未区分请求和响应
 
-**改进方案**：优先将Saga信息嵌入Data中
+**改进方案**：区分请求和响应的Data嵌入策略
 
 ```lua
--- 建议的消息发送模板
-local enhanced_data = messaging.embed_saga_info_in_data(data, saga_id, response_action)
+-- 🎯 发送SAGA请求消息（需要嵌入response_action）
+local request_data = messaging.embed_saga_info_in_data(
+    business_data, 
+    saga_id, 
+    response_action  -- ✅ 告诉对方"收到响应后调用哪个callback"
+)
 
 ao.send({
     Target = target,
-    Data = json.encode(enhanced_data),
+    Data = json.encode(request_data),
     Tags = {
-        Action = action,
-        -- 注意：不再在Tags中放置Saga信息，优先使用Data嵌入
+        Action = action,  -- 用于匹配对方的handler
     }
 })
+
+-- 🎯 发送SAGA响应消息（不需要嵌入response_action）
+function messaging.respond(status, result_or_error, request_msg)
+    local data = status and { result = result_or_error } or { error = ... }
+    local saga_id, response_action = messaging.extract_saga_info_from_data(request_msg.Data)
+    
+    -- ✅ 响应只嵌入saga_id，不嵌入response_action
+    if saga_id then
+        data = messaging.embed_saga_info_in_data(data, saga_id, nil)  -- 第三个参数为nil
+    end
+    
+    -- ✅ response_action只设置在Tags.Action中，用于触发callback handler
+    local message = {
+        Target = request_msg.From,
+        Data = json.encode(data),
+        Tags = response_action and { Action = response_action } or nil
+    }
+    
+    ao.send(message)
+end
 ```
+
+**关键区别**：
+- **请求消息**：`embed_saga_info_in_data(data, saga_id, response_action)` - 三个参数都传
+- **响应消息**：`embed_saga_info_in_data(data, saga_id, nil)` - 第三个参数为nil
+- **响应的Action**：从请求Data中提取`response_action`，设置到响应的`Tags.Action`
 
 #### 3. 配置化常量管理
 

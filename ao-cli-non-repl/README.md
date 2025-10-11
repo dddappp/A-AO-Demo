@@ -171,20 +171,26 @@ cat ./ao-cli-non-repl/tests/README.md
 此项目的核心贡献是解决了AO平台上的Saga框架实现关键问题：
 
 ### 🎯 问题背景
-AO系统会对消息Tags进行过滤，导致Saga框架依赖的自定义Tag（如`X-SagaId`）在跨进程传递时丢失，破坏了分布式事务的协调机制。
+AO系统会对消息Tags进行过滤，导致Saga框架依赖的自定义Tag（如`X-SagaId`、`X-ResponseAction`）在跨进程传递时丢失，破坏了分布式事务的协调机制。
 
 ### ✅ 解决方案
-通过深入分析AO/AOS源码，我们实现了**Data嵌入策略**：
+通过深入分析AO/AOS源码和系统测试，我们实现了**Data嵌入策略**：
 - 将Saga相关信息从Tags移动到Data字段
 - 使用`messaging.embed_saga_info_in_data()`函数安全嵌入
 - 使用`messaging.get_saga_id()`函数可靠提取
+- **关键发现**：区分请求和响应的Saga信息嵌入策略
+  - 请求消息：嵌入`saga_id` + `response_action`
+  - 响应消息：只嵌入`saga_id`（`response_action`仅设置在`Tags.Action`中）
 - 确保信息在AO系统的Tag过滤机制下仍然完整传递
 
 ### 📊 验证成果
-- ✅ SAGA事务能够可靠启动和执行多个步骤
+- ✅ SAGA事务完全成功（current_step=6, completed=true）
 - ✅ 库存管理业务逻辑正确执行（数量从100更新到119）
-- ✅ 单进程内完整事务协调
-- ✅ 跨步骤状态一致性保证
+- ✅ 跨进程通信正常（alice↔bob消息传递无误）
+- ✅ Data嵌入策略有效（绕过AO Tag过滤机制）
 
 ### 🎖️ 技术意义
-此解决方案为AO平台上的复杂分布式应用提供了可靠的技术基础，特别是对于需要跨进程协调的业务场景。
+此解决方案为AO平台上的复杂分布式应用提供了可靠的技术基础，特别是对于需要跨进程协调的业务场景。核心经验：
+1. **Action tag不会被过滤**，可用于handler匹配
+2. **自定义tag会被过滤**，必须用Data嵌入
+3. **请求和响应的Saga信息嵌入策略不同**，这是关键细节
