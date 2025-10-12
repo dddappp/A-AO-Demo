@@ -166,7 +166,7 @@ function cross_contract_inventory_service.process_fee_callback(msg, env, respons
         local rollback_commit = saga.rollback_saga_instance(saga_id, 1, nil, nil, context, data.error)
         rollback_commit()
 
-        messaging.handle_response_based_on_tag(false, {
+        messaging.process_operation_result(false, {
             error = "ADJUSTMENT_FEE_PAYMENT_FAILED",
             reason = data.error,
             product_id = context.product_id,
@@ -267,7 +267,7 @@ function cross_contract_inventory_service.continue_adjustment_saga(saga_id, step
             report_commit()
 
             -- 🎉 库存调整完全成功！
-            messaging.handle_response_based_on_tag(true, {
+            messaging.process_operation_result(true, {
                 status = "INVENTORY_ADJUSTMENT_COMPLETED",
                 product_id = context.product_id,
                 location = context.location,
@@ -330,7 +330,7 @@ function cross_contract_inventory_service.rollback_adjustment_saga(saga_id, reas
     execute_full_rollback()
 
     -- 通知调整失败
-    messaging.handle_response_based_on_tag(false, {
+    messaging.process_operation_result(false, {
         error = "INVENTORY_ADJUSTMENT_FAILED",
         reason = reason,
         product_id = context.product_id,

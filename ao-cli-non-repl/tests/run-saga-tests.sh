@@ -143,7 +143,7 @@ echo ""
 
 # 设置等待时间（可以根据需要调整）
 # SAGA需要多次跨进程往返，每次都需要网络传输时间，所以基础等待时间需要更长
-WAIT_TIME="${AO_WAIT_TIME:-6}"
+WAIT_TIME="${AO_WAIT_TIME:-5}"
 SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-45}"  # 确保SAGA完全完成
 echo "等待时间设置为: 普通操作 ${WAIT_TIME} 秒, SAGA执行 ${SAGA_WAIT_TIME} 秒"
 
@@ -329,12 +329,17 @@ echo "等待SAGA异步执行完成..."
 echo "等待 $SAGA_WAIT_TIME 秒基础时间..."
 sleep "$SAGA_WAIT_TIME"
 
+# todo 改进等待机制。循环检测等待 SAGA 执行完成。
+#   可以每次延迟等待 SAGA_WAIT_TIME 秒，然后检查 INVENTORY_AFTER，如果 INVENTORY_AFTER 等于预期的值，则认为SAGA执行完成。
+#   或者累计时间超过一个较大的时间（定义一个常量），那么也可以退出循环。
+
 # 视网络状况，可以多等待一些时间
-echo "额外等待 30 秒以确保异步操作完成..."
-sleep 30
-# 如果还不够，可以再次等待
-#echo "再次额外等待 30 秒..."
-#sleep 30
+EXTRA_WAIT_TIME="${AO_EXTRA_WAIT_TIME:-130}"
+echo "额外等待 $EXTRA_WAIT_TIME 秒以确保异步操作完成..."
+sleep "$EXTRA_WAIT_TIME"
+echo "再次额外等待 $EXTRA_WAIT_TIME 秒..."
+sleep "$EXTRA_WAIT_TIME"
+
 
 echo "🔍 检查库存更新状态..."
 # 现在GetInventoryItem需要JSON对象格式

@@ -41,10 +41,6 @@ Handlers.add(
     "complete_in_out",
     Handlers.utils.hasMatchingTag("Action", "CompleteInOut"),
     function(msg, env, response)
-        -- 🆕 DDDML改进：处理Saga信息
-        local saga_id = messaging.get_saga_id(msg)
-        local response_action = messaging.get_response_action(msg)
-
         messaging.respond(true, {
             --
         }, msg)

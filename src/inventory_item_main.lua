@@ -40,8 +40,8 @@ saga.init(SagaInstances, SagaIdSequence)
 
 local function get_inventory_item(msg, env, response)
     local status, result = pcall((function()
-        local cmd = json.decode(msg.Data)
-        local _inventory_item_id = cmd.inventory_item_id
+        local cmd = json.decode(msg.Data)  -- 解析JSON对象
+        local _inventory_item_id = cmd.inventory_item_id  -- 提取值对象
         local _key = json.encode(inventory_item_id.to_key_array(_inventory_item_id))
         local _state = entity_coll.get(InventoryItemTable, _key)
         return _state

@@ -171,7 +171,7 @@ function payment_service.process_payment_transfer_tokens_callback(msg, env, resp
         total_commit()
 
         -- 通知支付失败
-        messaging.handle_response_based_on_tag(false, {
+        messaging.process_operation_result(false, {
             error = "PAYMENT_FAILED",
             reason = data.error,
             order_id = context.order_id
@@ -197,7 +197,7 @@ function payment_service.process_payment_transfer_tokens_callback(msg, env, resp
     commit()
 
     -- 通知支付成功
-    messaging.handle_response_based_on_tag(true, {
+    messaging.process_operation_result(true, {
         status = "payment_completed",
         order_id = context.order_id,
         amount = context.amount,

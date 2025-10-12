@@ -325,7 +325,7 @@ function ecommerce_payment_service.process_order_payment_transfer_callback(msg, 
         rollback_commit()
 
         -- 通知用户支付验证失败
-        messaging.handle_response_based_on_tag(false, {
+        messaging.process_operation_result(false, {
             error = "PAYMENT_VERIFICATION_FAILED",
             reason = data.error,
             order_id = context.order_id,
@@ -424,7 +424,7 @@ function ecommerce_payment_service.continue_payment_saga(saga_id, step_number)
             points_commit()
 
             -- 🎉 支付流程完全成功！
-            messaging.handle_response_based_on_tag(true, {
+            messaging.process_operation_result(true, {
                 status = "PAYMENT_COMPLETED",
                 order_id = context.order_id,
                 transaction_id = context.transaction_id,
@@ -488,7 +488,7 @@ function ecommerce_payment_service.rollback_payment_saga(saga_id, reason)
     execute_full_rollback()
 
     -- 通知支付失败
-    messaging.handle_response_based_on_tag(false, {
+    messaging.process_operation_result(false, {
         error = "PAYMENT_FAILED",
         reason = reason,
         order_id = context.order_id,

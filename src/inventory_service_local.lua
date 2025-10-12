@@ -50,7 +50,11 @@ function inventory_service_local.process_inventory_surplus_or_shortage_prepare_g
         location = context.location,
     }
     context.inventory_item_id = _inventory_item_id
-    return _inventory_item_id
+    -- 现在GetInventoryItem需要JSON对象格式：{"inventory_item_id": {...}}
+    local request = {
+        inventory_item_id = _inventory_item_id
+    }
+    return request
 end
 
 function inventory_service_local.process_inventory_surplus_or_shortage_on_get_inventory_item_reply(context, result)

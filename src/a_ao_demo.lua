@@ -143,9 +143,8 @@ local function get_inventory_item(msg, env, response)
         -- 从Data中提取实际的业务数据（现在是JSON对象格式）
         local cmd = json.decode(msg.Data)
         local _inventory_item_id = cmd.inventory_item_id  -- 提取值对象
-        msg.Data = cmd
 
-        -- -- 如果有Saga信息，则移除Saga相关字段（从cmd中移除）
+        -- 如果有Saga信息，则移除Saga相关字段（从cmd中移除）？NOTE 因为已经将实体 ID 封装为 Data 的一个属性，似乎这里没有必要移除
         -- if saga_id then
         --     cmd[messaging.X_TAGS.SAGA_ID] = nil
         --     cmd[messaging.X_TAGS.RESPONSE_ACTION] = nil
@@ -160,15 +159,14 @@ end
 
 local function add_inventory_item_entry(msg, env, response)
     local status, result, commit = pcall((function()
-        -- -- 🆕 DDDML改进：检查是否有Saga信息，然后处理业务数据
+        -- 🆕 DDDML改进：检查是否有Saga信息，然后处理业务数据
         -- local saga_id = messaging.get_saga_id(msg)
         -- local response_action = messaging.get_response_action(msg)
 
         -- 从Data中提取实际的业务数据
         local cmd = json.decode(msg.Data)
-        msg.Data = cmd
 
-        -- -- 如果有Saga信息，则移除Saga相关字段
+        -- 如果有Saga信息，则移除Saga相关字段？NOTE 因为已经将实体 ID 封装为 Data 的一个属性，似乎这里没有必要移除
         -- if saga_id then
         --     cmd[messaging.X_TAGS.SAGA_ID] = nil
         --     cmd[messaging.X_TAGS.RESPONSE_ACTION] = nil
@@ -178,13 +176,13 @@ local function add_inventory_item_entry(msg, env, response)
         return event, result_commit
     end))
 
-    -- -- 修复：正确处理返回值
-    -- if status then
-    --     local event, commit_func = result, commit
-    messaging.process_operation_result(status, result, commit, msg)
-    -- else
-    --     messaging.handle_response_based_on_tag(status, result, function() end, msg)
-    -- end
+    -- 修复：正确处理返回值
+    if status then
+        local event, commit_func = result, commit
+        messaging.process_operation_result(status, event, commit_func, msg)
+    else
+        messaging.process_operation_result(status, result, function() end, msg)
+    end
 end
 
 Handlers.add(
