@@ -85,7 +85,11 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
             0
         )
         local saga_id = saga_instance.saga_id
-        local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
+        local _inventory_item_id = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
+        -- GetInventoryItem needs JSON object format: {"inventory_item_id": {...}}
+        local request = {
+            inventory_item_id = _inventory_item_id
+        }
         -- Embed saga information in request data instead of tags
         request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
         return request, commit

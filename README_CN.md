@@ -255,7 +255,7 @@ aos process_alice
 ```shell
 docker run --rm \
 -v .:/myapp \
-wubuku/dddappp-ao:latest \
+wubuku/dddappp-ao:master \
 --dddmlDirectoryPath /myapp/dddml \
 --boundedContextName A.AO.Demo \
 --aoLuaProjectDirectoryPath /myapp/src \
@@ -282,7 +282,7 @@ wubuku/dddappp-ao:latest \
 ```shell
 docker run --rm \
 -v .:/myapp \
-wubuku/dddappp-ao:latest \
+wubuku/dddappp-ao:master \
 --dddmlDirectoryPath /myapp/dddml \
 --boundedContextName A.AO.Demo \
 --aoLuaProjectDirectoryPath /myapp/src \

@@ -143,7 +143,7 @@ echo ""
 
 # 设置等待时间（可以根据需要调整）
 # SAGA需要多次跨进程往返，每次都需要网络传输时间，所以基础等待时间需要更长
-WAIT_TIME="${AO_WAIT_TIME:-5}"
+WAIT_TIME="${AO_WAIT_TIME:-6}"
 SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-45}"  # 确保SAGA完全完成
 echo "等待时间设置为: 普通操作 ${WAIT_TIME} 秒, SAGA执行 ${SAGA_WAIT_TIME} 秒"
 
@@ -330,8 +330,9 @@ echo "等待 $SAGA_WAIT_TIME 秒基础时间..."
 sleep "$SAGA_WAIT_TIME"
 
 # 视网络状况，可以多等待一些时间
-#echo "额外等待 30 秒以确保异步操作完成..."
-#sleep 30
+echo "额外等待 30 秒以确保异步操作完成..."
+sleep 30
+# 如果还不够，可以再次等待
 #echo "再次额外等待 30 秒..."
 #sleep 30
 
