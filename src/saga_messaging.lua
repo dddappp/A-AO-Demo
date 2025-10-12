@@ -27,26 +27,27 @@ local function respond_original_requester(saga_instance, result_or_error, is_err
     local response_action = saga_instance.original_message and saga_instance.original_message.response_action or nil
     local no_response_required = saga_instance.original_message and saga_instance.original_message.no_response_required or nil
     
-    -- todo 直接构造消息的 XTags 似乎更好？
-    -- local x_tags = {}
-    -- x_tags[messaging.X_TAGS.RESPONSE_ACTION] = response_action
-    -- x_tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED] = no_response_required
+    -- NOTE 直接构造消息的 XTags 似乎更好？
+    local x_tags = {}
+    x_tags[messaging.X_TAGS.RESPONSE_ACTION] = response_action
+    x_tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED] = no_response_required
 
     if is_error and not result_or_error then
         result_or_error = saga_instance.error or "INTERNAL_ERROR"
     end
-    
-    -- todo 直接构造消息的 XTags 似乎更好
+
     -- 🆕 DDDML改进：构造包含Saga信息的模拟消息，用于messaging.respond提取
     -- response_action会被嵌入到Data中，然后设置到响应消息的Tags.Action中
-    local mock_msg_data = {}
-    if response_action then
-        mock_msg_data[messaging.X_TAGS.RESPONSE_ACTION] = response_action
-    end
+    -- local mock_msg_data = {}
+    -- if response_action then
+    --     mock_msg_data[messaging.X_TAGS.RESPONSE_ACTION] = response_action
+    -- end
     
     messaging.process_operation_result(not is_error, result_or_error, function() end, {
         From = original_message_from,
-        Data = require("json").encode(mock_msg_data),
+        -- Data = require("json").encode(mock_msg_data),
+        Data = {},
+        [messaging.X_TAGS_KEY] = x_tags,
     })
 end
 
