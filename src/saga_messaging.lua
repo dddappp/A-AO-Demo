@@ -26,8 +26,7 @@ local function respond_original_requester(saga_instance, result_or_error, is_err
     
     messaging.handle_response_based_on_tag(not is_error, result_or_error, function() end, {
         From = original_message_from,
-        -- Data = json.encode(mock_msg_data),
-        Data = mock_msg_data,
+        Data = json.encode(mock_msg_data),
     })
 end
 
