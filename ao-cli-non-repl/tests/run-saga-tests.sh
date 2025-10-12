@@ -144,7 +144,7 @@ echo ""
 # 设置等待时间（可以根据需要调整）
 # SAGA需要多次跨进程往返，每次都需要网络传输时间，所以基础等待时间需要更长
 WAIT_TIME="${AO_WAIT_TIME:-5}"
-SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-45}"  # 确保SAGA完全完成
+SAGA_WAIT_TIME="${AO_SAGA_WAIT_TIME:-30}"  # 确保SAGA完全完成
 echo "等待时间设置为: 普通操作 ${WAIT_TIME} 秒, SAGA执行 ${SAGA_WAIT_TIME} 秒"
 
 # 检查是否为dry-run模式
@@ -325,21 +325,20 @@ echo ""
 echo "=== 步骤 6: 验证SAGA执行结果 ==="
 echo "等待SAGA异步执行完成..."
 
-# 等待SAGA执行完成 (增加额外等待时间)
+# 改进等待机制：循环检测等待 SAGA 执行完成
+# 首先等待基础时间，然后循环检测直到完成或超时
+MAX_SAGA_WAIT_TIME="${AO_MAX_SAGA_WAIT_TIME:-300}"  # 默认5分钟最大等待时间
+CHECK_INTERVAL="${SAGA_WAIT_TIME:-30}"  # 每次检查间隔
+
 echo "等待 $SAGA_WAIT_TIME 秒基础时间..."
 sleep "$SAGA_WAIT_TIME"
-
-# 改进等待机制：循环检测等待 SAGA 执行完成
-# 每次检查间隔为 SAGA_WAIT_TIME 秒，最大等待时间为 MAX_SAGA_WAIT_TIME
-MAX_SAGA_WAIT_TIME="${AO_MAX_SAGA_WAIT_TIME:-300}"  # 默认5分钟最大等待时间
-CHECK_INTERVAL="${SAGA_WAIT_TIME:-45}"  # 每次检查间隔
 
 echo "🔄 开始循环检测 SAGA 执行状态..."
 echo "   目标库存数量: 119"
 echo "   检查间隔: ${CHECK_INTERVAL} 秒"
 echo "   最大等待时间: ${MAX_SAGA_WAIT_TIME} 秒"
 
-total_waited=0
+total_waited=$SAGA_WAIT_TIME  # 初始化为已等待的基础时间
 saga_completed=false
 
 while [ $total_waited -lt $MAX_SAGA_WAIT_TIME ]; do
