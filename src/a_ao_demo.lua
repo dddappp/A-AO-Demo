@@ -137,18 +137,19 @@ end
 local function get_inventory_item(msg, env, response)
     local status, result = pcall((function()
         -- 🆕 DDDML改进：检查是否有Saga信息，然后处理业务数据
-        local saga_id = messaging.get_saga_id(msg)
-        local response_action = messaging.get_response_action(msg)
+        -- local saga_id = messaging.get_saga_id(msg)
+        -- local response_action = messaging.get_response_action(msg)
 
         -- 从Data中提取实际的业务数据（现在是JSON对象格式）
         local cmd = json.decode(msg.Data)
         local _inventory_item_id = cmd.inventory_item_id  -- 提取值对象
+        msg.Data = cmd
 
-        -- 如果有Saga信息，则移除Saga相关字段（从cmd中移除）
-        if saga_id then
-            cmd[messaging.X_TAGS.SAGA_ID] = nil
-            cmd[messaging.X_TAGS.RESPONSE_ACTION] = nil
-        end
+        -- -- 如果有Saga信息，则移除Saga相关字段（从cmd中移除）
+        -- if saga_id then
+        --     cmd[messaging.X_TAGS.SAGA_ID] = nil
+        --     cmd[messaging.X_TAGS.RESPONSE_ACTION] = nil
+        -- end
 
         local _key = json.encode(inventory_item_id.to_key_array(_inventory_item_id))
         local _state = entity_coll.get(InventoryItemTable, _key)
@@ -159,31 +160,31 @@ end
 
 local function add_inventory_item_entry(msg, env, response)
     local status, result, commit = pcall((function()
-        -- 🆕 DDDML改进：检查是否有Saga信息，然后处理业务数据
-        local saga_id = messaging.get_saga_id(msg)
-        local response_action = messaging.get_response_action(msg)
+        -- -- 🆕 DDDML改进：检查是否有Saga信息，然后处理业务数据
+        -- local saga_id = messaging.get_saga_id(msg)
+        -- local response_action = messaging.get_response_action(msg)
 
         -- 从Data中提取实际的业务数据
-        local data = json.decode(msg.Data)
-        local cmd = data
+        local cmd = json.decode(msg.Data)
+        msg.Data = cmd
 
-        -- 如果有Saga信息，则移除Saga相关字段
-        if saga_id then
-            cmd[messaging.X_TAGS.SAGA_ID] = nil
-            cmd[messaging.X_TAGS.RESPONSE_ACTION] = nil
-        end
+        -- -- 如果有Saga信息，则移除Saga相关字段
+        -- if saga_id then
+        --     cmd[messaging.X_TAGS.SAGA_ID] = nil
+        --     cmd[messaging.X_TAGS.RESPONSE_ACTION] = nil
+        -- end
 
         local event, result_commit = inventory_item_aggregate.add_inventory_item_entry(cmd, msg, env)
         return event, result_commit
     end))
 
-    -- 修复：正确处理返回值
-    if status then
-        local event, commit_func = result, commit
-        messaging.handle_response_based_on_tag(status, event, commit_func, msg)
-    else
-        messaging.handle_response_based_on_tag(status, result, function() end, msg)
-    end
+    -- -- 修复：正确处理返回值
+    -- if status then
+    --     local event, commit_func = result, commit
+    messaging.handle_response_based_on_tag(status, result, commit, msg)
+    -- else
+    --     messaging.handle_response_based_on_tag(status, result, function() end, msg)
+    -- end
 end
 
 Handlers.add(

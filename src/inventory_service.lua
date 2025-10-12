@@ -71,7 +71,7 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_get_inventory_item_action() }
 
-    local status, result = pcall((function()
+    local status, request_or_error, commit = pcall((function()
         local saga_instance, commit = saga.create_saga_instance(
             ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE,
             target,
@@ -79,22 +79,19 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
             context,
             {
                 from = msg.From,
-                response_action = nil  -- No final callback needed for this test scenario
+                response_action = messaging.get_response_action(msg),
+                no_response_required = messaging.get_no_response_required(msg),
             },
-            nil  -- Allow dynamic steps based on callbacks
+            0
         )
         local saga_id = saga_instance.saga_id
         local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
         -- Embed saga information in request data instead of tags
         request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
-        return {request = request, commit = commit}
+        return request, commit
     end))
 
-    if status then
-        messaging.commit_send_or_error(status, result.request, result.commit, target, tags)
-    else
-        messaging.commit_send_or_error(status, result, function() end, target, tags)
-    end
+    messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback(msg, env, response)

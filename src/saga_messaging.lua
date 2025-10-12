@@ -7,29 +7,27 @@ local saga_messaging = {}
 
 local function respond_original_requester(saga_instance, result_or_error, is_error)
     local original_message_from = saga_instance.original_message and saga_instance.original_message.from or nil
+    local response_action = saga_instance.original_message and saga_instance.original_message.response_action or nil
+    local no_response_required = saga_instance.original_message and saga_instance.original_message.no_response_required or nil
+
     if is_error and not result_or_error then
         result_or_error = saga_instance.error or "INTERNAL_ERROR"
     end
-
-    -- Construct response data with embedded saga information
-    local data = not is_error and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) }
-
-    -- Embed saga information if available
-    -- Note: Response messages only embed saga_id, not response_action
-    if saga_instance.saga_id then
-        data = messaging.embed_saga_info_in_data(data, tostring(saga_instance.saga_id), nil)
+    
+    -- Construct a mock message with Saga information for messaging.respond to extract
+    -- response_action will be embedded in Data, then set to response message's Tags.Action
+    local mock_msg_data = {}
+    if response_action then
+        mock_msg_data[messaging.X_TAGS.RESPONSE_ACTION] = response_action
     end
-
-    -- Send response directly instead of using handle_response_based_on_tag
-    local tags = {}
-    if saga_instance.original_message and saga_instance.original_message.response_action then
-        tags["Action"] = saga_instance.original_message.response_action
+    if no_response_required then
+        mock_msg_data[messaging.X_TAGS.NO_RESPONSE_REQUIRED] = no_response_required
     end
-
-    ao.send({
-        Target = original_message_from,
-        Data = json.encode(data),
-        Tags = tags
+    
+    messaging.handle_response_based_on_tag(not is_error, result_or_error, function() end, {
+        From = original_message_from,
+        -- Data = json.encode(mock_msg_data),
+        Data = mock_msg_data,
     })
 end
 

@@ -34,6 +34,9 @@ function messaging.extract_saga_info_from_data(data)
     if type(data) == "string" then
         data = json.decode(data)
     end
+    if type(data) ~= "table" then
+        return nil, nil
+    end
     return data[messaging.X_TAGS.SAGA_ID], data[messaging.X_TAGS.RESPONSE_ACTION]
 end
 
@@ -41,7 +44,8 @@ end
 -- Based on data embedding mechanism (the only reliable cross-process transmission method)
 function messaging.get_saga_id(msg)
     -- Extract saga information only from data (cross-process safe)
-    return messaging.extract_saga_info_from_data(msg.Data)
+    local saga_id, _ = messaging.extract_saga_info_from_data(msg.Data)
+    return saga_id
 end
 
 function messaging.get_response_action(msg)
@@ -51,8 +55,11 @@ function messaging.get_response_action(msg)
 end
 
 function messaging.get_no_response_required(msg)
-    -- DDDML Enhancement: Extract from data embedding (not used yet, for compatibility)
-    return nil  -- Currently no_response_required is not embedded in data
+    local data = msg.Data
+    if type(data) == "string" then
+        data = json.decode(data)
+    end
+    return data[messaging.X_TAGS.NO_RESPONSE_REQUIRED]
 end
 
 local string_to_boolean_mappings = {
@@ -85,25 +92,27 @@ end
 function messaging.respond(status, result_or_error, request_msg)
     local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
 
-    local saga_id = messaging.get_saga_id(request_msg)
-    local response_action = messaging.get_response_action(request_msg)
+    local saga_id, response_action = messaging.extract_saga_info_from_data(request_msg.Data)
 
-    local tags = {}
+    local target = request_msg.From
+
+    local message = {
+        Target = target,
+        Data = json.encode(data)
+    }
+
     if response_action then
-        tags["Action"] = response_action
+        message.Tags = { Action = response_action }
     end
 
     -- Embed saga information in response data if available
     -- Note: Response messages only embed saga_id, not response_action
     if saga_id then
         data = messaging.embed_saga_info_in_data(data, saga_id, nil)
+        message.Data = json.encode(data)
     end
-
-    ao.send({
-        Target = request_msg.From,
-        Data = json.encode(data),
-        Tags = tags
-    })
+    
+    ao.send(message)
 end
 
 function messaging.handle_response_based_on_tag(status, result_or_error, commit, request_msg)
