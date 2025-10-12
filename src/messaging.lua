@@ -115,7 +115,7 @@ function messaging.respond(status, result_or_error, request_msg)
     ao.send(message)
 end
 
-function messaging.handle_response_based_on_tag(status, result_or_error, commit, request_msg)
+function messaging.process_operation_result(status, result_or_error, commit, request_msg)
     if status then
         commit()
     end

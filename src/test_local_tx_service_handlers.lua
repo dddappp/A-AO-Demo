@@ -14,7 +14,7 @@ local function test_update_and_create_articles(msg, env, response)
         local cmd = json.decode(msg.Data)
         return test_local_tx_service.test_update_and_create_articles(cmd, msg, env)
     end))
-    messaging.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.process_operation_result(status, result, commit, msg)
 end
 
 --[[

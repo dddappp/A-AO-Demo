@@ -77,7 +77,7 @@ local function update_article_body(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.update_body(cmd, msg, env)
     end))
-    messaging.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.process_operation_result(status, result, commit, msg)
 end
 
 local function create_article(msg, env, response)
@@ -85,7 +85,7 @@ local function create_article(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.create(cmd, msg, env)
     end))
-    messaging.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.process_operation_result(status, result, commit, msg)
 end
 
 local function update_article(msg, env, response)
@@ -93,7 +93,7 @@ local function update_article(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.update(cmd, msg, env)
     end))
-    messaging.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.process_operation_result(status, result, commit, msg)
 end
 
 local function add_comment(msg, env, response)
@@ -101,7 +101,7 @@ local function add_comment(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.add_comment(cmd, msg, env)
     end))
-    messaging.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.process_operation_result(status, result, commit, msg)
 end
 
 local function update_comment(msg, env, response)
@@ -109,7 +109,7 @@ local function update_comment(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.update_comment(cmd, msg, env)
     end))
-    messaging.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.process_operation_result(status, result, commit, msg)
 end
 
 local function remove_comment(msg, env, response)
@@ -117,7 +117,7 @@ local function remove_comment(msg, env, response)
         local cmd = json.decode(msg.Data)
         return article_aggregate.remove_comment(cmd, msg, env)
     end))
-    messaging.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.process_operation_result(status, result, commit, msg)
 end
 
 Handlers.add(

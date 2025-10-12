@@ -54,7 +54,7 @@ local function add_inventory_item_entry(msg, env, response)
         local cmd = json.decode(msg.Data)
         return inventory_item_aggregate.add_inventory_item_entry(cmd, msg, env)
     end))
-    messaging.handle_response_based_on_tag(status, result, commit, msg)
+    messaging.process_operation_result(status, result, commit, msg)
 end
 
 Handlers.add(

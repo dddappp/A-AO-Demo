@@ -24,7 +24,7 @@ local function respond_original_requester(saga_instance, result_or_error, is_err
         mock_msg_data[messaging.X_TAGS.NO_RESPONSE_REQUIRED] = no_response_required
     end
     
-    messaging.handle_response_based_on_tag(not is_error, result_or_error, function() end, {
+    messaging.process_operation_result(not is_error, result_or_error, function() end, {
         From = original_message_from,
         Data = json.encode(mock_msg_data),
     })
