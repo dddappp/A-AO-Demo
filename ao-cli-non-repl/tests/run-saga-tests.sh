@@ -329,21 +329,52 @@ echo "等待SAGA异步执行完成..."
 echo "等待 $SAGA_WAIT_TIME 秒基础时间..."
 sleep "$SAGA_WAIT_TIME"
 
-# todo 改进等待机制。循环检测等待 SAGA 执行完成。
-#   可以每次延迟等待 SAGA_WAIT_TIME 秒，然后检查 INVENTORY_AFTER，如果 INVENTORY_AFTER 等于预期的值，则认为SAGA执行完成。
-#   或者累计时间超过一个较大的时间（定义一个常量），那么也可以退出循环。
+# 改进等待机制：循环检测等待 SAGA 执行完成
+# 每次检查间隔为 SAGA_WAIT_TIME 秒，最大等待时间为 MAX_SAGA_WAIT_TIME
+MAX_SAGA_WAIT_TIME="${AO_MAX_SAGA_WAIT_TIME:-300}"  # 默认5分钟最大等待时间
+CHECK_INTERVAL="${SAGA_WAIT_TIME:-45}"  # 每次检查间隔
 
-# 视网络状况，可以多等待一些时间
-EXTRA_WAIT_TIME="${AO_EXTRA_WAIT_TIME:-130}"
-echo "额外等待 $EXTRA_WAIT_TIME 秒以确保异步操作完成..."
-sleep "$EXTRA_WAIT_TIME"
-echo "再次额外等待 $EXTRA_WAIT_TIME 秒..."
-sleep "$EXTRA_WAIT_TIME"
+echo "🔄 开始循环检测 SAGA 执行状态..."
+echo "   目标库存数量: 119"
+echo "   检查间隔: ${CHECK_INTERVAL} 秒"
+echo "   最大等待时间: ${MAX_SAGA_WAIT_TIME} 秒"
+
+total_waited=0
+saga_completed=false
+
+while [ $total_waited -lt $MAX_SAGA_WAIT_TIME ]; do
+    echo "⏳ 已等待 ${total_waited} 秒，正在检查 SAGA 状态..."
+
+    # 检查库存状态
+    INVENTORY_AFTER=$(run_ao_cli message "$ALICE_PROCESS_ID" "GetInventoryItem" --data '{"inventory_item_id": {"product_id": 1, "location": "y"}}' --wait 2>&1 | grep '"quantity"' | grep -o '[0-9]*' | head -1 || echo "0")
+
+    echo "   当前库存数量: $INVENTORY_AFTER"
+
+    # 检查是否达到预期值
+    if [ "$INVENTORY_AFTER" = "119" ]; then
+        echo "✅ SAGA 执行完成！库存已正确更新到 119"
+        saga_completed=true
+        break
+    fi
+
+    # 如果还有时间，继续等待
+    if [ $((total_waited + CHECK_INTERVAL)) -lt $MAX_SAGA_WAIT_TIME ]; then
+        echo "   继续等待 ${CHECK_INTERVAL} 秒..."
+        sleep "$CHECK_INTERVAL"
+        total_waited=$((total_waited + CHECK_INTERVAL))
+    else
+        echo "⚠️ 已达到最大等待时间 (${MAX_SAGA_WAIT_TIME} 秒)"
+        break
+    fi
+done
+
+if ! $saga_completed; then
+    echo "⚠️ SAGA 执行可能未完成，继续后续检查..."
+fi
 
 
-echo "🔍 检查库存更新状态..."
-# 现在GetInventoryItem需要JSON对象格式
-INVENTORY_AFTER=$(run_ao_cli message "$ALICE_PROCESS_ID" "GetInventoryItem" --data '{"inventory_item_id": {"product_id": 1, "location": "y"}}' --wait 2>&1 | grep '"quantity"' | grep -o '[0-9]*' | head -1 || echo "0")
+# 库存检查已在循环中完成，现在 INVENTORY_AFTER 变量已设置
+echo "🔍 最终库存检查结果:"
 echo "SAGA执行后的库存数量: $INVENTORY_AFTER"
 
 echo ""
@@ -387,10 +418,16 @@ if [ "$INVENTORY_AFTER" = "119" ]; then
     STEP_6_SUCCESS=true
     INVENTORY_UPDATED=true
     echo "✅ 库存成功更新到119"
+    if $saga_completed; then
+        echo "✅ SAGA 在循环检测中已确认完成"
+    fi
 else
     STEP_6_SUCCESS=false
     INVENTORY_UPDATED=false
     echo "❌ 库存未更新，期望119，实际: $INVENTORY_AFTER"
+    if ! $saga_completed; then
+        echo "⚠️ SAGA 在循环检测中未确认完成，可能仍在执行中"
+    fi
 fi
 
 # 检查SAGA是否完成
@@ -398,7 +435,7 @@ if $SAGA_COMPLETED; then
     SAGA_ID=$SAGA_ID_SEQ
     echo "✅ SAGA实例已完成，ID: $SAGA_ID, 最终步骤: $SAGA_CURRENT_STEP"
 else
-    echo "❌ SAGA实例未完成，状态: $SAGA_STATUS"
+    echo "⚠️ SAGA实例状态查询: $SAGA_STATUS"
 fi
 
 if $STEP_6_SUCCESS; then
