@@ -353,7 +353,10 @@ function inventory_service_local.process_inventory_surplus_or_shortage_prepare_g
         location = context.location,
     }
     context.inventory_item_id = _inventory_item_id
-    return _inventory_item_id
+    local request = {
+        inventory_item_id = _inventory_item_id
+    }
+    return request
 end
 
 function inventory_service_local.process_inventory_surplus_or_shortage_on_get_inventory_item_reply(context, result)
@@ -750,6 +753,39 @@ Inbox[#Inbox]
 ```
 
 如果没有什么意外，这个 Saga 实例的执行状态应该是"已完成"。
+
+### 自动化测试脚本
+
+为了简化测试过程，我们提供了自动化测试脚本：
+
+#### 两进程测试脚本（v1）
+```bash
+./ao-cli-non-repl/tests/run-saga-tests.sh
+```
+
+这个脚本自动执行完整的两进程Saga测试流程，适合快速验证基本的Saga功能。
+
+#### 多进程测试脚本（v2）
+```bash
+./ao-cli-non-repl/tests/run-saga-tests-v2.sh
+```
+
+这个脚本测试按DDDML模块划分的真正多进程分布式架构，需要使用 `--enableMultipleAOLuaProjects` 选项生成的代码。
+
+**脚本功能**：
+- 自动生成AO进程并加载代码
+- 配置进程间通信
+- 执行Saga事务
+- 验证执行结果
+- 提供详细的测试报告
+
+**环境变量**：
+- `AO_DRY_RUN=true` - 模拟模式，验证脚本逻辑而不连接AO网络
+- `AO_PROJECT_ROOT=/path/to/project` - 指定项目根目录
+- `AO_WAIT_TIME=5` - 设置普通操作等待时间
+- `AO_SAGA_WAIT_TIME=30` - 设置Saga执行基础等待时间
+- `AO_MAX_SAGA_WAIT_TIME=300` - 设置Saga执行最大等待时间（秒）
+- `AO_CHECK_INTERVAL=30` - 设置Saga状态检查间隔（秒）
 
 
 ## 延伸阅读

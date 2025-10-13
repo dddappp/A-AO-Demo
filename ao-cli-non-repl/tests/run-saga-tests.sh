@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-# 🎯 AO SAGA 自动化测试脚本 - 验证Data嵌入Saga信息传递解决方案
+# 🎯 AO SAGA 自动化测试脚本 v1 - 两进程测试
+# 验证Data嵌入Saga信息传递解决方案
 #
 # 核心验证：通过将Saga信息从Tags移动到Data字段，绕过AO系统的Tag过滤机制
 # 确保分布式事务能够在AO平台上可靠执行
