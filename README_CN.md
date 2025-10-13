@@ -772,12 +772,19 @@ Inbox[#Inbox]
 
 这个脚本测试按DDDML模块划分的真正多进程分布式架构，需要使用 `--enableMultipleAOLuaProjects` 选项生成的代码。
 
+#### 官方 Token 蓝图测试脚本
+```bash
+./ao-cli-non-repl/tests/run-official-token-tests.sh
+```
+
+这个脚本测试AO官方标准Token蓝图的完整功能，包括Info、Balance、Transfer、Mint、Total-Supply、Burn等7个核心API。
+
 **脚本功能**：
-- 自动生成AO进程并加载代码
-- 配置进程间通信
-- 执行Saga事务
-- 验证执行结果
-- 提供详细的测试报告
+- 自动生成AO进程并加载官方Token蓝图
+- 验证bint大整数库的精确计算功能
+- 测试Debit-Notice/Credit-Notice通知系统
+- 验证幂等性和状态一致性保证
+- 提供详细的测试报告和功能验证
 
 **环境变量**：
 - `AO_DRY_RUN=true` - 模拟模式，验证脚本逻辑而不连接AO网络

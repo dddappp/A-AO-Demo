@@ -788,12 +788,19 @@ This script automatically executes the complete two-process Saga testing process
 
 This script tests the true multi-process distributed architecture divided by DDDML modules, requiring code generated with the `--enableMultipleAOLuaProjects` option.
 
+#### Official Token Blueprint Testing Script
+```bash
+./ao-cli-non-repl/tests/run-official-token-tests.sh
+```
+
+This script tests the complete functionality of the AO official standard Token blueprint, including 7 core APIs: Info, Balance, Transfer, Mint, Total-Supply, Burn.
+
 **Script Functions**:
-- Automatically generate AO processes and load code
-- Configure inter-process communication
-- Execute Saga transactions
-- Verify execution results
-- Provide detailed test reports
+- Automatically generate AO processes and load the official Token blueprint
+- Verify bint big integer library's precise calculation functionality
+- Test Debit-Notice/Credit-Notice notification system
+- Verify idempotency and state consistency guarantees
+- Provide detailed test reports and function verification
 
 **Environment Variables**:
 - `AO_DRY_RUN=true` - Simulation mode, verify script logic without connecting to AO network
