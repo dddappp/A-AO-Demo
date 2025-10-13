@@ -381,9 +381,39 @@ echo "Saga执行后的库存数量: $INVENTORY_AFTER"
 
 echo ""
 echo "🔍 检查inventory_service进程中的SAGA实例状态..."
-# 检查Saga状态
+# 直接查询SagaIdSequence全局变量（它是一个表，第一个元素是当前序号）
 SAGA_ID_SEQ=$(run_ao_cli eval "$INVENTORY_SERVICE_PROCESS_ID" --data "return SagaIdSequence[1] or 0" --wait 2>/dev/null | grep 'Data:' | tail -1 | grep -o '[0-9]*' || echo "0")
 echo "SAGA ID序列: $SAGA_ID_SEQ"
+
+# 如果有SAGA实例，查询最新的SAGA状态
+if [ "$SAGA_ID_SEQ" -gt 0 ]; then
+    # 获取完整的响应，包括嵌套的JSON结构
+    SAGA_RESPONSE=$(run_ao_cli message "$INVENTORY_SERVICE_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": $SAGA_ID_SEQ}" --wait 2>/dev/null || echo "")
+
+    # 调试模式：输出完整响应（如果设置了DEBUG环境变量）
+    if [ "${DEBUG}" = "1" ]; then
+        echo "🔍 DEBUG: 完整SAGA响应:"
+        echo "$SAGA_RESPONSE"
+        echo ""
+    fi
+
+    # 提取current_step和completed状态（注意JSON中可能有空格）
+    SAGA_CURRENT_STEP=$(echo "$SAGA_RESPONSE" | grep -o '"current_step":[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "unknown")
+    SAGA_COMPLETED_FLAG=$(echo "$SAGA_RESPONSE" | grep -o '"completed":[[:space:]]*true' || echo "")
+
+    if [ -n "$SAGA_COMPLETED_FLAG" ]; then
+        SAGA_STATUS="id=$SAGA_ID_SEQ, current_step=$SAGA_CURRENT_STEP, completed=true"
+        SAGA_COMPLETED=true
+    else
+        SAGA_STATUS="id=$SAGA_ID_SEQ, current_step=$SAGA_CURRENT_STEP, completed=false"
+        SAGA_COMPLETED=false
+    fi
+else
+    SAGA_STATUS="not_found"
+    SAGA_COMPLETED=false
+fi
+
+echo "SAGA实例状态: $SAGA_STATUS"
 
 # 判断测试是否成功
 if [ "$INVENTORY_AFTER" = "119" ]; then
