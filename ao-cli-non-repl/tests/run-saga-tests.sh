@@ -325,7 +325,7 @@ echo "等待SAGA异步执行完成..."
 # 改进等待机制：循环检测等待 SAGA 执行完成
 # 首先等待基础时间，然后循环检测直到完成或超时
 MAX_SAGA_WAIT_TIME="${AO_MAX_SAGA_WAIT_TIME:-300}"  # 默认5分钟最大等待时间
-CHECK_INTERVAL="${SAGA_WAIT_TIME:-30}"  # 每次检查间隔
+CHECK_INTERVAL="${AO_CHECK_INTERVAL:-$SAGA_WAIT_TIME}"  # 每次检查间隔，默认等于基础等待时间
 
 echo "等待 $SAGA_WAIT_TIME 秒基础时间..."
 sleep "$SAGA_WAIT_TIME"
@@ -543,7 +543,7 @@ echo "  - 如果验证失败，检查库存更新和SAGA状态"
 echo ""
 echo "💡 使用提示:"
 echo "  - 如需指定特定项目路径: export AO_PROJECT_ROOT=/path/to/project"
-echo "  - 调整等待时间: export AO_WAIT_TIME=3 AO_SAGA_WAIT_TIME=15"
+echo "  - 调整等待时间: export AO_WAIT_TIME=3 AO_SAGA_WAIT_TIME=15 AO_CHECK_INTERVAL=20 AO_MAX_SAGA_WAIT_TIME=600"
 echo "  - 查看详细日志: 设置环境变量 DEBUG=1"
 echo ""
 echo "🧹 清理提示:"

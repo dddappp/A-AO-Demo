@@ -536,7 +536,7 @@ echo "  - 如果库存更新失败，检查跨进程消息传递"
 echo ""
 echo "💡 使用提示:"
 echo "  - 如需指定特定项目路径: export AO_PROJECT_ROOT=/path/to/project"
-echo "  - 调整等待时间: export AO_WAIT_TIME=3 AO_SAGA_WAIT_TIME=15"
+echo "  - 调整等待时间: export AO_WAIT_TIME=3 AO_SAGA_WAIT_TIME=15 AO_CHECK_INTERVAL=20 AO_MAX_SAGA_WAIT_TIME=600"
 echo "  - 查看详细日志: 设置环境变量 DEBUG=1"
 echo "  - 模拟测试: AO_DRY_RUN=true ./run-saga-tests-v2.sh"
 
