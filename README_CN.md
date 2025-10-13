@@ -785,7 +785,7 @@ Inbox[#Inbox]
 - `AO_WAIT_TIME=5` - 设置普通操作等待时间
 - `AO_SAGA_WAIT_TIME=30` - 设置Saga执行基础等待时间
 - `AO_MAX_SAGA_WAIT_TIME=300` - 设置Saga执行最大等待时间（秒）
-- `AO_CHECK_INTERVAL=30` - 设置Saga状态检查间隔（秒）
+- `AO_CHECK_INTERVAL=30` - 设置Saga状态检查重试间隔（秒），默认为SAGA_WAIT_TIME
 
 
 ## 延伸阅读

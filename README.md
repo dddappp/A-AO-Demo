@@ -801,7 +801,7 @@ This script tests the true multi-process distributed architecture divided by DDD
 - `AO_WAIT_TIME=5` - Set ordinary operation wait time
 - `AO_SAGA_WAIT_TIME=30` - Set Saga execution base wait time
 - `AO_MAX_SAGA_WAIT_TIME=300` - Set Saga execution maximum wait time (seconds)
-- `AO_CHECK_INTERVAL=30` - Set Saga status check interval (seconds)
+- `AO_CHECK_INTERVAL=30` - Set Saga status check interval between retries (seconds), defaults to SAGA_WAIT_TIME
 
 
 ## Extended reading
