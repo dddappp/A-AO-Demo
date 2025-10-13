@@ -309,21 +309,44 @@ The command parameters above are straightforward:
 
 After executing the above command, you will see a "ton" of code generated for you by the dddappp tool in the `. /src` directory.
 
+#### Multi-Process Mode (By Module)
+
+To better support distributed architecture and microservice deployment, dddappp also supports **generating multiple independent AO processes by DDDML modules**. In this mode, each business module runs in an independent process, improving system scalability and maintainability.
+
+After configuring with reference to the file [dddml/configuration.yaml](./dddml/configuration.yaml), run in the repository root directory:
+
+```shell
+docker run --rm \
+-v .:/myapp \
+wubuku/dddappp-ao:master \
+--dddmlDirectoryPath /myapp/dddml \
+--boundedContextName A.AO.Demo \
+--aoLuaProjectDirectoryPath /myapp/src \
+--exposeBaseDddmlFiles \
+--enableMultipleAOLuaProjects
+```
+
+This will generate independent AO Lua main files for each DDDML module:
+
+- **`inventory_item_main.lua`**: Inventory item aggregate process, managing inventory data and operations
+- **`inventory_service_main.lua`**: Inventory service process, implementing Saga coordinator, orchestrating cross-process business workflows
+- **`in_out_service_main.lua`**: In/Out service process (abstract service, provided by external implementation)
+- **`blog_main.lua`**: Blog aggregate process, managing articles and comments data
+- **`a_ao_demo_main.lua`**: Default module process, containing basic framework, currently basically an empty file. Because we didn't put useful objects (aggregates, services) into this module.
+
+Each module process is an independent AO process, supporting multi-process concurrent execution and cross-process Saga transactions. This multi-process architecture provides better business module decoupling and resource isolation, which is our recommended production environment deployment method.
 
 #### Update dddappp Docker Image
 
-Since the dddappp-ao:master image is updated frequently, 
-if you've run the above command before and run into problems, 
-you may be required to manually delete the image and pull it again before `docker run`,
-making sure you use the latest version of the image.
+Since the dddappp tool's image master version is updated frequently, if you've run the above command before and now encounter problems, you may need to manually delete the old image to ensure you use the latest version of the image.
 
 ```shell
 # If you have already run it, you may need to Clean Up Exited Docker Containers first
-docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:latest")
+docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:master")
 # remove the image
-docker image rm wubuku/dddappp-ao:latest
+docker image rm wubuku/dddappp-ao:master
 # pull the image
-docker pull wubuku/dddappp-ao:latest
+docker pull wubuku/dddappp-ao:master
 ```
 
 ### Filling in the business logic
@@ -445,6 +468,108 @@ Just so much for programming. All set, let's start testing the app.
 
 
 ## Testing the Application
+
+dddappp supports multiple testing methods, from simple single-process testing to complex multi-process distributed testing. Below we first introduce the **recommended production environment deployment method**: multi-process architecture with processes divided by modules, which provides better scalability and business module decoupling.
+
+### Saga Testing by Module Processes
+
+> NOTE This section applies to multi-process code generated with the `--enableMultipleAOLuaProjects` option.
+
+Multi-process architecture is one of the core advantages of dddappp: each business module runs in an independent AO process, achieving true distributed deployment. This architecture not only improves system scalability and maintainability, but also better validates cross-process Saga transaction execution.
+
+If you have generated modular code with the `--enableMultipleAOLuaProjects` option enabled, you can perform true multi-process testing as follows:
+
+#### 1. Start Multiple AO Processes
+
+Start independent AO processes for each module:
+
+```bash
+# Terminal 1: Start inventory aggregate process
+aos process_inventory_item
+.load src/inventory_item_main.lua
+
+# Terminal 2: Start in/out service process (using mock implementation)
+aos process_in_out_service
+.load src/in_out_service_mock.lua  # Note: mock code needs to be loaded here
+# .load src/in_out_service_main.lua
+
+# Terminal 3: Start inventory service process (Saga coordinator)
+aos process_inventory_service
+.load src/inventory_service_main.lua
+
+# Terminal 4: Start blog process
+# aos process_blog
+# .load src/blog_main.lua
+```
+
+#### 2. Configure Inter-Process Communication
+
+In the inventory service process, set global variables to configure the target addresses of each module process (refer to the two-process testing configuration method):
+
+```lua
+-- Execute the following commands in the inventory service process to set target process IDs
+INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = "INVENTORY_ITEM_PROCESS_ID"
+INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = "IN_OUT_SERVICE_PROCESS_ID"
+```
+
+Here the `inventory_service_config.lua` file provides a configuration interface:
+
+```lua
+-- Configuration storage (supports state persistence across reloads)
+INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID or ""
+INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID or ""
+
+return {
+    inventory_item = {
+        get_target = function()
+            return INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID
+        end,
+        set_target = function(process_id)
+            INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = process_id
+        end,
+    },
+    in_out = {
+        get_target = function()
+            return INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID
+        end,
+        set_target = function(process_id)
+            INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = process_id
+        end,
+    }
+}
+```
+
+#### 3. Execute Cross-Process Saga Test
+
+Start Saga in the inventory service process:
+
+```lua
+Send({ Target = "INVENTORY_SERVICE_PROCESS_ID", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "test", quantity = 100 }) })
+```
+
+Saga will automatically call across processes:
+1. **InventoryService process** → **InventoryItem process**: Query inventory status
+2. **InventoryService process** → **InOutService process**: Create in/out order
+3. **InventoryService process** → **InventoryItem process**: Add inventory entry
+4. **InventoryService process** → **InOutService process**: Complete in/out order
+
+#### 4. Verify Multi-Process Execution
+
+Check Saga status in each process:
+
+```lua
+# Check Saga status in InventoryService process
+Send({ Target = "INVENTORY_SERVICE_PROCESS_ID", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = 1 }) })
+
+# Check inventory changes in InventoryItem process
+Send({ Target = "INVENTORY_ITEM_PROCESS_ID", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "test" } }) })
+```
+
+This multi-process architecture demonstrates the powerful capabilities of the DDDML tool: decomposing complex business logic into multiple independent, collaborative processes to achieve true distributed architecture.
+
+### Two-Process Testing (Alice and Bob)
+
+If you haven't prepared for full multi-process deployment yet, or want to quickly validate basic Saga functionality, you can use this simplified two-process testing method.
 
 Start another aos process:
 
@@ -641,6 +766,39 @@ Inbox[#Inbox]
 ```
 
 If nothing is wrong, the execution status of the Saga instance should be "Completed".
+
+### Automated Testing Scripts
+
+To simplify the testing process, we provide automated testing scripts:
+
+#### Two-Process Testing Script (v1)
+```bash
+./ao-cli-non-repl/tests/run-saga-tests.sh
+```
+
+This script automatically executes the complete two-process Saga testing process, suitable for quickly validating basic Saga functionality.
+
+#### Multi-Process Testing Script (v2)
+```bash
+./ao-cli-non-repl/tests/run-saga-tests-v2.sh
+```
+
+This script tests the true multi-process distributed architecture divided by DDDML modules, requiring code generated with the `--enableMultipleAOLuaProjects` option.
+
+**Script Functions**:
+- Automatically generate AO processes and load code
+- Configure inter-process communication
+- Execute Saga transactions
+- Verify execution results
+- Provide detailed test reports
+
+**Environment Variables**:
+- `AO_DRY_RUN=true` - Simulation mode, verify script logic without connecting to AO network
+- `AO_PROJECT_ROOT=/path/to/project` - Specify project root directory
+- `AO_WAIT_TIME=5` - Set ordinary operation wait time
+- `AO_SAGA_WAIT_TIME=30` - Set Saga execution base wait time
+- `AO_MAX_SAGA_WAIT_TIME=300` - Set Saga execution maximum wait time (seconds)
+- `AO_CHECK_INTERVAL=30` - Set Saga status check interval (seconds)
 
 
 ## Extended reading
