@@ -397,7 +397,10 @@ function inventory_service_local.process_inventory_surplus_or_shortage_prepare_g
         location = context.location,
     }
     context.inventory_item_id = _inventory_item_id
-    return _inventory_item_id
+    local request = {
+        inventory_item_id = _inventory_item_id
+    }
+    return request
 end
 
 function inventory_service_local.process_inventory_surplus_or_shortage_on_get_inventory_item_reply(context, result)
@@ -589,7 +592,7 @@ In this aos (`__PROCESS_BOB__`) process, load our application code (be wary of r
 It is now ready to be tested in the first process (`__PROCESS_ALICE__`) by sending messages to this `__PROCESS_BOB__` process.
 
 
-### "Inventory Item" aggregate tests
+#### "Inventory Item" aggregate tests
 
 
 Send the following messages in the process `__PROCESS_ALICE__`, 
@@ -618,7 +621,7 @@ Inbox[#Inbox]
 ```
 
 
-### Manually Sending Messages to Test Saga
+#### Manually Sending Messages to Test Saga
 
 First, we'll manually send messages to test step by step and observe the execution process of the Saga.
 
@@ -697,7 +700,7 @@ You should see the code snippet `"completed":true` in the `Data` property value 
 indicating that the execution status of this Saga instance is "completed".
 
 
-### Testing Cross-Process Execution of Saga
+#### Testing Cross-Process Execution of Saga
 
 When modifying `./src/inventory_service_config.lua` earlier,
 we directed the `target` of the two components `inventory_item` and `in_out`, which the "Inventory Service" depends on, 
