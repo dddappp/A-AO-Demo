@@ -7,12 +7,8 @@ set -e
 # 核心验证：按DDDML模块生成独立的AO进程，实现真正的分布式部署
 # 验证跨进程Saga事务的完整执行流程
 
-# 设置代理（如果需要）
 # 注意：视环境不同，可能需要在运行脚本前设置网络代理，例如：
 # export HTTPS_PROXY=http://127.0.0.1:1235 HTTP_PROXY=http://127.0.0.1:1235 ALL_PROXY=socks5://127.0.0.1:1234
-export HTTPS_PROXY="${HTTPS_PROXY:-http://127.0.0.1:1235}"
-export HTTP_PROXY="${HTTP_PROXY:-http://127.0.0.1:1235}"
-export ALL_PROXY="${ALL_PROXY:-socks5://127.0.0.1:1234}"
 
 echo "=== AO SAGA 多进程测试脚本 v2 (按模块划分进程) ==="
 echo "测试按DDDML模块生成的独立AO进程的Saga执行"
