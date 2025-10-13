@@ -300,11 +300,11 @@ wubuku/dddappp-ao:master \
 
 ```shell
 # If you have already run it, you may need to Clean Up Exited Docker Containers first
-docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:latest")
+docker rm $(docker ps -aq --filter "ancestor=wubuku/dddappp-ao:master")
 # remove the image
-docker image rm wubuku/dddappp-ao:latest
+docker image rm wubuku/dddappp-ao:master
 # pull the image
-docker pull wubuku/dddappp-ao:latest
+docker pull wubuku/dddappp-ao:master
 ```
 
 
@@ -437,18 +437,36 @@ aos process_inventory_service
 
 #### 2. 配置进程间通信
 
-在 `inventory_service_config.lua` 中配置各模块进程的目标地址：
+在库存服务进程中，设置全局变量来配置各模块进程的目标地址（参考两进程测试中的配置方式）：
 
 ```lua
+-- 在库存服务进程中执行以下命令设置目标进程ID
+INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = "INVENTORY_ITEM_PROCESS_ID"
+INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = "IN_OUT_SERVICE_PROCESS_ID"
+```
+
+这里的 `inventory_service_config.lua` 文件提供了配置接口：
+
+```lua
+-- 配置存储（支持重新加载时保持状态）
+INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID or ""
+INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID or ""
+
 return {
     inventory_item = {
         get_target = function()
-            return "INVENTORY_ITEM_PROCESS_ID"  -- 库存聚合进程ID
+            return INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID
+        end,
+        set_target = function(process_id)
+            INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = process_id
         end,
     },
     in_out = {
         get_target = function()
-            return "IN_OUT_SERVICE_PROCESS_ID"  -- 出入库服务进程ID
+            return INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID
+        end,
+        set_target = function(process_id)
+            INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = process_id
         end,
     }
 }
