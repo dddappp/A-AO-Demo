@@ -340,7 +340,7 @@ echo "   检查间隔: ${CHECK_INTERVAL} 秒"
 echo "   最大等待时间: ${MAX_SAGA_WAIT_TIME} 秒"
 
 total_waited=$SAGA_WAIT_TIME  # 初始化为已等待的基础时间
-saga_completed=false
+inventory_updated_correctly=false
 
 while [ $total_waited -lt $MAX_SAGA_WAIT_TIME ]; do
     echo "⏳ 已等待 ${total_waited} 秒，正在检查 SAGA 状态..."
@@ -352,8 +352,8 @@ while [ $total_waited -lt $MAX_SAGA_WAIT_TIME ]; do
 
     # 检查是否达到预期值
     if [ "$INVENTORY_AFTER" = "119" ]; then
-        echo "✅ SAGA 执行完成！库存已正确更新到 119"
-        saga_completed=true
+        echo "✅ 库存已正确更新到 119，SAGA 执行成功！"
+        inventory_updated_correctly=true
         break
     fi
 
@@ -368,8 +368,8 @@ while [ $total_waited -lt $MAX_SAGA_WAIT_TIME ]; do
     fi
 done
 
-if ! $saga_completed; then
-    echo "⚠️ SAGA 执行可能未完成，继续后续检查..."
+if ! $inventory_updated_correctly; then
+    echo "⚠️ 库存未按预期更新，继续后续检查..."
 fi
 
 
@@ -418,15 +418,15 @@ if [ "$INVENTORY_AFTER" = "119" ]; then
     STEP_6_SUCCESS=true
     INVENTORY_UPDATED=true
     echo "✅ 库存成功更新到119"
-    if $saga_completed; then
-        echo "✅ SAGA 在循环检测中已确认完成"
+    if $inventory_updated_correctly; then
+        echo "✅ 库存更新在循环检测中已确认完成"
     fi
 else
     STEP_6_SUCCESS=false
     INVENTORY_UPDATED=false
     echo "❌ 库存未更新，期望119，实际: $INVENTORY_AFTER"
-    if ! $saga_completed; then
-        echo "⚠️ SAGA 在循环检测中未确认完成，可能仍在执行中"
+    if ! $inventory_updated_correctly; then
+        echo "⚠️ 库存更新在循环检测中未确认完成，可能仍在执行中"
     fi
 fi
 
