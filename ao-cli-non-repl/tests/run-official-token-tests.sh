@@ -4,8 +4,13 @@ set -e
 # 🎯 AO 官方 Token 蓝图自动化测试脚本
 # 测试官方代币合约的完整功能
 #
+# 注意：此脚本目前专为 AO mainnet 设计，使用现代 AO API (ao.send() 等)
+# 在 legacy 网络上可能无法正常工作
+#
 # 基于 AO 官方 Token Blueprint: https://github.com/permaweb/ao/blob/main/lua-examples/ao-standard-token/token.lua
 # 验证所有原生功能：Info, Balance, Balances, Transfer, Mint, Total-Supply, Burn
+#
+# 如需测试 legacy 网络兼容版本，请使用: run-legacy-token-tests.sh
 
 echo "=== AO 官方 Token 蓝图自动化测试脚本 ==="
 echo "测试官方代币合约的完整功能"
@@ -67,10 +72,11 @@ else
 fi
 
 # 检查官方 token 蓝图文件是否存在
-OFFICIAL_TOKEN_BLUEPRINT="$PROJECT_ROOT/ao-official-token-blueprint.lua"
+OFFICIAL_TOKEN_BLUEPRINT="$SCRIPT_DIR/ao-official-token-blueprint.lua"
 if [ ! -f "$OFFICIAL_TOKEN_BLUEPRINT" ]; then
     echo "❌ 官方 Token 蓝图文件未找到: $OFFICIAL_TOKEN_BLUEPRINT"
-    echo "请先下载官方 Token 蓝图文件："
+    echo "请确保 ao-official-token-blueprint.lua 文件存在于 tests 目录中"
+    echo "或者运行以下命令下载："
     echo "  curl -o $OFFICIAL_TOKEN_BLUEPRINT https://raw.githubusercontent.com/permaweb/ao/main/lua-examples/ao-standard-token/token.lua"
     exit 1
 fi

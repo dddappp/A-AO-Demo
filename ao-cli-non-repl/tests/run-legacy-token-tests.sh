@@ -68,10 +68,10 @@ else
 fi
 
 # 检查 legacy token 蓝图文件是否存在
-LEGACY_TOKEN_BLUEPRINT="$PROJECT_ROOT/ao-legacy-token-blueprint.lua"
+LEGACY_TOKEN_BLUEPRINT="$SCRIPT_DIR/ao-legacy-token-blueprint.lua"
 if [ ! -f "$LEGACY_TOKEN_BLUEPRINT" ]; then
     echo "❌ Legacy Token 蓝图文件未找到: $LEGACY_TOKEN_BLUEPRINT"
-    echo "请先下载或创建 legacy token 蓝图文件"
+    echo "请确保 ao-legacy-token-blueprint.lua 文件存在于 tests 目录中"
     exit 1
 fi
 
