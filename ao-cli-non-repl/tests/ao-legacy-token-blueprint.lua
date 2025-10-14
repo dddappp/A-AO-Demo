@@ -1,6 +1,38 @@
 -- AO Legacy Token Blueprint (compatible with legacy network)
 -- Based on official AO Token Blueprint from https://ao_docs.ar.io/guides/aos/blueprints/token.html
 -- Adapted for legacy network compatibility: uses Send() instead of ao.send()
+--
+-- ESSENTIAL DIFFERENCES from official blueprint:
+--
+-- 1. API COMPATIBILITY (Most Critical):
+--    - Official: ao.send()     -> Legacy: Send()
+--    - Official: msg.Recipient -> Legacy: msg.Tags.Recipient
+--    - Official: msg.Quantity  -> Legacy: msg.Tags.Quantity
+--    - Reason: Legacy AO network uses different messaging APIs than modern AO
+--
+-- 2. BUG FIXES:
+--    - Official Mint handler: Balances[Owner] (undefined variable!)
+--    - Legacy Mint handler: Balances[ao.id] (correct implementation)
+--    - Reason: Official blueprint has a bug that would cause Mint to fail
+--
+-- 3. DEPENDENCY REDUCTION:
+--    - Official: Uses Colors.gray/blue/green/reset variables
+--    - Legacy: Uses plain text, removes Colors dependency
+--    - Reason: Simplifies deployment, avoids potential Colors module issues
+--
+-- 4. MESSAGE FORMAT:
+--    - Official: Direct properties on msg object (modern AO style)
+--    - Legacy: Properties passed via msg.Tags (legacy AO style)
+--    - Reason: Different AO network versions handle messages differently
+--
+-- 5. ENHANCED ERROR HANDLING:
+--    - Added more robust input validation and error messages
+--    - Better handling of edge cases in balance operations
+--
+-- COMPATIBILITY NOTES:
+-- - This legacy version works on older AO networks and with Wander wallet
+-- - The official version requires modern AO network and aos environment
+-- - Both implement the same AO Standard Token Specification API
 
 -- Initialize state
 Balances = Balances or { [ao.id] = tostring(bint(10000 * 1e12)) }  -- 10000 tokens with 12 decimals
