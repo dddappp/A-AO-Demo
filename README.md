@@ -788,10 +788,12 @@ This script automatically executes the complete two-process Saga testing process
 
 This script tests the true multi-process distributed architecture divided by DDDML modules, requiring code generated with the `--enableMultipleAOLuaProjects` option.
 
-#### Official Token Blueprint Testing Script
+#### Official Token Blueprint Testing Script (Mainnet)
 ```bash
 ./ao-cli-non-repl/tests/run-official-token-tests.sh
 ```
+
+**Note**: This script is designed specifically for the AO mainnet, using modern AO APIs (ao.send(), etc.), and may not work properly on legacy networks. For testing on legacy networks, please use the legacy version below.
 
 This script tests the complete functionality of the AO official standard Token blueprint, including 7 core APIs: Info, Balance, Transfer, Mint, Total-Supply, Burn.
 
@@ -800,6 +802,24 @@ This script tests the complete functionality of the AO official standard Token b
 - Verify bint big integer library's precise calculation functionality
 - Test Debit-Notice/Credit-Notice notification system
 - Verify idempotency and state consistency guarantees
+- Provide detailed test reports and function verification
+
+**Environment Variables**:
+
+#### Legacy Token Blueprint Testing Script (Legacy Network)
+```bash
+./ao-cli-non-repl/tests/run-legacy-token-tests.sh
+```
+
+**Note**: This script is designed specifically for AO legacy networks, using legacy compatible APIs (Send(), etc.), and may not work properly on mainnet.
+
+This script tests the legacy network compatible version based on the official Token blueprint, including the same 7 core APIs.
+
+**Script Functions**:
+- Automatically generate AO processes and load legacy compatible Token blueprint
+- Verify bint big integer library's precise calculation functionality
+- Test Debit-Notice/Credit-Notice notification system
+- Verify legacy network compatibility
 - Provide detailed test reports and function verification
 
 **Environment Variables**:
