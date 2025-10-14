@@ -5,8 +5,6 @@
 > **新地址**: https://github.com/dddappp/ao-cli
 > **npm包**: `@dddappp/ao-cli`
 
-此目录现在仅保留原始的博客应用测试用例文档和脚本，用于测试 A-AO-Demo 项目中的博客应用。
-
 ## 📦 迁移状态
 
 AO CLI 工具已完全迁移到独立代码库，包含：
@@ -127,6 +125,50 @@ cat ./ao-cli-non-repl/tests/README.md
 6. **创建测试数据** (`ao-cli message`)
 7. **执行 SAGA 事务** (`ao-cli eval`)
 8. **验证执行结果** (库存更新和事务状态)
+
+
+### 官方 Token 蓝图测试脚本 (主网)
+```bash
+./ao-cli-non-repl/tests/run-official-token-tests.sh
+```
+
+**注意**: 此脚本专为AO主网设计，使用现代AO API (ao.send()等)，在legacy网络上可能无法正常工作。如需测试legacy网络，请使用下方的legacy版本。
+
+这个脚本测试AO官方标准Token蓝图的完整功能，包括Info、Balance、Transfer、Mint、Total-Supply、Burn等7个核心API。
+
+**脚本功能**：
+- 自动生成AO进程并加载官方Token蓝图
+- 验证bint大整数库的精确计算功能
+- 测试Debit-Notice/Credit-Notice通知系统
+- 验证幂等性和状态一致性保证
+- 提供详细的测试报告和功能验证
+
+**环境变量**：
+
+### Legacy Token 蓝图测试脚本 (遗留网络)
+```bash
+./ao-cli-non-repl/tests/run-legacy-token-tests.sh
+```
+
+**注意**: 此脚本专为AO legacy网络设计，使用Send()等legacy兼容API，在主网上可能无法正常工作。
+
+这个脚本测试基于官方Token Blueprint的legacy网络兼容版本，包含相同的7个核心API。
+
+**脚本功能**：
+- 自动生成AO进程并加载legacy兼容Token蓝图
+- 验证bint大整数库的精确计算功能
+- 测试Debit-Notice/Credit-Notice通知系统
+- 验证legacy网络兼容性
+- 提供详细的测试报告和功能验证
+
+**环境变量**：
+- `AO_DRY_RUN=true` - 模拟模式，验证脚本逻辑而不连接AO网络
+- `AO_PROJECT_ROOT=/path/to/project` - 指定项目根目录
+- `AO_WAIT_TIME=5` - 设置普通操作等待时间
+- `AO_SAGA_WAIT_TIME=30` - 设置Saga执行基础等待时间
+- `AO_MAX_SAGA_WAIT_TIME=300` - 设置Saga执行最大等待时间（秒）
+- `AO_CHECK_INTERVAL=30` - 设置Saga状态检查重试间隔（秒），默认为SAGA_WAIT_TIME
+
 
 ### 核心验证机制
 

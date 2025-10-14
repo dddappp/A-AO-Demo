@@ -1,223 +1,321 @@
--- AO Legacy Token Blueprint (compatible with legacy network)
--- Based on official AO Token Blueprint from https://ao_docs.ar.io/guides/aos/blueprints/token.html
--- Adapted for legacy network compatibility: uses Send() instead of ao.send()
---
--- ESSENTIAL DIFFERENCES from official blueprint:
---
--- 1. API COMPATIBILITY (Most Critical):
---    - Official: ao.send()     -> Legacy: Send()
---    - Official: msg.Recipient -> Legacy: msg.Tags.Recipient
---    - Official: msg.Quantity  -> Legacy: msg.Tags.Quantity
---    - Reason: Legacy AO network uses different messaging APIs than modern AO
---
--- 2. BUG FIXES:
---    - Official Mint handler: Balances[Owner] (undefined variable!)
---    - Legacy Mint handler: Balances[ao.id] (correct implementation)
---    - Reason: Official blueprint has a bug that would cause Mint to fail
---
--- 3. DEPENDENCY REDUCTION:
---    - Official: Uses Colors.gray/blue/green/reset variables
---    - Legacy: Uses plain text, removes Colors dependency
---    - Reason: Simplifies deployment, avoids potential Colors module issues
---
--- 4. MESSAGE FORMAT:
---    - Official: Direct properties on msg object (modern AO style)
---    - Legacy: Properties passed via msg.Tags (legacy AO style)
---    - Reason: Different AO network versions handle messages differently
---
--- 5. ENHANCED ERROR HANDLING:
---    - Added more robust input validation and error messages
---    - Better handling of edge cases in balance operations
---
--- COMPATIBILITY NOTES:
--- - This legacy version works on older AO networks and with Wander wallet
--- - The official version requires modern AO network and aos environment
--- - Both implement the same AO Standard Token Specification API
+-- 拷贝自 https://github.com/permaweb/aos/blob/main/blueprints/token.lua
+-- 版本：a2f52b5
 
--- Initialize state
-Balances = Balances or { [ao.id] = tostring(bint(10000 * 1e12)) }  -- 10000 tokens with 12 decimals
+local bint = require('.bint')(256)
+--[[
+  This module implements the ao Standard Token Specification.
+
+  Terms:
+    Sender: the wallet or Process that sent the Message
+
+  It will first initialize the internal state, and then attach handlers,
+    according to the ao Standard Token Spec API:
+
+    - Info(): return the token parameters, like Name, Ticker, Logo, and Denomination
+
+    - Balance(Target?: string): return the token balance of the Target. If Target is not provided, the Sender
+        is assumed to be the Target
+
+    - Balances(): return the token balance of all participants
+
+    - Transfer(Target: string, Quantity: number): if the Sender has a sufficient balance, send the specified Quantity
+        to the Target. It will also issue a Credit-Notice to the Target and a Debit-Notice to the Sender
+
+    - Mint(Quantity: number): if the Sender matches the Process Owner, then mint the desired Quantity of tokens, adding
+        them the Processes' balance
+]]
+--
+local json = require('json')
+
+--[[
+  utils helper functions to remove the bint complexity.
+]]
+--
+
+
+local utils = {
+  add = function(a, b)
+    return tostring(bint(a) + bint(b))
+  end,
+  subtract = function(a, b)
+    return tostring(bint(a) - bint(b))
+  end,
+  toBalanceValue = function(a)
+    return tostring(bint(a))
+  end,
+  toNumber = function(a)
+    return bint.tonumber(a)
+  end
+}
+
+
+--[[
+     Initialize State
+
+     ao.id is equal to the Process.Id
+   ]]
+--
+Variant = "0.0.3"
+
+-- token should be idempotent and not change previous state updates
+Denomination = Denomination or 12
+Balances = Balances or { [ao.id] = utils.toBalanceValue(10000 * 10 ^ Denomination) }
+TotalSupply = TotalSupply or utils.toBalanceValue(10000 * 10 ^ Denomination)
 Name = Name or 'Points Coin'
 Ticker = Ticker or 'PNTS'
-Denomination = Denomination or 12
 Logo = Logo or 'SBCCXwwecBlDqRLUjb8dYABExTJXLieawf7m2aBJ-KY'
 
--- Info handler
-Handlers.add(
-    "info",
-    Handlers.utils.hasMatchingTag("Action", "Info"),
-    function(msg)
-        Send({
-            Target = msg.From,
-            Action = "Info-Response",
-            Name = Name,
-            Ticker = Ticker,
-            Logo = Logo,
-            Denomination = tostring(Denomination)
-        })
+--[[
+     Add handlers for each incoming Action defined by the ao Standard Token Specification
+   ]]
+--
+
+--[[
+     Info
+   ]]
+--
+Handlers.add('info', Handlers.utils.hasMatchingTag("Action", "Info"), function(msg)
+  if msg.reply then
+    msg.reply({
+      name = Name,
+      ticker = Ticker,
+      logo = Logo,
+      denomination = tostring(Denomination),
+      supply = TotalSupply
+    })
+  else
+    Send({Target = msg.From, 
+      name = Name,
+      ticker = Ticker,
+      logo = Logo,
+      denomination = tostring(Denomination),
+      supply = TotalSupply
+   })
+  end
+end)
+
+--[[
+     Balance
+   ]]
+--
+Handlers.add('balance', Handlers.utils.hasMatchingTag("Action", "Balance"), function(msg)
+  local bal = '0'
+
+  -- If not Recipient is provided, then return the Senders balance
+  if (msg.Tags.Recipient) then
+    if (Balances[msg.Tags.Recipient]) then
+      bal = Balances[msg.Tags.Recipient]
     end
-)
+  elseif msg.Tags.Target and Balances[msg.Tags.Target] then
+    bal = Balances[msg.Tags.Target]
+  elseif Balances[msg.From] then
+    bal = Balances[msg.From]
+  end
+  if msg.reply then
+    msg.reply({
+      Balance = bal,
+      Ticker = Ticker,
+      Account = msg.Tags.Recipient or msg.From,
+      Data = bal
+    })
+  else
+    Send({
+      Target = msg.From,
+      Balance = bal,
+      Ticker = Ticker,
+      Account = msg.Tags.Recipient or msg.From,
+      Data = bal
+    })
+  end
+end)
 
--- Balance handler
-Handlers.add(
-    "balance",
-    Handlers.utils.hasMatchingTag("Action", "Balance"),
-    function(msg)
-        local bal = '0'
+--[[
+     Balances
+   ]]
+--
+Handlers.add('balances', Handlers.utils.hasMatchingTag("Action", "Balances"),
+  function(msg) 
+    if msg.reply then
+      msg.reply({ Data = json.encode(Balances) })
+    else 
+      Send({Target = msg.From, Data = json.encode(Balances) }) 
+    end
+  end)
 
-        -- If not Target is provided, then return the Senders balance
-        if (msg.Tags.Target and Balances[msg.Tags.Target]) then
-            bal = Balances[msg.Tags.Target]
-        elseif Balances[msg.From] then
-            bal = Balances[msg.From]
+--[[
+     Transfer
+   ]]
+--
+Handlers.add('transfer', Handlers.utils.hasMatchingTag("Action", "Transfer"), function(msg)
+  assert(type(msg.Recipient) == 'string', 'Recipient is required!')
+  assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+  assert(bint.__lt(0, bint(msg.Quantity)), 'Quantity must be greater than 0')
+
+  if not Balances[msg.From] then Balances[msg.From] = "0" end
+  if not Balances[msg.Recipient] then Balances[msg.Recipient] = "0" end
+
+  if bint(msg.Quantity) <= bint(Balances[msg.From]) then
+    Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Quantity)
+    Balances[msg.Recipient] = utils.add(Balances[msg.Recipient], msg.Quantity)
+
+    --[[
+         Only send the notifications to the Sender and Recipient
+         if the Cast tag is not set on the Transfer message
+       ]]
+    --
+    if not msg.Cast then
+      -- Debit-Notice message template, that is sent to the Sender of the transfer
+      local debitNotice = {
+        Action = 'Debit-Notice',
+        Recipient = msg.Recipient,
+        Quantity = msg.Quantity,
+        Data = Colors.gray ..
+            "You transferred " ..
+            Colors.blue .. msg.Quantity .. Colors.gray .. " to " .. Colors.green .. msg.Recipient .. Colors.reset
+      }
+      -- Credit-Notice message template, that is sent to the Recipient of the transfer
+      local creditNotice = {
+        Target = msg.Recipient,
+        Action = 'Credit-Notice',
+        Sender = msg.From,
+        Quantity = msg.Quantity,
+        Data = Colors.gray ..
+            "You received " ..
+            Colors.blue .. msg.Quantity .. Colors.gray .. " from " .. Colors.green .. msg.From .. Colors.reset
+      }
+
+      -- Add forwarded tags to the credit and debit notice messages
+      for tagName, tagValue in pairs(msg) do
+        -- Tags beginning with "X-" are forwarded
+        if string.sub(tagName, 1, 2) == "X-" then
+          debitNotice[tagName] = tagValue
+          creditNotice[tagName] = tagValue
         end
+      end
 
-        Send({
-            Target = msg.From,
-            Action = "Balance-Response",
-            Balance = bal,
-            Ticker = Ticker,
-            Account = msg.Tags.Target or msg.From,
-            Data = bal
-        })
+      -- Send Debit-Notice and Credit-Notice
+      if msg.reply then
+        msg.reply(debitNotice)
+      else
+        debitNotice.Target = msg.From
+        Send(debitNotice)
+      end
+      Send(creditNotice)
     end
-)
+    -- update process base state
+    local patchMsg = { 
+      device = "patch@1.0",
+      balances = {},
+      ['token-info'] = {
+        name = Name,
+        ticker = Ticker,
+        logo = Logo,
+        denomination = tostring(Denomination),
+        supply = TotalSupply
+    }}
+    patchMsg.balances[msg.Recipient] = Balances[msg.Recipient]
+    patchMsg.balances[msg.From] = Balances[msg.From]
+    Send(patchMsg)
 
--- Balances handler
-Handlers.add(
-    "balances",
-    Handlers.utils.hasMatchingTag("Action", "Balances"),
-    function(msg)
-        Send({
-            Target = msg.From,
-            Action = "Balances-Response",
-            Data = json.encode(Balances)
-        })
+  else
+    if msg.reply then
+      msg.reply({
+        Action = 'Transfer-Error',
+        ['Message-Id'] = msg.Id,
+        Error = 'Insufficient Balance!'
+      })
+    else
+      Send({
+        Target = msg.From,
+        Action = 'Transfer-Error',
+        ['Message-Id'] = msg.Id,
+        Error = 'Insufficient Balance!'
+      })
     end
-)
+  end
+end)
 
--- Transfer handler
-Handlers.add(
-    "transfer",
-    Handlers.utils.hasMatchingTag("Action", "Transfer"),
-    function(msg)
-        assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
-        assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
-        assert(bint.__lt(0, bint(msg.Tags.Quantity)), 'Quantity must be greater than 0')
+--[[
+    Mint
+   ]]
+--
+Handlers.add('mint', Handlers.utils.hasMatchingTag("Action","Mint"), function(msg)
+  assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+  assert(bint(0) < bint(msg.Quantity), 'Quantity must be greater than zero!')
 
-        if not Balances[msg.From] then Balances[msg.From] = "0" end
-        if not Balances[msg.Tags.Recipient] then Balances[msg.Tags.Recipient] = "0" end
+  if not Balances[ao.id] then Balances[ao.id] = "0" end
 
-        local qty = bint(msg.Tags.Quantity)
-        local balance = bint(Balances[msg.From])
-
-        if bint.__le(qty, balance) then
-            Balances[msg.From] = tostring(bint.__sub(balance, qty))
-            Balances[msg.Tags.Recipient] = tostring(bint.__add(bint(Balances[msg.Tags.Recipient]), qty))
-
-            -- Send Debit-Notice to the Sender
-            Send({
-                Target = msg.From,
-                Action = 'Debit-Notice',
-                Recipient = msg.Tags.Recipient,
-                Quantity = tostring(qty),
-                Data = "You transferred " .. tostring(qty) .. " to " .. msg.Tags.Recipient
-            })
-
-            -- Send Credit-Notice to the Recipient
-            Send({
-                Target = msg.Tags.Recipient,
-                Action = 'Credit-Notice',
-                Sender = msg.From,
-                Quantity = tostring(qty),
-                Data = "You received " .. tostring(qty) .. " from " .. msg.From
-            })
-        else
-            Send({
-                Target = msg.From,
-                Action = 'Transfer-Error',
-                ['Message-Id'] = msg.Id,
-                Error = 'Insufficient Balance!'
-            })
-        end
+  if msg.From == ao.id then
+    -- Add tokens to the token pool, according to Quantity
+    Balances[msg.From] = utils.add(Balances[msg.From], msg.Quantity)
+    TotalSupply = utils.add(TotalSupply, msg.Quantity)
+    if msg.reply then
+      msg.reply({
+        Data = Colors.gray .. "Successfully minted " .. Colors.blue .. msg.Quantity .. Colors.reset
+      })
+    else
+      Send({
+        Target = msg.From,
+        Data = Colors.gray .. "Successfully minted " .. Colors.blue .. msg.Quantity .. Colors.reset
+      })
     end
-)
-
--- Mint handler
-Handlers.add(
-    "mint",
-    Handlers.utils.hasMatchingTag("Action", "Mint"),
-    function(msg)
-        assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
-        assert(bint.__lt(0, bint(msg.Tags.Quantity)), 'Quantity must be greater than zero!')
-
-        if not Balances[ao.id] then Balances[ao.id] = "0" end
-
-        if msg.From == ao.id then
-            -- Add tokens to the token pool, according to Quantity
-            Balances[ao.id] = tostring(bint.__add(bint(Balances[ao.id]), bint(msg.Tags.Quantity)))
-            Send({
-                Target = msg.From,
-                Action = "Mint-Confirmation",
-                Data = "Successfully minted " .. msg.Tags.Quantity .. " tokens"
-            })
-        else
-            Send({
-                Target = msg.From,
-                Action = 'Mint-Error',
-                ['Message-Id'] = msg.Id,
-                Error = 'Only the Process Owner can mint new ' .. Ticker .. ' tokens!'
-            })
-        end
+    -- update process base state
+    local patchMsg = { 
+      device = "patch@1.0",
+      balances = {},
+      ['token-info'] = {
+        name = Name,
+        ticker = Ticker,
+        logo = Logo,
+        denomination = tostring(Denomination),
+        supply = TotalSupply
+    }}
+    patchMsg.balances[msg.From] = Balances[msg.From]
+    Send(patchMsg)
+  else
+    if msg.reply then
+      msg.reply({
+        Action = 'Mint-Error',
+        ['Message-Id'] = msg.Id,
+        Error = 'Only the Process Id can mint new ' .. Ticker .. ' tokens!'
+      })
+    else
+      Send({
+        Target = msg.From,
+        Action = 'Mint-Error',
+        ['Message-Id'] = msg.Id,
+        Error = 'Only the Process Id can mint new ' .. Ticker .. ' tokens!'
+      })
     end
-)
+  end
+end)
 
--- Burn handler (added for completeness)
-Handlers.add(
-    "burn",
-    Handlers.utils.hasMatchingTag("Action", "Burn"),
-    function(msg)
-        assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
-        assert(bint.__lt(0, bint(msg.Tags.Quantity)), 'Quantity must be greater than zero!')
+--[[
+     Total Supply
+   ]]
+--
+Handlers.add('totalSupply', Handlers.utils.hasMatchingTag("Action","Total-Supply"), function(msg)
+  assert(msg.From ~= ao.id, 'Cannot call Total-Supply from the same process!')
+  if msg.reply then
+    msg.reply({
+      Action = 'Total-Supply',
+      Data = TotalSupply,
+      Ticker = Ticker
+    })
+  else
+    Send({
+      Target = msg.From,
+      Action = 'Total-Supply',
+      Data = TotalSupply,
+      Ticker = Ticker
+    })
+  end
+end)
 
-        if not Balances[msg.From] then Balances[msg.From] = "0" end
 
-        local qty = bint(msg.Tags.Quantity)
-        local balance = bint(Balances[msg.From])
-
-        if bint.__le(qty, balance) then
-            Balances[msg.From] = tostring(bint.__sub(balance, qty))
-            Send({
-                Target = msg.From,
-                Action = "Burn-Success",
-                Quantity = tostring(qty),
-                Data = "Successfully burned " .. tostring(qty) .. " tokens"
-            })
-        else
-            Send({
-                Target = msg.From,
-                Action = 'Burn-Error',
-                ['Message-Id'] = msg.Id,
-                Error = 'Insufficient Balance to burn!'
-            })
-        end
-    end
-)
-
--- Total Supply handler (added for completeness)
-Handlers.add(
-    "total_supply",
-    Handlers.utils.hasMatchingTag("Action", "Total-Supply"),
-    function(msg)
-        local total = bint(0)
-        for address, balance in pairs(Balances) do
-            total = bint.__add(total, bint(balance))
-        end
-
-        Send({
-            Target = msg.From,
-            Action = "Total-Supply-Response",
-            ["Total-Supply"] = tostring(total),
-            Ticker = Ticker
-        })
-    end
-)
+--[[
+ Burn
+]] --
+Handlers.add('burn', Handlers.utils.hasMatchingTag("Action",'Burn'), function(msg)
+  print('not implemented')
+end)
