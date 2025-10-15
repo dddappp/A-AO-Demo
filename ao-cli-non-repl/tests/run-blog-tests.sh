@@ -109,15 +109,33 @@ run_ao_cli() {
 # Function to get current inbox length for a process (only call when necessary)
 get_current_inbox_length() {
     local process_id="$1"
-    # Use eval to query inbox length directly from the process
-    local length_query="return #Inbox"
-    local result=$(run_ao_cli eval "$process_id" --data "$length_query" --wait 2>/dev/null || echo "0")
 
-    # Extract the number from the result
-    local current_length=$(echo "$result" | grep -o '[0-9]\+' | head -1)
+    # Use the inbox command to get current status
+    # This is more reliable than eval for getting inbox length
+    local inbox_output=$(run_ao_cli inbox "$process_id" 2>/dev/null)
 
-    # If we can't parse length, assume it's 0
+    # Debug: show raw output for troubleshooting
+    echo "🔧 Debug: Inbox command output:" >&2
+    echo "$inbox_output" | head -3 >&2
+
+    # Extract inbox length from the output
+    # Format is typically: "length = N" or similar
+    local current_length=$(echo "$inbox_output" | grep -o "length = [0-9]*" | sed 's/length = //' | head -1)
+
+    # If that doesn't work, try other patterns
     if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
+        # Try "Inbox: N" format
+        current_length=$(echo "$inbox_output" | grep -o "Inbox: [0-9]*" | sed 's/Inbox: //' | head -1)
+    fi
+
+    if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
+        # Try any standalone number
+        current_length=$(echo "$inbox_output" | grep -o '[0-9]\+' | head -1)
+    fi
+
+    # If we still can't parse length, assume it's 0
+    if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
+        echo "⚠️  Could not parse inbox length from: $inbox_output" >&2
         current_length=0
     fi
 
@@ -309,6 +327,15 @@ if [ -z "$PROCESS_ID" ]; then
     echo "由于进程生成失败，测试终止"
     exit 1
 else
+    # 立即检查新spawn进程的Inbox长度
+    initial_inbox_check=$(get_current_inbox_length "$PROCESS_ID")
+    echo "🔍 新spawn进程初始Inbox长度: $initial_inbox_check"
+
+    if [ "$initial_inbox_check" -gt 5 ]; then
+        echo "⚠️  警告: 新spawn进程初始Inbox长度异常高 ($initial_inbox_check)"
+        echo "   这可能表示有问题，正常应该接近0"
+    fi
+
     STEP_1_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 步骤1成功，当前成功计数: $STEP_SUCCESS_COUNT"
