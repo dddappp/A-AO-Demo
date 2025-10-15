@@ -20,6 +20,7 @@ echo "📋 Inbox验证配置:"
 echo "   ⏱️  检查间隔: ${INBOX_CHECK_INTERVAL}s"
 echo "   ⏳ 最大等待: ${INBOX_MAX_WAIT_TIME}s"
 echo "   🛡️  进程稳定化: ${INBOX_STABILIZATION_TIME}s"
+echo "   📊 验证策略: 相对变化检测 (不依赖绝对长度)"
 echo ""
 
 # 获取脚本目录和可能的项目根目录
@@ -280,7 +281,7 @@ STEP_8_SUCCESS=false
 STEP_9_SUCCESS=false
 STEP_10_SUCCESS=false
 
-# Track expected Inbox length for efficiency (predictive tracking, no repeated queries)
+# Track expected Inbox length for reference (relative change detection)
 EXPECTED_INBOX_LENGTH=0
 
 echo "🔍 预检查: 验证Inbox查询功能..."
@@ -328,10 +329,21 @@ if run_ao_cli load "$PROCESS_ID" "$APP_FILE" --wait; then
     sleep $INBOX_STABILIZATION_TIME
 
     # Query inbox length after all initialization (spawn + load blueprint)
-    # This establishes the baseline for predictive tracking
+    # This establishes the baseline for relative change detection
     EXPECTED_INBOX_LENGTH=$(get_current_inbox_length "$PROCESS_ID")
-    echo "   📊 Initialized expected Inbox length: $EXPECTED_INBOX_LENGTH (predictive tracking enabled)"
-    echo "   📝 Note: This baseline includes any messages from spawn/load operations"
+    echo "   📊 Initialized baseline Inbox length: $EXPECTED_INBOX_LENGTH (relative change detection enabled)"
+
+    # Check if baseline is too high - this indicates potential issues
+    if [ "$EXPECTED_INBOX_LENGTH" -gt 10 ]; then
+        echo "   ⚠️  Warning: High baseline Inbox length ($EXPECTED_INBOX_LENGTH) detected!"
+        echo "   🔍 This may indicate:"
+        echo "      • Network/system messages accumulating"
+        echo "      • Previous test sessions leaving messages"
+        echo "      • AO process initialization producing many messages"
+        echo "   💡 The test will still work using relative change detection"
+    fi
+
+    echo "   📝 Note: Test uses relative change detection, not absolute length prediction"
 else
     STEP_2_SUCCESS=false
     echo "❌ 代码加载失败"
@@ -354,28 +366,51 @@ echo "📋 Inbox机制验证：通过Eval在进程内部执行Send，回复消�
 echo "   (外部API调用不会让消息进入Inbox，只有进程内部Send才会)"
 echo "📊 当前预期Inbox长度: $EXPECTED_INBOX_LENGTH"
 echo "初始化json库并发送消息..."
+
+# Record inbox length before operation for relative change detection
+inbox_before_operation=$(get_current_inbox_length "$PROCESS_ID")
+echo "📊 Inbox长度(操作前): $inbox_before_operation"
+
 if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'GetArticleIdSequence' } })" --wait; then
     echo "✅ 消息发送成功 (eval command completed)"
 
-    # Wait for Inbox to reach expected length (msg.reply() will send network message to Inbox)
-    # Note: GetArticleIdSequence uses msg.reply(), so inbox should increase by exactly 1
-    target_inbox_length=$((EXPECTED_INBOX_LENGTH + 1))
-    echo "🎯 期望Inbox长度: $target_inbox_length (当前 $EXPECTED_INBOX_LENGTH + 1)"
+    # Wait for Inbox to increase (relative change detection)
+    # Note: GetArticleIdSequence uses msg.reply(), so inbox should increase by at least 1
+    echo "⏳ 等待Inbox增长 (相对变化检测)..."
 
-    if wait_for_expected_inbox_length "$PROCESS_ID" "$target_inbox_length"; then
-        # Update expected length for next operation (predictive tracking)
-        EXPECTED_INBOX_LENGTH=$target_inbox_length
-        echo "✅ Inbox验证成功：msg.reply() 机制确认工作正常"
-        echo "   📈 Inbox增长: +1 消息 (从 $((EXPECTED_INBOX_LENGTH - 1)) 到 $EXPECTED_INBOX_LENGTH)"
+    local waited=0
+    local success=false
 
-        # Display the actual Inbox message content (most valuable Data field)
-        display_latest_inbox_message "$PROCESS_ID" "GetArticleIdSequence Response Message"
+    while [ $waited -lt $INBOX_MAX_WAIT_TIME ]; do
+        sleep $INBOX_CHECK_INTERVAL
+        waited=$((waited + INBOX_CHECK_INTERVAL))
 
+        inbox_after_operation=$(get_current_inbox_length "$PROCESS_ID")
+        inbox_growth=$((inbox_after_operation - inbox_before_operation))
+
+        echo "   📊 Inbox检查 (${waited}s): $inbox_before_operation → $inbox_after_operation (增长: +$inbox_growth)"
+
+        if [ "$inbox_growth" -ge 1 ]; then
+            echo "✅ Inbox验证成功：检测到消息进入Inbox"
+            echo "   📈 Inbox增长: +$inbox_growth 消息 (从 $inbox_before_operation 到 $inbox_after_operation)"
+            success=true
+
+            # Update expected length for next operation (predictive tracking)
+            EXPECTED_INBOX_LENGTH=$inbox_after_operation
+
+            # Display the actual Inbox message content (most valuable Data field)
+            display_latest_inbox_message "$PROCESS_ID" "GetArticleIdSequence Response Message"
+            break
+        fi
+    done
+
+    if [ "$success" = true ]; then
         STEP_3_SUCCESS=true
         ((STEP_SUCCESS_COUNT++))
         echo "   🎯 步骤3成功，当前成功计数: $STEP_SUCCESS_COUNT"
     else
         echo "❌ Inbox验证失败：msg.reply() 未产生预期的Inbox消息"
+        echo "   📊 最终状态: $inbox_before_operation → $inbox_after_operation (增长: +$inbox_growth)"
         echo "   🔍 调试信息: 检查应用代码中的GetArticleIdSequence handler是否正确调用msg.reply()"
         STEP_3_SUCCESS=false
     fi
@@ -463,29 +498,52 @@ echo "📋 Inbox机制验证：通过Eval在进程内部执行Send，回复消�
 echo "   (最终验证Inbox功能，确保所有业务回复都正确进入Inbox)"
 echo "📊 当前预期Inbox长度: $EXPECTED_INBOX_LENGTH"
 echo "初始化json库并发送消息..."
+
+# Record inbox length before operation for relative change detection
+inbox_before_operation=$(get_current_inbox_length "$PROCESS_ID")
+echo "📊 Inbox长度(操作前): $inbox_before_operation"
+
 if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = 1, version = 2, commenter = 'alice', body = 'comment_body_manual' }) })" --wait; then
     echo "✅ 消息发送成功 (eval command completed)"
 
-    # Wait for Inbox to reach expected length (AddComment uses msg.reply(), so inbox should increase by 1)
-    # Note: This is the final operation that should produce an Inbox message
-    target_inbox_length=$((EXPECTED_INBOX_LENGTH + 1))
-    echo "🎯 期望Inbox长度: $target_inbox_length (当前 $EXPECTED_INBOX_LENGTH + 1)"
+    # Wait for Inbox to increase (relative change detection)
+    # Note: AddComment uses msg.reply(), so inbox should increase by at least 1
+    echo "⏳ 等待Inbox增长 (相对变化检测)..."
 
-    if wait_for_expected_inbox_length "$PROCESS_ID" "$target_inbox_length"; then
-        # Update expected length for final verification
-        EXPECTED_INBOX_LENGTH=$target_inbox_length
-        echo "✅ Inbox最终验证成功：msg.reply() 机制完整验证通过"
-        echo "   📈 Inbox增长: +1 消息 (从 $((EXPECTED_INBOX_LENGTH - 1)) 到 $EXPECTED_INBOX_LENGTH)"
-        echo "   📋 所有业务操作的回复消息都已正确进入Inbox"
+    local waited=0
+    local success=false
 
-        # Display the actual Inbox message content (most valuable Data field)
-        display_latest_inbox_message "$PROCESS_ID" "AddComment Response Message"
+    while [ $waited -lt $INBOX_MAX_WAIT_TIME ]; do
+        sleep $INBOX_CHECK_INTERVAL
+        waited=$((waited + INBOX_CHECK_INTERVAL))
 
+        inbox_after_operation=$(get_current_inbox_length "$PROCESS_ID")
+        inbox_growth=$((inbox_after_operation - inbox_before_operation))
+
+        echo "   📊 Inbox检查 (${waited}s): $inbox_before_operation → $inbox_after_operation (增长: +$inbox_growth)"
+
+        if [ "$inbox_growth" -ge 1 ]; then
+            echo "✅ Inbox最终验证成功：msg.reply() 机制完整验证通过"
+            echo "   📈 Inbox增长: +$inbox_growth 消息 (从 $inbox_before_operation 到 $inbox_after_operation)"
+            echo "   📋 所有业务操作的回复消息都已正确进入Inbox"
+            success=true
+
+            # Update expected length for final verification
+            EXPECTED_INBOX_LENGTH=$inbox_after_operation
+
+            # Display the actual Inbox message content (most valuable Data field)
+            display_latest_inbox_message "$PROCESS_ID" "AddComment Response Message"
+            break
+        fi
+    done
+
+    if [ "$success" = true ]; then
         STEP_10_SUCCESS=true
         ((STEP_SUCCESS_COUNT++))
         echo "   🎯 步骤10成功，当前成功计数: $STEP_SUCCESS_COUNT"
     else
         echo "❌ Inbox最终验证失败：AddComment的msg.reply()未产生预期的Inbox消息"
+        echo "   📊 最终状态: $inbox_before_operation → $inbox_after_operation (增长: +$inbox_growth)"
         echo "   🔍 调试信息: 检查应用代码中的AddComment handler是否正确调用msg.reply()"
         STEP_10_SUCCESS=false
     fi
