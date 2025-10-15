@@ -65,17 +65,13 @@ run_ao_cli() {
 get_current_inbox_length() {
     local process_id="$1"
 
-    # Use the inbox command to get current status
-    local inbox_output=$(run_ao_cli inbox "$process_id" 2>/dev/null)
+    # Use eval to query inbox length directly without sending reply
+    # This avoids the issue where ao-cli inbox command itself sends messages
+    local result=$(run_ao_cli eval "$process_id" --data "return #Inbox" 2>/dev/null)
 
-    # Extract inbox length from the output
-    # Primary method: from "length = N" in the JSON data
-    local current_length=$(echo "$inbox_output" | grep -o "length = [0-9]*" | sed 's/length = //' | head -1)
-
-    # If that doesn't work, try secondary method: from "Prompt: ...[Inbox:N]>"
-    if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
-        current_length=$(echo "$inbox_output" | grep -o "\[Inbox:[0-9]*\]" | sed 's/\[Inbox://' | sed 's/\]//' | tail -1)
-    fi
+    # Extract the number from the eval result
+    # Look for the returned number at the end of output
+    local current_length=$(echo "$result" | grep -o '[0-9]\+$' | tail -1)
 
     # If we still can't parse length, assume it's 0
     if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
