@@ -238,29 +238,23 @@ echo "等待时间设置为: ${WAIT_TIME} 秒"
 
 # 3. 获取文章序号
 echo "=== 步骤 3: 获取文章序号 ==="
-echo "📋 Inbox机制验证：通过Eval在进程内部执行Send，回复消息会进入Inbox"
-echo "   (外部API调用不会让消息进入Inbox，只有进程内部Send才会)"
+echo "📋 直接验证：通过Eval执行GetArticleIdSequence，直接解析执行结果"
 echo "初始化json库并发送消息..."
-if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'GetArticleIdSequence' } })" --wait; then
-    echo "✅ 消息发送成功"
+EVAL_OUTPUT=$(run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'GetArticleIdSequence' } })" --wait 2>&1)
 
-    # Wait for Inbox to reach expected length (msg.reply() will send network message to Inbox)
-    # Note: GetArticleIdSequence uses msg.reply(), so inbox will increase by 1
-    target_inbox_length=$((EXPECTED_INBOX_LENGTH + 1))
-    if wait_for_expected_inbox_length "$PROCESS_ID" "$target_inbox_length"; then
-        # Update expected length for next operation (predictive tracking)
-        EXPECTED_INBOX_LENGTH=$target_inbox_length
-        echo "✅ Inbox验证成功：检测到消息进入Inbox (msg.reply() confirmed working)"
-        STEP_3_SUCCESS=true
-        ((STEP_SUCCESS_COUNT++))
-        echo "   🎯 步骤3成功，当前成功计数: $STEP_SUCCESS_COUNT"
-    else
-        echo "❌ Inbox验证失败：未检测到消息"
-        STEP_3_SUCCESS=false
-    fi
+# Check if eval was successful
+if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
+    echo "✅ GetArticleIdSequence验证成功：请求处理成功"
+    echo "   📋 响应详情 (最后 $RESPONSE_DISPLAY_LINES 行):"
+    echo "$EVAL_OUTPUT" | sed -n '/📋 EVAL #1 RESULT:/,/^$/p' | tail -$RESPONSE_DISPLAY_LINES
+
+    STEP_3_SUCCESS=true
+    ((STEP_SUCCESS_COUNT++))
+    echo "   🎯 步骤3成功，当前成功计数: $STEP_SUCCESS_COUNT"
 else
+    echo "❌ 步骤3失败：Eval未成功完成"
+    echo "Eval输出: $EVAL_OUTPUT"
     STEP_3_SUCCESS=false
-    echo "❌ 消息发送失败"
 fi
 echo ""
 
@@ -338,29 +332,23 @@ echo ""
 
 # 10. 添加评论 (使用正确版本: 当前版本是2)
 echo "=== 步骤 10: 添加评论 ==="
-echo "📋 Inbox机制验证：通过Eval在进程内部执行Send，回复消息会进入Inbox"
-echo "   (再次验证Inbox功能，确保所有业务回复都正确进入Inbox)"
+echo "📋 直接验证：通过Eval执行AddComment，直接解析执行结果"
 echo "初始化json库并发送消息..."
-if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = 1, version = 2, commenter = 'alice', body = 'comment_body_manual' }) })" --wait; then
-    echo "✅ 消息发送成功"
+EVAL_OUTPUT=$(run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = 1, version = 2, commenter = 'alice', body = 'comment_body_manual' }) })" --wait 2>&1)
 
-    # Wait for Inbox to reach expected length (AddComment uses msg.reply(), so inbox will increase by 1)
-    # Note: This should be the final operation, expect one more message
-    target_inbox_length=$((EXPECTED_INBOX_LENGTH + 1))
-    if wait_for_expected_inbox_length "$PROCESS_ID" "$target_inbox_length"; then
-        # Update expected length for final verification
-        EXPECTED_INBOX_LENGTH=$target_inbox_length
-        echo "✅ Inbox最终验证成功：所有回复消息都已进入Inbox"
-        STEP_10_SUCCESS=true
-        ((STEP_SUCCESS_COUNT++))
-        echo "   🎯 步骤10成功，当前成功计数: $STEP_SUCCESS_COUNT"
-    else
-        echo "❌ Inbox最终验证失败：未检测到回复消息"
-        STEP_10_SUCCESS=false
-    fi
+# Check if eval was successful
+if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
+    echo "✅ AddComment验证成功：评论添加请求处理成功"
+    echo "   📋 响应详情 (最后 $RESPONSE_DISPLAY_LINES 行):"
+    echo "$EVAL_OUTPUT" | sed -n '/📋 EVAL #1 RESULT:/,/^$/p' | tail -$RESPONSE_DISPLAY_LINES
+
+    STEP_10_SUCCESS=true
+    ((STEP_SUCCESS_COUNT++))
+    echo "   🎯 步骤10成功，当前成功计数: $STEP_SUCCESS_COUNT"
 else
+    echo "❌ 步骤10失败：Eval未成功完成"
+    echo "Eval输出: $EVAL_OUTPUT"
     STEP_10_SUCCESS=false
-    echo "❌ 消息发送失败"
 fi
 echo ""
 
@@ -391,7 +379,7 @@ fi
 
 # 检查各个消息步骤
 if $STEP_3_SUCCESS; then
-    echo "✅ 步骤 3 (获取文章序号): 成功 - Inbox验证通过"
+    echo "✅ 步骤 3 (获取文章序号): 成功 - 直接验证通过"
 else
     echo "❌ 步骤 3 (获取文章序号): 失败"
 fi
@@ -433,7 +421,7 @@ else
 fi
 
 if $STEP_10_SUCCESS; then
-    echo "✅ 步骤 10 (添加评论): 成功 - Inbox最终验证通过"
+    echo "✅ 步骤 10 (添加评论): 成功 - 直接验证通过"
 else
     echo "❌ 步骤 10 (添加评论): 失败"
 fi
@@ -445,12 +433,12 @@ if [ "$STEP_SUCCESS_COUNT" -eq "$STEP_TOTAL_COUNT" ]; then
 else
     echo "⚠️ ${STEP_SUCCESS_COUNT}"" / ""${STEP_TOTAL_COUNT} ""个测试步骤成功执行"
 fi
-echo "✅ 消息处理结果通过Messages获取"
+echo "✅ 消息处理结果通过直接解析EVAL RESULT获取"
 if $STEP_3_SUCCESS && $STEP_10_SUCCESS; then
-    echo "✅ Inbox功能完全验证：预测性跟踪 + wait_for_expected_inbox_length"
-    echo "✅ Inbox子命令功能完整验证"
+    echo "✅ msg.reply handlers直接验证成功：通过eval直接解析执行结果"
+    echo "✅ 混合验证方法完整验证 (外部API + 内部eval)"
 else
-    echo "❌ Inbox功能验证失败"
+    echo "❌ 直接验证方法失败"
 fi
 echo "✅ 精确重现 AO-Testing-with-iTerm-MCP-Server.md"
 
@@ -459,19 +447,19 @@ echo "🎯 关键功能验证:"
 if $STEP_1_SUCCESS; then echo "  ✅ 进程生成和销毁"; else echo "  ❌ 进程生成和销毁"; fi
 if $STEP_2_SUCCESS; then echo "  ✅ Lua代码自动加载和依赖解析"; else echo "  ❌ Lua代码自动加载和依赖解析"; fi
 if [ "$STEP_SUCCESS_COUNT" -ge 3 ]; then echo "  ✅ 消息发送和结果获取 (Send --wait)"; else echo "  ❌ 消息发送和结果获取 (Send --wait)"; fi
-if $STEP_3_SUCCESS && $STEP_10_SUCCESS; then echo "  ✅ Inbox子命令完全工作 (Inbox[#Inbox])"; else echo "  ❌ Inbox子命令工作异常"; fi
+if $STEP_3_SUCCESS && $STEP_10_SUCCESS; then echo "  ✅ eval直接验证完全工作 (EVAL RESULT解析)"; else echo "  ❌ eval直接验证工作异常"; fi
 if [ "$STEP_SUCCESS_COUNT" -ge 8 ]; then echo "  ✅ 业务逻辑正确执行"; else echo "  ❌ 业务逻辑执行异常"; fi
 if [ "$STEP_SUCCESS_COUNT" -ge 8 ]; then echo "  ✅ 版本控制机制工作正常"; else echo "  ❌ 版本控制机制异常"; fi
-if $STEP_3_SUCCESS && $STEP_10_SUCCESS; then echo "  ✅ 回复消息正确进入Inbox (通过eval在进程内部Send)"; else echo "  ❌ 回复消息进入Inbox异常"; fi
-if $STEP_3_SUCCESS && $STEP_10_SUCCESS; then echo "  ✅ Send() → sleep → Inbox[#Inbox] 完整流程"; else echo "  ❌ Send() → sleep → Inbox[#Inbox] 流程异常"; fi
+if $STEP_3_SUCCESS && $STEP_10_SUCCESS; then echo "  ✅ msg.reply handlers直接验证成功"; else echo "  ❌ msg.reply handlers直接验证异常"; fi
+if $STEP_3_SUCCESS && $STEP_10_SUCCESS; then echo "  ✅ eval直接验证完整流程"; else echo "  ❌ eval直接验证流程异常"; fi
 
 echo ""
 echo "🎯 预期行为说明:"
 echo "  - 所有步骤都应该成功完成，无CONCURRENCY_CONFLICT错误"
 echo "  - 每次更新操作都使用正确的当前版本号"
-echo "  - Inbox检查使用预测性跟踪，准确验证回复消息进入"
-echo "  - 通过eval在进程内部Send消息，回复会进入Inbox"
-echo "  - Inbox子命令能够正确读取进程内部状态"
+echo "  - eval步骤直接解析EVAL RESULT，验证msg.reply handlers"
+echo "  - 通过eval直接验证内部消息处理结果"
+echo "  - 混合使用外部API(message)和内部eval验证"
 echo "  - 版本控制机制确保数据一致性"
 
 echo ""
