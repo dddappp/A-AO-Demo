@@ -85,6 +85,82 @@ get_current_inbox_length() {
     echo "$current_length"
 }
 
+# Function to display the latest Inbox message (most valuable Data field)
+display_latest_inbox_message() {
+    local process_id="$1"
+    local message_title="${2:-Latest Inbox Message}"
+
+    echo "📨 $message_title:"
+
+    # Get the latest message from inbox
+    local inbox_output=$(run_ao_cli inbox "$process_id" --latest 2>/dev/null)
+
+    if [ $? -eq 0 ] && [ -n "$inbox_output" ]; then
+        echo "   📋 Full Inbox Output (first 500 chars):"
+        echo "$inbox_output" | head -1 | cut -c1-500
+        echo ""
+
+        # Try to extract Data field which is usually most valuable
+        local data_found=false
+
+        # Try different patterns for Data field
+        local data_field=$(echo "$inbox_output" | grep -o '"Data":"[^"]*"' | head -1)
+        if [ -z "$data_field" ]; then
+            # Try alternative format: Data = "value"
+            data_field=$(echo "$inbox_output" | grep -o 'Data = "[^"]*"' | head -1)
+        fi
+
+        if [ -n "$data_field" ]; then
+            local data_value
+            if [[ "$data_field" == '"Data":"'* ]]; then
+                data_value=$(echo "$data_field" | sed 's/"Data":"//' | sed 's/"$//')
+            else
+                data_value=$(echo "$data_field" | sed 's/Data = "//' | sed 's/"$//')
+            fi
+            echo "   📄 Data: $data_value"
+            data_found=true
+        fi
+
+        # Try to extract Action field
+        local action_found=false
+        local action_field=$(echo "$inbox_output" | grep -o '"Action":"[^"]*"' | head -1)
+        if [ -z "$action_field" ]; then
+            action_field=$(echo "$inbox_output" | grep -o 'Action = "[^"]*"' | head -1)
+        fi
+
+        if [ -n "$action_field" ]; then
+            local action_value
+            if [[ "$action_field" == '"Action":"'* ]]; then
+                action_value=$(echo "$action_field" | sed 's/"Action":"//' | sed 's/"$//')
+            else
+                action_value=$(echo "$action_field" | sed 's/Action = "//' | sed 's/"$//')
+            fi
+            echo "   🎯 Action: $action_value"
+            action_found=true
+        fi
+
+        # Show Tags summary if available
+        local tags_summary=$(echo "$inbox_output" | grep -o '"Tags":{[^}]*}' | head -1)
+        if [ -z "$tags_summary" ]; then
+            tags_summary=$(echo "$inbox_output" | grep -o 'Tags = {[^}]*}' | head -1)
+        fi
+
+        if [ -n "$tags_summary" ]; then
+            echo "   🏷️  Tags: ${tags_summary:0:150}..."
+        fi
+
+        # If we couldn't parse structured data, show key lines
+        if [ "$data_found" = false ] && [ "$action_found" = false ]; then
+            echo "   ⚠️  Could not parse structured message data"
+            echo "   📄 Key lines containing data:"
+            echo "$inbox_output" | grep -E "(Data|Action|Tags)" | head -3
+        fi
+    else
+        echo "   ❌ Failed to retrieve inbox message"
+    fi
+    echo ""
+}
+
 # Function to wait for Inbox length to reach expected value (efficient tracking for sequential operations)
 wait_for_expected_inbox_length() {
     local process_id="$1"
@@ -289,6 +365,9 @@ else
             echo "✅ Credit-Notice verification successful"
             echo "   ✅ Credit-Notice received in receiver's inbox (Send() confirmed working)"
             echo "   💰 Transfer of $TRANSFER_AMOUNT tokens completed successfully"
+
+            # Display the actual Credit-Notice message content
+            display_latest_inbox_message "$RECEIVER_PROCESS_ID" "Credit-Notice Message in Receiver Inbox"
         else
             echo "⚠️ Credit-Notice not received within timeout"
             echo "   ⚠️ Transfer request sent but Credit-Notice verification pending"
