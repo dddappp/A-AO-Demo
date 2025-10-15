@@ -4,6 +4,13 @@ set -e
 # 注意：视环境不同，可能需要在运行脚本前设置网络代理，例如：
 # export HTTPS_PROXY=http://127.0.0.1:1235 HTTP_PROXY=http://127.0.0.1:1235 ALL_PROXY=socks5://127.0.0.1:1234
 
+# Constants for output display
+RESPONSE_DISPLAY_LINES=15  # Number of lines to display from ao-cli responses (showing the most valuable tail part)
+
+# Constants for Inbox waiting
+INBOX_CHECK_INTERVAL=2     # Check Inbox every 2 seconds
+INBOX_MAX_WAIT_TIME=300    # Maximum wait time for Inbox changes
+
 echo "=== AO 博客应用自动化测试脚本 (使用 ao-cli 工具) ==="
 echo "基于 AO-Testing-with-iTerm-MCP-Server.md 文档的测试流程"
 echo "完整重现: Send() → sleep → Inbox[#Inbox] 的测试模式"
@@ -114,8 +121,8 @@ get_current_inbox_length() {
 wait_for_expected_inbox_length() {
     local process_id="$1"
     local expected_length="$2"
-    local max_wait="${3:-300}"
-    local check_interval="${4:-2}"
+    local max_wait="${3:-$INBOX_MAX_WAIT_TIME}"
+    local check_interval="${4:-$INBOX_CHECK_INTERVAL}"
 
     echo "⏳ Waiting for Inbox to reach expected length: $expected_length (max wait: ${max_wait}s)..."
 
@@ -483,3 +490,4 @@ echo ""
 echo "💡 使用提示:"
 echo "  - 如需指定特定项目路径: export AO_PROJECT_ROOT=/path/to/project"
 echo "  - 脚本会自动检测包含 src/a_ao_demo.lua 的项目目录"
+echo "  - Inbox检查间隔: ${INBOX_CHECK_INTERVAL}s, 最大等待时间: ${INBOX_MAX_WAIT_TIME}s"
