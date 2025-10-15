@@ -115,8 +115,8 @@ get_current_inbox_length() {
     local result=$(run_ao_cli eval "$process_id" --data "return #Inbox" 2>/dev/null)
 
     # Extract the number from the eval result Data field
-    # Look for Data: "number" pattern
-    local current_length=$(echo "$result" | grep -o 'Data: "[0-9]*"' | sed 's/Data: "//' | sed 's/"//')
+    # Look for Data: "number" pattern (exclude command lines)
+    local current_length=$(echo "$result" | grep '^   Data: "[0-9]*"$' | sed 's/   Data: "//' | sed 's/"//')
 
     # If we still can't parse length, assume it's 0
     if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
@@ -383,7 +383,7 @@ echo "初始化json库并发送消息..."
 inbox_before_operation=$(get_current_inbox_length "$PROCESS_ID")
 echo "📊 Inbox长度(操作前): $inbox_before_operation"
 
-if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'GetArticleIdSequence' } })" --wait; then
+if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = '$PROCESS_ID', Tags = { Action = 'GetArticleIdSequence' } })" --wait; then
     echo "✅ 消息发送成功 (eval command completed)"
 
     # Wait for Inbox to increase (relative change detection)
@@ -515,7 +515,7 @@ echo "初始化json库并发送消息..."
 inbox_before_operation=$(get_current_inbox_length "$PROCESS_ID")
 echo "📊 Inbox长度(操作前): $inbox_before_operation"
 
-if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = 1, version = 2, commenter = 'alice', body = 'comment_body_manual' }) })" --wait; then
+if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = '$PROCESS_ID', Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = 1, version = 2, commenter = 'alice', body = 'comment_body_manual' }) })" --wait; then
     echo "✅ 消息发送成功 (eval command completed)"
 
     # Wait for Inbox to increase (relative change detection)
