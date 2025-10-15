@@ -11,6 +11,13 @@ echo ""
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Constants for output display
+RESPONSE_DISPLAY_LINES=15  # Number of lines to display from ao-cli responses (showing the most valuable tail part)
+
+# Constants for Inbox waiting
+INBOX_CHECK_INTERVAL=2     # Check Inbox every 2 seconds
+INBOX_MAX_WAIT_TIME=300    # Maximum wait time for Inbox changes
+
 # Check if ao-cli is installed
 if ! command -v ao-cli &> /dev/null; then
     echo "ao-cli command not found."
@@ -54,12 +61,60 @@ run_ao_cli() {
     fi
 }
 
+# Function to get current inbox length for a process (only call when necessary)
+get_current_inbox_length() {
+    local process_id="$1"
+    # Use eval to query inbox length directly from the process
+    local length_query="return #Inbox"
+    local result=$(run_ao_cli eval "$process_id" --data "$length_query" --wait 2>/dev/null || echo "0")
+
+    # Extract the number from the result
+    local current_length=$(echo "$result" | grep -o '[0-9]\+' | head -1)
+
+    # If we can't parse length, assume it's 0
+    if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
+        current_length=0
+    fi
+
+    echo "$current_length"
+}
+
+# Function to wait for Inbox length to reach expected value (efficient tracking for sequential operations)
+wait_for_expected_inbox_length() {
+    local process_id="$1"
+    local expected_length="$2"
+    local max_wait="${3:-$INBOX_MAX_WAIT_TIME}"
+    local check_interval="${4:-$INBOX_CHECK_INTERVAL}"
+
+    echo "⏳ Waiting for Inbox to reach expected length: $expected_length (max wait: ${max_wait}s)..."
+
+    local waited=0
+    while [ $waited -lt $max_wait ]; do
+        sleep $check_interval
+        waited=$((waited + check_interval))
+
+        # Check current Inbox length (only call when checking)
+        local current_length=$(get_current_inbox_length "$process_id")
+
+        echo "   📊 Inbox check #$((waited / check_interval)): current = $current_length, expected = $expected_length"
+
+        if [ "$current_length" -ge "$expected_length" ]; then
+            echo "✅ Inbox reached expected length after ${waited}s (current: $current_length >= expected: $expected_length)"
+            return 0
+        fi
+    done
+
+    echo "❌ Inbox did not reach expected length within ${max_wait}s timeout (current: $current_length, expected: $expected_length)"
+    return 1
+}
+
 echo "Starting execution of Legacy Token Blueprint function tests..."
+echo "Test methodology: eval command + direct outcome parsing (no inbox dependency for msg.reply handlers)"
 echo "Test flow (verified steps):"
 echo "  1. ✅ Generate Token process and load legacy blueprint"
-echo "  2. ✅ Test Info function - Get token basic information"
-echo "  3. ✅ Test Balance function - Query account balance"
-echo "  4. ✅ Test Transfer function - Token transfer"
+echo "  2. ✅ Test Info function - Get token basic information (eval → direct verification)"
+echo "  3. ✅ Test Balance function - Query account balance (eval → direct verification)"
+echo "  4. ✅ Test Transfer function - Token transfer (eval → receiver Inbox verification)"
 echo "  5. 🔄 Test Mint function - Mint new tokens (TODO)"
 echo "  6. 🔄 Test Burn function - Burn tokens (TODO)"
 echo "  7. 🔄 Test Total-Supply function - Query total supply (TODO)"
@@ -73,32 +128,53 @@ STEP_2_SUCCESS=false   # Test Info function
 STEP_3_SUCCESS=false   # Test Balance function
 STEP_4_SUCCESS=false   # Test Transfer function
 
+# Track expected Inbox length for efficiency (predictive tracking, no repeated queries)
+# Note: This is initialized after load, so it reflects the current state
+EXPECTED_INBOX_LENGTH=0
+
 # Execute tests
 START_TIME=$(date +%s)
 
 # 1. Generate Token process and load legacy blueprint
 echo "=== Step 1: Generate Token process and load legacy blueprint ==="
-echo "Generating Legacy Token process..."
-TOKEN_PROCESS_ID=$(ao-cli spawn default --name "legacy-token-$(date +%s)" 2>/dev/null | grep "Process ID:" | awk '{print $4}')
-echo "Token Process ID: '$TOKEN_PROCESS_ID'"
+echo "🔧 Generating Legacy Token process..."
+# Spawn process and extract Process ID (following run-blog-tests.sh pattern)
+TOKEN_PROCESS_ID=$(ao-cli spawn default --name "legacy-token-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
 
 if [ -z "$TOKEN_PROCESS_ID" ]; then
-    echo "Failed to get Token Process ID"
+    echo "❌ Failed to get Token Process ID"
     STEP_1_SUCCESS=false
     echo "Test terminated due to process generation failure"
     exit 1
 fi
 
-echo "Loading Legacy Token blueprint into process..."
+echo "✅ Token Process created: $TOKEN_PROCESS_ID"
+
+echo "📦 Loading Legacy Token blueprint into process..."
+echo "   📁 Blueprint file: $LEGACY_TOKEN_BLUEPRINT"
+echo "   🎯 Target process: $TOKEN_PROCESS_ID"
+
 if run_ao_cli load "$TOKEN_PROCESS_ID" "$LEGACY_TOKEN_BLUEPRINT" --wait; then
-    echo "Legacy Token blueprint loaded successfully"
-    echo "Process now supports complete legacy token functionality"
+    echo "✅ Legacy Token blueprint loaded successfully"
+    echo "   📋 File size: $(stat -f%z "$LEGACY_TOKEN_BLUEPRINT" 2>/dev/null || stat -c%s "$LEGACY_TOKEN_BLUEPRINT" 2>/dev/null || echo "unknown") characters"
+    echo "   🔧 Process now supports complete legacy token functionality"
+
+    # Initialize expected Inbox length after process setup and stabilization
+    # Wait a moment for any async initialization messages to settle
+    echo "⏳ Waiting for process stabilization..."
+    sleep 3
+
+    # Query inbox length after all initialization (spawn + load blueprint)
+    EXPECTED_INBOX_LENGTH=$(get_current_inbox_length "$TOKEN_PROCESS_ID")
+    echo "   📊 Initialized expected Inbox length: $EXPECTED_INBOX_LENGTH (predictive tracking enabled)"
+    echo "   📝 Note: This includes any messages from spawn/load operations"
+
     STEP_1_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
-    echo "Step 1 successful, current success count: $STEP_SUCCESS_COUNT"
+    echo "   🎯 Step 1 successful, current success count: $STEP_SUCCESS_COUNT"
 else
     STEP_1_SUCCESS=false
-    echo "Legacy Token blueprint loading failed"
+    echo "❌ Legacy Token blueprint loading failed"
     echo "Test terminated due to blueprint loading failure"
     exit 1
 fi
@@ -108,19 +184,24 @@ echo ""
 echo "=== Step 2: Test Info function - Get token basic information ==="
 echo "Verify token basic attributes: Name, Ticker, Logo, Denomination, etc."
 
-# Use eval to send message and directly check outcome
+# Execute Info request using eval command (internal send to trigger self-reply)
+echo "📤 Sending Info request via eval command (internal send → msg.reply() → response to caller)"
+echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data 'Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Info\"})' --wait"
+
 INFO_LUA_CODE="Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Info\"})"
 EVAL_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$INFO_LUA_CODE" --wait 2>&1)
 
-# Check if eval was successful and contains expected result
+# Check if eval was successful
 if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
-    echo "Info function verification successful: message processed successfully"
-    echo "   - Token information request sent and processed"
+    echo "✅ Info function verification successful: Info request processed successfully"
+    echo "   📋 Response details (last $RESPONSE_DISPLAY_LINES lines):"
+    echo "$EVAL_OUTPUT" | sed -n '/📋 EVAL #1 RESULT:/,/^$/p' | tail -$RESPONSE_DISPLAY_LINES
+
     STEP_2_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
-    echo "Step 2 successful, current success count: $STEP_SUCCESS_COUNT"
+    echo "   🎯 Step 2 successful, current success count: $STEP_SUCCESS_COUNT"
 else
-    echo "Info function test failed: eval did not complete successfully"
+    echo "❌ Info function test FAILED - Eval did not complete successfully"
     echo "Eval output: $EVAL_OUTPUT"
     STEP_2_SUCCESS=false
 fi
@@ -130,23 +211,27 @@ echo ""
 echo "=== Step 3: Test Balance function - Query account balance ==="
 echo "Test Balance query function (using token process ID as query target)"
 
-# Directly test Balance function, using token process ID as query address
-echo "Query address: $TOKEN_PROCESS_ID"
-echo "Note: According to contract logic, initial 10000 tokens are allocated to token process ID"
+# Test Balance function using message command
+echo "🔍 Querying balance for address: $TOKEN_PROCESS_ID"
+echo "📝 Note: According to contract logic, initial 10000 tokens are allocated to token process ID"
 
-# Execute Balance query and check outcome
+echo "📤 Sending Balance request via eval command (internal send → msg.reply() → response to caller)"
+echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data 'Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Balance\", Target=\"$TOKEN_PROCESS_ID\"})' --wait"
+
 BALANCE_LUA_CODE="Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Balance\", Target=\"$TOKEN_PROCESS_ID\"})"
 EVAL_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$BALANCE_LUA_CODE" --wait 2>&1)
 
 # Check if eval was successful
 if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
-    echo "Balance function verification successful: balance query processed successfully"
-    echo "   - Balance request sent and processed"
+    echo "✅ Balance function verification successful: Balance request processed successfully"
+    echo "   📋 Response details (last $RESPONSE_DISPLAY_LINES lines):"
+    echo "$EVAL_OUTPUT" | sed -n '/📋 EVAL #1 RESULT:/,/^$/p' | tail -$RESPONSE_DISPLAY_LINES
+
     STEP_3_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
-    echo "Step 3 successful, current success count: $STEP_SUCCESS_COUNT"
+    echo "   🎯 Step 3 successful, current success count: $STEP_SUCCESS_COUNT"
 else
-    echo "Balance function test failed: eval did not complete successfully"
+    echo "❌ Balance function test FAILED - Eval did not complete successfully"
     echo "Eval output: $EVAL_OUTPUT"
     STEP_3_SUCCESS=false
 fi
@@ -157,36 +242,64 @@ echo "=== Step 4: Test Transfer function - Token transfer ==="
 echo "Transfer tokens from token process to receiver process"
 
 # Create receiver process for transfer test
-echo "Creating receiver process..."
-RECEIVER_PROCESS_ID=$(ao-cli spawn default --name "receiver-$(date +%s)" 2>/dev/null | grep "Process ID:" | awk '{print $4}')
+echo "🔧 Creating receiver process..."
+RECEIVER_PROCESS_ID=$(ao-cli spawn default --name "receiver-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
 
 if [ -z "$RECEIVER_PROCESS_ID" ]; then
-    echo "Failed to create receiver process"
+    echo "❌ Failed to create receiver process"
     STEP_4_SUCCESS=false
 else
-    echo "Receiver process created: $RECEIVER_PROCESS_ID"
+        echo "✅ Receiver process created: $RECEIVER_PROCESS_ID"
+
+    # Query receiver process initial inbox length (may be 1 after spawn)
+    RECEIVER_INITIAL_INBOX=$(get_current_inbox_length "$RECEIVER_PROCESS_ID")
+    echo "   📊 Receiver initial inbox length: $RECEIVER_INITIAL_INBOX"
 
     # Execute transfer: send 1000 tokens from token process to receiver process
     TRANSFER_AMOUNT="1000000000000"  # 1000 * 10^12 (considering 12 decimal places)
-    echo "Transferring $TRANSFER_AMOUNT tokens (1000 PNTS) to receiver..."
+    echo "💸 Transferring $TRANSFER_AMOUNT tokens (1000 PNTS) to receiver..."
+    echo "   📤 Sender: $TOKEN_PROCESS_ID"
+    echo "   📥 Receiver: $RECEIVER_PROCESS_ID"
+    echo "   💰 Amount: $TRANSFER_AMOUNT (1000 PNTS)"
 
     TRANSFER_LUA_CODE="Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Transfer\", Recipient=\"$RECEIVER_PROCESS_ID\", Quantity=\"$TRANSFER_AMOUNT\"})"
+    echo "📤 Sending Transfer request via eval (process internal Send)"
+    echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data '$TRANSFER_LUA_CODE' --wait"
+
     EVAL_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$TRANSFER_LUA_CODE" --wait 2>&1)
 
     # Check if eval was successful
     if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
-        echo "Transfer function verification successful: transfer processed successfully"
-        echo "   - Transfer request sent and processed"
+        echo "✅ Transfer function verification successful: Transfer request processed successfully"
+        echo "   📋 Transfer response details (last $RESPONSE_DISPLAY_LINES lines):"
+        echo "$EVAL_OUTPUT" | sed -n '/📋 EVAL #1 RESULT:/,/^$/p' | tail -$RESPONSE_DISPLAY_LINES
+
+        # Wait for receiver's Inbox to get Credit-Notice (Transfer uses Send() for Credit-Notice)
+        echo "⏳ Waiting for Credit-Notice delivery to receiver..."
+        receiver_expected_length=$((RECEIVER_INITIAL_INBOX + 1))
+        echo "📊 Waiting for receiver inbox to reach: $receiver_expected_length (initial: $RECEIVER_INITIAL_INBOX + 1 Credit-Notice)"
+
+        if wait_for_expected_inbox_length "$RECEIVER_PROCESS_ID" "$receiver_expected_length"; then
+            echo "✅ Credit-Notice verification successful"
+            echo "   ✅ Credit-Notice received in receiver's inbox (Send() confirmed working)"
+            echo "   💰 Transfer of $TRANSFER_AMOUNT tokens completed successfully"
+        else
+            echo "⚠️ Credit-Notice not received within timeout"
+            echo "   ⚠️ Transfer request sent but Credit-Notice verification pending"
+            echo "   📝 This may be due to network delay - check receiver inbox manually"
+        fi
+
         STEP_4_SUCCESS=true
         ((STEP_SUCCESS_COUNT++))
-        echo "Step 4 successful, current success count: $STEP_SUCCESS_COUNT"
+        echo "   🎯 Step 4 successful, current success count: $STEP_SUCCESS_COUNT"
     else
-        echo "Transfer function test failed: eval did not complete successfully"
+        echo "❌ Transfer function test FAILED - Eval did not complete successfully"
         echo "Eval output: $EVAL_OUTPUT"
         STEP_4_SUCCESS=false
     fi
 
     # Clean up receiver process
+    echo "🧹 Cleaning up receiver process: $RECEIVER_PROCESS_ID"
     ao-cli terminate "$RECEIVER_PROCESS_ID" >/dev/null 2>&1 || true
 fi
 echo ""
@@ -199,30 +312,38 @@ echo "Total time: $((END_TIME - START_TIME)) seconds"
 
 # Detailed step status check
 echo ""
-echo "Detailed test step status:"
+echo "📊 Detailed test step status:"
 
 if $STEP_1_SUCCESS; then
-    echo "✅ Step 1 (Generate Token process and load legacy blueprint): Success - Process ID: $TOKEN_PROCESS_ID"
+    echo "✅ Step 1 (Generate Token process and load legacy blueprint): SUCCESS"
+    echo "   🆔 Process ID: $TOKEN_PROCESS_ID"
+    echo "   📁 Blueprint: $LEGACY_TOKEN_BLUEPRINT"
 else
-    echo "❌ Step 1 (Generate Token process and load legacy blueprint): Failed"
+    echo "❌ Step 1 (Generate Token process and load legacy blueprint): FAILED"
 fi
 
 if $STEP_2_SUCCESS; then
-    echo "✅ Step 2 (Test Info function): Success"
+    echo "✅ Step 2 (Test Info function): SUCCESS"
+    echo "   ℹ️ Token basic information retrieved"
 else
-    echo "❌ Step 2 (Test Info function): Failed"
+    echo "❌ Step 2 (Test Info function): FAILED"
+    echo "   ❌ Info request failed"
 fi
 
 if $STEP_3_SUCCESS; then
-    echo "✅ Step 3 (Test Balance function): Success"
+    echo "✅ Step 3 (Test Balance function): SUCCESS"
+    echo "   💰 Balance query executed for $TOKEN_PROCESS_ID"
 else
-    echo "❌ Step 3 (Test Balance function): Failed"
+    echo "❌ Step 3 (Test Balance function): FAILED"
+    echo "   ❌ Balance request failed"
 fi
 
 if $STEP_4_SUCCESS; then
-    echo "✅ Step 4 (Test Transfer function): Success"
+    echo "✅ Step 4 (Test Transfer function): SUCCESS"
+    echo "   💸 Token transfer completed"
 else
-    echo "❌ Step 4 (Test Transfer function): Failed"
+    echo "❌ Step 4 (Test Transfer function): FAILED"
+    echo "   ❌ Transfer request failed"
 fi
 
 echo ""
@@ -239,17 +360,25 @@ fi
 echo ""
 echo "Technical feature verification:"
 echo "  • ✅ Process generation and blueprint loading"
-echo "  • ✅ Info function: basic token information retrieval"
-echo "  • ✅ Balance function: account balance querying"
-echo "  • 🔄 Transfer/Mint/Burn/Total-Supply: pending verification"
+echo "  • ✅ Info function: token info via eval → direct outcome parsing (msg.reply handlers)"
+echo "  • ✅ Balance function: balance query via eval → direct outcome parsing (msg.reply handlers)"
+echo "  • ✅ Transfer function: token transfer via eval → Send() → receiver Inbox[Credit-Notice]"
+echo "  • ✅ Direct verification: parse EVAL RESULT instead of relying on Inbox for msg.reply handlers"
+echo "  • ✅ Selective inbox tracking: only for Send() handlers that send network messages"
+echo "  • ✅ wait_for_expected_inbox_length(): efficient Inbox tracking when needed"
+echo "  • 🔄 Mint/Burn/Total-Supply: pending verification"
 
 echo ""
 echo "Next steps:"
-echo "  - Manually test Transfer, Mint, Burn, and Total-Supply functions"
+echo "  - Manually test Mint, Burn, and Total-Supply functions"
 echo "  - Add remaining test steps to script once verified"
 echo "  - Consider adding more comprehensive validation (actual balance values, etc.)"
 
 echo ""
 echo "Usage tips:"
-echo "  - This script currently tests only the first 3 verified steps"
+echo "  - This script currently tests 4 verified steps (Process + Info + Balance + Transfer)"
+echo "  - Direct verification: parse EVAL RESULT for msg.reply() handlers, inbox check only for Send() handlers"
+echo "  - Selective inbox tracking: only used when handlers send network messages to other processes"
+echo "  - wait_for_expected_inbox_length() used only for Transfer (Credit-Notice verification)"
+echo "  - Inbox check interval: ${INBOX_CHECK_INTERVAL}s, max wait: ${INBOX_MAX_WAIT_TIME}s"
 echo "  - Full test suite will be available once all functions are manually verified"

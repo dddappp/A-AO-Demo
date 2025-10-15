@@ -92,6 +92,53 @@ run_ao_cli() {
     fi
 }
 
+# Function to get current inbox length for a process (only call when necessary)
+get_current_inbox_length() {
+    local process_id="$1"
+    # Use eval to query inbox length directly from the process
+    local length_query="return #Inbox"
+    local result=$(run_ao_cli eval "$process_id" --data "$length_query" --wait 2>/dev/null || echo "0")
+
+    # Extract the number from the result
+    local current_length=$(echo "$result" | grep -o '[0-9]\+' | head -1)
+
+    # If we can't parse length, assume it's 0
+    if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
+        current_length=0
+    fi
+
+    echo "$current_length"
+}
+
+# Function to wait for Inbox length to reach expected value
+wait_for_expected_inbox_length() {
+    local process_id="$1"
+    local expected_length="$2"
+    local max_wait="${3:-300}"
+    local check_interval="${4:-2}"
+
+    echo "⏳ Waiting for Inbox to reach expected length: $expected_length (max wait: ${max_wait}s)..."
+
+    local waited=0
+    while [ $waited -lt $max_wait ]; do
+        sleep $check_interval
+        waited=$((waited + check_interval))
+
+        # Check current Inbox length
+        local current_length=$(get_current_inbox_length "$process_id")
+
+        echo "   📊 Inbox check #$((waited / check_interval)): current = $current_length, expected = $expected_length"
+
+        if [ "$current_length" -ge "$expected_length" ]; then
+            echo "✅ Inbox reached expected length after ${waited}s (current: $current_length >= expected: $expected_length)"
+            return 0
+        fi
+    done
+
+    echo "❌ Inbox did not reach expected length within ${max_wait}s timeout (current: $current_length, expected: $expected_length)"
+    return 1
+}
+
 # 使用ao-cli的load命令，它会自动处理模块依赖
 #
 # 📋 Inbox机制重要说明：
@@ -114,7 +161,7 @@ echo " 10. 添加评论 (Send + Inbox[#Inbox])"
 echo ""
 echo "🎯 完整实现: Send() → sleep → Inbox[#Inbox] 模式"
 echo "   - 每个消息发送后等待处理完成"
-echo "   - 使用 ao-cli inbox --latest 检查收件箱状态和回复消息"
+echo "   - 使用预测性Inbox跟踪 + wait_for_expected_inbox_length检查收件箱状态"
 echo "   - 验证消息处理结果是否正确进入Inbox"
 echo ""
 
@@ -131,6 +178,9 @@ STEP_7_SUCCESS=false
 STEP_8_SUCCESS=false
 STEP_9_SUCCESS=false
 STEP_10_SUCCESS=false
+
+# Track expected Inbox length for efficiency (predictive tracking, no repeated queries)
+EXPECTED_INBOX_LENGTH=0
 
 # 执行测试
 START_TIME=$(date +%s)
@@ -160,6 +210,16 @@ if run_ao_cli load "$PROCESS_ID" "$APP_FILE" --wait; then
     STEP_2_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 代码加载成功，当前成功计数: $STEP_SUCCESS_COUNT"
+
+    # Initialize expected Inbox length after process setup and stabilization
+    # Wait a moment for any async initialization messages to settle
+    echo "⏳ Waiting for process stabilization..."
+    sleep 3
+
+    # Query inbox length after all initialization (spawn + load blueprint)
+    EXPECTED_INBOX_LENGTH=$(get_current_inbox_length "$PROCESS_ID")
+    echo "   📊 Initialized expected Inbox length: $EXPECTED_INBOX_LENGTH (predictive tracking enabled)"
+    echo "   📝 Note: This includes any messages from spawn/load operations"
 else
     STEP_2_SUCCESS=false
     echo "❌ 代码加载失败"
@@ -182,20 +242,25 @@ echo "📋 Inbox机制验证：通过Eval在进程内部执行Send，回复消�
 echo "   (外部API调用不会让消息进入Inbox，只有进程内部Send才会)"
 echo "初始化json库并发送消息..."
 if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'GetArticleIdSequence' } })" --wait; then
-    STEP_3_SUCCESS=true
-    ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
+
+    # Wait for Inbox to reach expected length (msg.reply() will send network message to Inbox)
+    # Note: GetArticleIdSequence uses msg.reply(), so inbox will increase by 1
+    target_inbox_length=$((EXPECTED_INBOX_LENGTH + 1))
+    if wait_for_expected_inbox_length "$PROCESS_ID" "$target_inbox_length"; then
+        # Update expected length for next operation (predictive tracking)
+        EXPECTED_INBOX_LENGTH=$target_inbox_length
+        echo "✅ Inbox验证成功：检测到消息进入Inbox (msg.reply() confirmed working)"
+        STEP_3_SUCCESS=true
+        ((STEP_SUCCESS_COUNT++))
+        echo "   🎯 步骤3成功，当前成功计数: $STEP_SUCCESS_COUNT"
+    else
+        echo "❌ Inbox验证失败：未检测到消息"
+        STEP_3_SUCCESS=false
+    fi
 else
     STEP_3_SUCCESS=false
     echo "❌ 消息发送失败"
-fi
-echo ""
-sleep "$WAIT_TIME"
-echo "📬 Inbox检查：验证length从1增加，证明回复消息进入Inbox..."
-if run_ao_cli inbox "$PROCESS_ID" --latest 2>/dev/null | grep -q "length = [1-9]"; then
-    echo "✅ Inbox验证成功：检测到消息进入Inbox"
-else
-    echo "❌ Inbox验证失败：未检测到消息"
 fi
 echo ""
 
@@ -277,20 +342,25 @@ echo "📋 Inbox机制验证：通过Eval在进程内部执行Send，回复消�
 echo "   (再次验证Inbox功能，确保所有业务回复都正确进入Inbox)"
 echo "初始化json库并发送消息..."
 if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = ao.id, Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = 1, version = 2, commenter = 'alice', body = 'comment_body_manual' }) })" --wait; then
-    STEP_10_SUCCESS=true
-    ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
+
+    # Wait for Inbox to reach expected length (AddComment uses msg.reply(), so inbox will increase by 1)
+    # Note: This should be the final operation, expect one more message
+    target_inbox_length=$((EXPECTED_INBOX_LENGTH + 1))
+    if wait_for_expected_inbox_length "$PROCESS_ID" "$target_inbox_length"; then
+        # Update expected length for final verification
+        EXPECTED_INBOX_LENGTH=$target_inbox_length
+        echo "✅ Inbox最终验证成功：所有回复消息都已进入Inbox"
+        STEP_10_SUCCESS=true
+        ((STEP_SUCCESS_COUNT++))
+        echo "   🎯 步骤10成功，当前成功计数: $STEP_SUCCESS_COUNT"
+    else
+        echo "❌ Inbox最终验证失败：未检测到回复消息"
+        STEP_10_SUCCESS=false
+    fi
 else
     STEP_10_SUCCESS=false
     echo "❌ 消息发送失败"
-fi
-echo ""
-sleep "$WAIT_TIME"
-echo "📬 Inbox检查：最终验证Inbox状态，确认所有回复消息都已进入..."
-if run_ao_cli inbox "$PROCESS_ID" --latest 2>/dev/null | grep -q "length = [2-9]"; then
-    echo "✅ Inbox最终验证成功"
-else
-    echo "❌ Inbox最终验证失败"
 fi
 echo ""
 
@@ -377,7 +447,7 @@ else
 fi
 echo "✅ 消息处理结果通过Messages获取"
 if $STEP_3_SUCCESS && $STEP_10_SUCCESS; then
-    echo "✅ Inbox功能完全验证：length从1增加到2+"
+    echo "✅ Inbox功能完全验证：预测性跟踪 + wait_for_expected_inbox_length"
     echo "✅ Inbox子命令功能完整验证"
 else
     echo "❌ Inbox功能验证失败"
@@ -399,7 +469,7 @@ echo ""
 echo "🎯 预期行为说明:"
 echo "  - 所有步骤都应该成功完成，无CONCURRENCY_CONFLICT错误"
 echo "  - 每次更新操作都使用正确的当前版本号"
-echo "  - Inbox检查显示length从1增加到2，证明回复消息进入"
+echo "  - Inbox检查使用预测性跟踪，准确验证回复消息进入"
 echo "  - 通过eval在进程内部Send消息，回复会进入Inbox"
 echo "  - Inbox子命令能够正确读取进程内部状态"
 echo "  - 版本控制机制确保数据一致性"
