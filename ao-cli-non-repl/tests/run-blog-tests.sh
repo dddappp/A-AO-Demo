@@ -111,31 +111,20 @@ get_current_inbox_length() {
     local process_id="$1"
 
     # Use the inbox command to get current status
-    # This is more reliable than eval for getting inbox length
     local inbox_output=$(run_ao_cli inbox "$process_id" 2>/dev/null)
 
-    # Debug: show raw output for troubleshooting
-    echo "🔧 Debug: Inbox command output:" >&2
-    echo "$inbox_output" | head -3 >&2
-
     # Extract inbox length from the output
-    # Format is typically: "length = N" or similar
+    # Primary method: from "length = N" in the JSON data
     local current_length=$(echo "$inbox_output" | grep -o "length = [0-9]*" | sed 's/length = //' | head -1)
 
-    # If that doesn't work, try other patterns
+    # If that doesn't work, try secondary method: from "Prompt: ...[Inbox:N]>"
     if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
-        # Try "Inbox: N" format
-        current_length=$(echo "$inbox_output" | grep -o "Inbox: [0-9]*" | sed 's/Inbox: //' | head -1)
-    fi
-
-    if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
-        # Try any standalone number
-        current_length=$(echo "$inbox_output" | grep -o '[0-9]\+' | head -1)
+        current_length=$(echo "$inbox_output" | grep -o "\[Inbox:[0-9]*\]" | sed 's/\[Inbox://' | sed 's/\]//' | tail -1)
     fi
 
     # If we still can't parse length, assume it's 0
     if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
-        echo "⚠️  Could not parse inbox length from: $inbox_output" >&2
+        echo "⚠️  Could not parse inbox length, defaulting to 0" >&2
         current_length=0
     fi
 
@@ -405,8 +394,8 @@ if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target =
     # Note: GetArticleIdSequence uses msg.reply(), so inbox should increase by at least 1
     echo "⏳ 等待Inbox增长 (相对变化检测)..."
 
-    local waited=0
-    local success=false
+    waited=0
+    success=false
 
     while [ $waited -lt $INBOX_MAX_WAIT_TIME ]; do
         sleep $INBOX_CHECK_INTERVAL
@@ -537,8 +526,8 @@ if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target =
     # Note: AddComment uses msg.reply(), so inbox should increase by at least 1
     echo "⏳ 等待Inbox增长 (相对变化检测)..."
 
-    local waited=0
-    local success=false
+    waited=0
+    success=false
 
     while [ $waited -lt $INBOX_MAX_WAIT_TIME ]; do
         sleep $INBOX_CHECK_INTERVAL
