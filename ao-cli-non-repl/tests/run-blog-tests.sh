@@ -123,6 +123,82 @@ get_current_inbox_length() {
     echo "$current_length"
 }
 
+# Function to display the latest Inbox message (most valuable Data field)
+display_latest_inbox_message() {
+    local process_id="$1"
+    local message_title="${2:-Latest Inbox Message}"
+
+    echo "📨 $message_title:"
+
+    # Get the latest message from inbox
+    local inbox_output=$(run_ao_cli inbox "$process_id" --latest 2>/dev/null)
+
+    if [ $? -eq 0 ] && [ -n "$inbox_output" ]; then
+        echo "   📋 Full Inbox Output (first 500 chars):"
+        echo "$inbox_output" | head -1 | cut -c1-500
+        echo ""
+
+        # Try to extract Data field which is usually most valuable
+        local data_found=false
+
+        # Try different patterns for Data field
+        local data_field=$(echo "$inbox_output" | grep -o '"Data":"[^"]*"' | head -1)
+        if [ -z "$data_field" ]; then
+            # Try alternative format: Data = "value"
+            data_field=$(echo "$inbox_output" | grep -o 'Data = "[^"]*"' | head -1)
+        fi
+
+        if [ -n "$data_field" ]; then
+            local data_value
+            if [[ "$data_field" == '"Data":"'* ]]; then
+                data_value=$(echo "$data_field" | sed 's/"Data":"//' | sed 's/"$//')
+            else
+                data_value=$(echo "$data_field" | sed 's/Data = "//' | sed 's/"$//')
+            fi
+            echo "   📄 Data: $data_value"
+            data_found=true
+        fi
+
+        # Try to extract Action field
+        local action_found=false
+        local action_field=$(echo "$inbox_output" | grep -o '"Action":"[^"]*"' | head -1)
+        if [ -z "$action_field" ]; then
+            action_field=$(echo "$inbox_output" | grep -o 'Action = "[^"]*"' | head -1)
+        fi
+
+        if [ -n "$action_field" ]; then
+            local action_value
+            if [[ "$action_field" == '"Action":"'* ]]; then
+                action_value=$(echo "$action_field" | sed 's/"Action":"//' | sed 's/"$//')
+            else
+                action_value=$(echo "$action_field" | sed 's/Action = "//' | sed 's/"$//')
+            fi
+            echo "   🎯 Action: $action_value"
+            action_found=true
+        fi
+
+        # Show Tags summary if available
+        local tags_summary=$(echo "$inbox_output" | grep -o '"Tags":{[^}]*}' | head -1)
+        if [ -z "$tags_summary" ]; then
+            tags_summary=$(echo "$inbox_output" | grep -o 'Tags = {[^}]*}' | head -1)
+        fi
+
+        if [ -n "$tags_summary" ]; then
+            echo "   🏷️  Tags: ${tags_summary:0:150}..."
+        fi
+
+        # If we couldn't parse structured data, show key lines
+        if [ "$data_found" = false ] && [ "$action_found" = false ]; then
+            echo "   ⚠️  Could not parse structured message data"
+            echo "   📄 Key lines containing data:"
+            echo "$inbox_output" | grep -E "(Data|Action|Tags)" | head -3
+        fi
+    else
+        echo "   ❌ Failed to retrieve inbox message"
+    fi
+    echo ""
+}
+
 # Function to wait for Inbox length to reach expected value
 wait_for_expected_inbox_length() {
     local process_id="$1"
@@ -291,6 +367,10 @@ if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target =
         EXPECTED_INBOX_LENGTH=$target_inbox_length
         echo "✅ Inbox验证成功：msg.reply() 机制确认工作正常"
         echo "   📈 Inbox增长: +1 消息 (从 $((EXPECTED_INBOX_LENGTH - 1)) 到 $EXPECTED_INBOX_LENGTH)"
+
+        # Display the actual Inbox message content (most valuable Data field)
+        display_latest_inbox_message "$PROCESS_ID" "GetArticleIdSequence Response Message"
+
         STEP_3_SUCCESS=true
         ((STEP_SUCCESS_COUNT++))
         echo "   🎯 步骤3成功，当前成功计数: $STEP_SUCCESS_COUNT"
@@ -397,6 +477,10 @@ if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target =
         echo "✅ Inbox最终验证成功：msg.reply() 机制完整验证通过"
         echo "   📈 Inbox增长: +1 消息 (从 $((EXPECTED_INBOX_LENGTH - 1)) 到 $EXPECTED_INBOX_LENGTH)"
         echo "   📋 所有业务操作的回复消息都已正确进入Inbox"
+
+        # Display the actual Inbox message content (most valuable Data field)
+        display_latest_inbox_message "$PROCESS_ID" "AddComment Response Message"
+
         STEP_10_SUCCESS=true
         ((STEP_SUCCESS_COUNT++))
         echo "   🎯 步骤10成功，当前成功计数: $STEP_SUCCESS_COUNT"
