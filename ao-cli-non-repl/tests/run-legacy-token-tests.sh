@@ -13,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Constants for output display
 RESPONSE_DISPLAY_LINES=15  # Number of lines to display from ao-cli responses (showing the most valuable tail part)
+INBOX_DISPLAY_LINES=50     # Number of lines to display from inbox output (showing the most valuable beginning part)
 
 # Constants for Inbox waiting
 INBOX_CHECK_INTERVAL=2     # Check Inbox every 2 seconds
@@ -67,11 +68,12 @@ get_current_inbox_length() {
 
     # Use eval to query inbox length directly without sending reply
     # This avoids the issue where ao-cli inbox command itself sends messages
-    local result=$(run_ao_cli eval "$process_id" --data "return #Inbox" 2>/dev/null)
+    local result=$(run_ao_cli eval "$process_id" --data "return #Inbox" --wait 2>/dev/null)
 
     # Extract the number from the eval result Data field
-    # Look for Data: "number" pattern
-    local current_length=$(echo "$result" | grep -o 'Data: "[0-9]*"' | sed 's/Data: "//' | sed 's/"//')
+    # Look for the actual result Data field (not the input Data field)
+    # Match lines that start with "   Data: " followed by a quoted number
+    local current_length=$(echo "$result" | sed -n '/^📋 EVAL #1 RESULT:/,/^Prompt:/p' | grep '^   Data: "[0-9]*"$' | sed 's/   Data: "//' | sed 's/"$//' | head -1)
 
     # If we still can't parse length, assume it's 0
     if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
@@ -92,8 +94,8 @@ display_latest_inbox_message() {
     local inbox_output=$(run_ao_cli inbox "$process_id" --latest 2>/dev/null)
 
     if [ $? -eq 0 ] && [ -n "$inbox_output" ]; then
-        echo "   📋 Full Inbox Output (first 500 chars):"
-        echo "$inbox_output" | head -1 | cut -c1-500
+        echo "   📋 Full Inbox Output (first $INBOX_DISPLAY_LINES lines):"
+        echo "$inbox_output" | head -$INBOX_DISPLAY_LINES
         echo ""
 
         # Try to extract Data field which is usually most valuable
