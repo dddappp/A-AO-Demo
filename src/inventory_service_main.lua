@@ -36,7 +36,11 @@ Handlers.add(
         local cmd = json.decode(msg.Data)
         local saga_id = cmd.saga_id
         local s = entity_coll.get(SagaInstances, saga_id)
-        messaging.respond(true, s, msg)
+        if msg.reply then
+            msg.reply(s)
+        else
+            Send({Target = msg.From, Data = json.encode(s)})
+        end
     end
 )
 
@@ -45,7 +49,11 @@ Handlers.add(
     "get_sage_id_sequence",
     Handlers.utils.hasMatchingTag("Action", "GetSagaIdSequence"),
     function(msg, env, response)
-        messaging.respond(true, SagaIdSequence, msg)
+        if msg.reply then
+            msg.reply(SagaIdSequence)
+        else
+            Send({Target = msg.From, Data = json.encode(SagaIdSequence)})
+        end
     end
 )
 

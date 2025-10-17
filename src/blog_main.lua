@@ -58,7 +58,11 @@ local function get_article(msg, env, response)
         local _state = entity_coll.get(ArticleTable, article_id)
         return _state
     end))
-    messaging.respond(status, result, msg)
+    if msg.reply then
+        msg.reply(result)
+    else
+        Send({Target = msg.From, Data = json.encode(result)})
+    end
 end
 
 local function get_comment(msg, env, response)
@@ -69,7 +73,11 @@ local function get_comment(msg, env, response)
         local _state = entity_coll.get(CommentTable, _key)
         return _state
     end))
-    messaging.respond(status, result, msg)
+    if msg.reply then
+        msg.reply(result)
+    else
+        Send({Target = msg.From, Data = json.encode(result)})
+    end
 end
 
 local function update_article_body(msg, env, response)
@@ -140,7 +148,11 @@ Handlers.add(
         for _ in pairs(ArticleTable) do
             count = count + 1
         end
-        messaging.respond(true, count, msg)
+        if msg.reply then
+            msg.reply({count = count})
+        else
+            Send({Target = msg.From, Data = json.encode({count = count})})
+        end
     end
 )
 
@@ -148,7 +160,11 @@ Handlers.add(
     "get_article_id_sequence",
     Handlers.utils.hasMatchingTag("Action", "GetArticleIdSequence"),
     function(msg, env, response)
-        messaging.respond(true, ArticleIdSequence, msg)
+        if msg.reply then
+            msg.reply(ArticleIdSequence)
+        else
+            Send({Target = msg.From, Data = json.encode(ArticleIdSequence)})
+        end
     end
 )
 
@@ -196,7 +212,11 @@ Handlers.add(
         local cmd = json.decode(msg.Data)
         local saga_id = cmd.saga_id
         local s = entity_coll.get(SagaInstances, saga_id)
-        messaging.respond(true, s, msg)
+        if msg.reply then
+            msg.reply(s)
+        else
+            Send({Target = msg.From, Data = json.encode(s)})
+        end
     end
 )
 
@@ -205,7 +225,11 @@ Handlers.add(
     "get_sage_id_sequence",
     Handlers.utils.hasMatchingTag("Action", "GetSagaIdSequence"),
     function(msg, env, response)
-        messaging.respond(true, SagaIdSequence, msg)
+        if msg.reply then
+            msg.reply(SagaIdSequence)
+        else
+            Send({Target = msg.From, Data = json.encode(SagaIdSequence)})
+        end
     end
 )
 
