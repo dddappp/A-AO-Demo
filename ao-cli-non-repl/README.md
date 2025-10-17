@@ -21,26 +21,71 @@ AO CLI 工具已完全迁移到独立代码库，包含：
 ### 文件结构
 ```
 ao-cli-non-repl/
-├── README.md           # 此文档 - 项目测试概览
+├── README.md           # 此文档 - 项目测试概览和完整使用指南
 └── tests/
-    ├── README.md       # 详细测试文档和使用指南
-    ├── run-blog-tests.sh   # 博客应用自动化测试脚本
-    └── run-saga-tests.sh   # SAGA跨进程自动化测试脚本 ⭐
+    ├── run-blog-tests.sh           # 博客应用自动化测试脚本
+    ├── run-saga-tests.sh           # SAGA跨进程自动化测试脚本 ⭐
+    ├── run-legacy-token-tests.sh   # Legacy Token蓝图功能测试脚本
+    ├── ao-legacy-token-blueprint.lua    # Legacy网络兼容的Token蓝图
+    ├── ao-official-token-blueprint.lua  # AO官方标准Token蓝图
+    └── process_alice_1008.txt      # 测试过程数据记录
 ```
 
 ### 测试套件功能
 
-#### 博客应用测试
-- 完整的博客应用端到端测试（文章、评论、版本控制）
-- 精确重现 `AO-Testing-with-iTerm-MCP-Server.md` 文档流程
-- Send() → sleep → Inbox[#Inbox] 完整测试模式
-- Inbox机制验证和业务逻辑测试
+#### 博客应用测试 (`run-blog-tests.sh`)
+验证博客应用的核心功能：
+- 文章的创建、读取、更新操作
+- 评论系统功能
+- 版本控制和乐观锁机制
+- Inbox 消息处理机制
 
-#### SAGA 跨进程测试 ⭐
-- 多进程架构下的分布式事务测试
-- 库存管理和 SAGA 模式实现验证
-- 跨进程消息传递和最终一致性保证
-- 动态配置和运行时参数设置
+> **NOTE**:
+> 按照当前博客应用的代码，"方法"总是向消息的发动者（`From`）回复消息，如果要想让包含执行结果的消息出现在一个进程 Inbox 里，可以在该进程内用 eval 的方式来发送消息。
+> 这样收到消息的进程就会从 From 中看到发送消息的进程 ID，然后将执行结果回复给这个 ID 指向的进程。
+> 如果收到消息的进程（原进程）没有 handler 可以处理消息，消息就会出现在原进程的 Inbox 中。
+
+**测试流程**:
+1. 生成 AO 进程并加载博客应用代码
+2. 执行文章和评论的 CRUD 操作
+3. 验证版本控制和并发安全
+4. 检查 Inbox 消息处理
+
+#### SAGA 跨进程测试 (`run-saga-tests.sh`) ⭐
+验证分布式事务处理能力：
+- 多进程架构下的消息协调
+- SAGA 模式的事务管理
+- 跨进程的状态一致性
+- 错误处理和补偿机制
+
+**🎯 技术亮点**: 该脚本验证了我们对AO平台Tag过滤问题的解决方案。通过将Saga信息嵌入Data字段而非Tags，确保了分布式事务的可靠执行。
+
+**关键技术突破**:
+- **Data嵌入策略**：将Saga信息从Tags移到Data，绕过AO Tag过滤
+- **请求vs响应区分**：请求消息嵌入`saga_id`+`response_action`，响应消息只嵌入`saga_id`
+- **混合使用Tag和Data**：Action用Tag（不被过滤），Saga协调信息用Data
+- **验证成果**：SAGA完全成功，库存从100更新到119
+
+**测试流程**:
+1. 生成 Alice 和 Bob 两个独立进程
+2. 配置进程间通信目标（Bob调用Alice的服务）
+3. 执行库存调整的 SAGA 事务（Data嵌入Saga信息传递）
+4. 验证事务完成和数据一致性（库存数量正确更新）
+
+#### Legacy Token 蓝图测试 (`run-legacy-token-tests.sh`)
+测试基于官方Token Blueprint的legacy网络兼容版本，包含7个核心API：
+- Info, Balance, Balances, Transfer, Mint, Total-Supply
+- 验证bint大整数库的精确计算功能
+- 测试Debit-Notice/Credit-Notice通知系统
+- 验证legacy网络兼容性和Inbox机制
+- 提供详细的测试报告和功能验证
+
+**踩坑经验总结**:
+- eval + Send跨进程通信确实工作，From='Unknown'不影响消息传递
+- Inbox相对变化检测比绝对长度预测更可靠
+- AO网络延迟大，跨进程响应可能需要10-30秒
+- ao-cli inbox会影响Inbox长度，不能用于长度查询
+- 合约进程可以成功查询其他合约，无需外部客户端
 
 ## 🚀 使用说明
 
@@ -72,14 +117,14 @@ ao-cli --version
 # SAGA跨进程测试 - 验证分布式事务 ⭐
 ./ao-cli-non-repl/tests/run-saga-tests.sh
 
+# Legacy Token蓝图测试 - 验证token功能和Inbox机制
+./ao-cli-non-repl/tests/run-legacy-token-tests.sh
+
 # 带自定义参数的测试
 AO_WAIT_TIME=5 AO_SAGA_WAIT_TIME=15 ./ao-cli-non-repl/tests/run-saga-tests.sh
 
 # 模拟运行（验证脚本逻辑）
 AO_DRY_RUN=true ./ao-cli-non-repl/tests/run-saga-tests.sh
-
-# 查看详细测试文档
-cat ./ao-cli-non-repl/tests/README.md
 ```
 
 #### 环境准备
@@ -95,15 +140,16 @@ cat ./ao-cli-non-repl/tests/README.md
 - ✅ **进程管理**: 自动生成、配置、清理 AO 进程
 - ✅ **代码加载**: 动态加载和验证 Lua 代码
 - ✅ **消息传递**: 进程内和跨进程消息传递
-- ✅ **Inbox机制**: Send() → sleep → Inbox[#Inbox] 完整流程
-- ✅ **业务逻辑**: 博客应用和库存管理功能
-- ✅ **分布式事务**: SAGA 模式和最终一致性
-- ✅ **错误处理**: 超时、重试和故障恢复
+- ✅ **Inbox机制**: Send() → sleep → Inbox[#Inbox] 完整流程验证
+- ✅ **业务逻辑**: 博客应用、库存管理和Token功能
+- ✅ **分布式事务**: SAGA 模式和最终一致性保证
+- ✅ **错误处理**: 超时、重试和故障恢复机制
+- ✅ **跨进程通信**: 合约间的直接查询和响应处理
 
-## 📋 测试用例说明
+## 📋 测试用例详细流程
 
-### 博客应用测试
-`run-blog-tests.sh` 脚本实现完整的博客应用功能测试：
+### 博客应用测试流程
+`run-blog-tests.sh` 执行完整的博客应用功能测试：
 
 1. **生成 AO 进程** (`ao-cli spawn`)
 2. **加载博客应用代码** (`ao-cli load`)
@@ -114,8 +160,8 @@ cat ./ao-cli-non-repl/tests/README.md
 7. **更新正文** (`ao-cli message` + Inbox检查)
 8. **添加评论** (`ao-cli message` + Inbox检查)
 
-### SAGA 跨进程测试 ⭐
-`run-saga-tests.sh` 脚本实现多进程分布式事务测试：
+### SAGA 跨进程测试流程 ⭐
+`run-saga-tests.sh` 实现多进程分布式事务测试：
 
 1. **生成聚合服务进程** (`ao-cli spawn`)
 2. **加载聚合和出入库服务代码** (`ao-cli load`)
@@ -126,64 +172,38 @@ cat ./ao-cli-non-repl/tests/README.md
 7. **执行 SAGA 事务** (`ao-cli eval`)
 8. **验证执行结果** (库存更新和事务状态)
 
-
-### 官方 Token 蓝图测试脚本 (主网)
+### Legacy Token 测试环境变量
 ```bash
-./ao-cli-non-repl/tests/run-official-token-tests.sh
+# 模拟运行（不连接网络）
+AO_DRY_RUN=true ./ao-cli-non-repl/tests/run-legacy-token-tests.sh
+
+# 自定义等待时间
+AO_WAIT_TIME=5 AO_SAGA_WAIT_TIME=30 ./ao-cli-non-repl/tests/run-legacy-token-tests.sh
 ```
 
-**注意**: 此脚本专为AO主网设计，使用现代AO API (ao.send()等)，在legacy网络上可能无法正常工作。如需测试legacy网络，请使用下方的legacy版本。
-
-这个脚本测试AO官方标准Token蓝图的完整功能，包括Info、Balance、Transfer、Mint、Total-Supply、Burn等7个核心API。
-
-**脚本功能**：
-- 自动生成AO进程并加载官方Token蓝图
-- 验证bint大整数库的精确计算功能
-- 测试Debit-Notice/Credit-Notice通知系统
-- 验证幂等性和状态一致性保证
-- 提供详细的测试报告和功能验证
-
-**环境变量**：
-
-### Legacy Token 蓝图测试脚本 (遗留网络)
-```bash
-./ao-cli-non-repl/tests/run-legacy-token-tests.sh
-```
-
-**注意**: 此脚本专为AO legacy网络设计，使用Send()等legacy兼容API，在主网上可能无法正常工作。
-
-这个脚本测试基于官方Token Blueprint的legacy网络兼容版本，包含相同的7个核心API。
-
-**脚本功能**：
-- 自动生成AO进程并加载legacy兼容Token蓝图
-- 验证bint大整数库的精确计算功能
-- 测试Debit-Notice/Credit-Notice通知系统
-- 验证legacy网络兼容性
-- 提供详细的测试报告和功能验证
-
-**环境变量**：
+**环境变量说明**：
 - `AO_DRY_RUN=true` - 模拟模式，验证脚本逻辑而不连接AO网络
 - `AO_PROJECT_ROOT=/path/to/project` - 指定项目根目录
 - `AO_WAIT_TIME=5` - 设置普通操作等待时间
 - `AO_SAGA_WAIT_TIME=30` - 设置Saga执行基础等待时间
 - `AO_MAX_SAGA_WAIT_TIME=300` - 设置Saga执行最大等待时间（秒）
-- `AO_CHECK_INTERVAL=30` - 设置Saga状态检查重试间隔（秒），默认为SAGA_WAIT_TIME
+- `AO_CHECK_INTERVAL=30` - 设置Saga状态检查重试间隔（秒）
 
 
 ### 核心验证机制
 
-#### Inbox 机制
-- **Send() → sleep → Inbox[#Inbox]**: 完整的消息处理流程
-- **进程内部 vs 外部调用**: 区分 Inbox 填充行为
-- **Eval vs Message**: 不同的消息传递模式验证
+#### Inbox 消息处理
+- **Send() → sleep → Inbox[#Inbox]**: 完整的消息生命周期验证
+- **相对变化检测**: 比绝对长度预测更可靠的验证策略
+- **跨进程响应**: 合约间直接查询的Inbox响应处理
 
-#### 跨进程架构
-- **动态配置**: 运行时设置进程间通信目标
-- **消息路由**: 自动的请求-响应匹配
-- **事务协调**: SAGA 模式的分布式事务处理
-- **最终一致性**: 跨进程状态同步验证
+#### 跨进程通信架构
+- **进程间消息传递**: eval + Send跨进程通信机制验证
+- **From='Unknown'处理**: 跨进程调用中的发送者标识处理
+- **网络延迟适应**: AO网络延迟的超时和重试策略
+- **事务协调**: SAGA模式的分布式状态同步
 
-**关键发现**: 通过 Eval 在进程内部执行 Send，且当回复消息没有被 Handler 处理时，才会进入进程的 Inbox。
+**关键技术发现**: AO平台支持完整的进程间通信，合约进程可以直接查询其他合约，无需外部客户端介入。
 
 ## 📖 相关文档
 
@@ -201,12 +221,7 @@ cat ./ao-cli-non-repl/tests/README.md
 - ✅ **多进程架构**: 验证跨进程通信和状态同步
 - ✅ **动态配置**: 运行时参数设置和环境适应性
 
-### 测试覆盖
-- **基础功能**: 博客应用、版本控制、乐观锁
-- **高级功能**: SAGA 模式、最终一致性、补偿事务
-- **系统特性**: Inbox 机制、多进程通信、错误处理
-
-这些测试确保 A-AO-Demo 项目作为 AO 平台复杂应用的参考实现。
+这些测试确保 A-AO-Demo 项目作为 AO 平台复杂应用的完整参考实现，涵盖从基础CRUD到分布式事务的全功能验证。
 
 ## 🔧 技术突破：AO Tag过滤问题解决方案
 
@@ -236,3 +251,16 @@ AO系统会对消息Tags进行过滤，导致Saga框架依赖的自定义Tag（�
 1. **Action tag不会被过滤**，可用于handler匹配
 2. **自定义tag会被过滤**，必须用Data嵌入
 3. **请求和响应的Saga信息嵌入策略不同**，这是关键细节
+
+## 📋 维护说明
+
+### 脚本更新
+- 业务逻辑变更时同步更新测试脚本
+- 根据网络条件调整等待时间参数
+- 确保测试用例与实际实现保持一致
+
+### 故障排除
+- 检查 AO 网络连接和钱包配置
+- 验证进程ID和消息格式
+- 确认 Eval 消息用于 Inbox 验证
+- 检查网络代理设置（如果网络条件不稳定）
