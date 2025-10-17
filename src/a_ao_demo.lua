@@ -180,8 +180,17 @@ Handlers.add(
     "get_article_id_sequence",
     Handlers.utils.hasMatchingTag("Action", "GetArticleIdSequence"),
     function(msg, env, response)
-        -- 直接返回结果，不依赖网络回复机制
-        -- 这样在eval上下文中可以直接获取返回值
+        -- 发送消息到当前进程自己，产生Inbox消息（类似token应用的做法）
+        -- 在eval上下文中，msg.From是"Unknown"，所以不能用msg.From
+        -- 而是要用ao.id发送到当前进程
+        Send({
+            Target = ao.id,
+            Action = "GetArticleIdSequence_Response",
+            Result = ArticleIdSequence
+        })
+
+        -- 设置全局变量作为备选方案
+        _G.GetArticleIdSequenceResult = ArticleIdSequence
         return ArticleIdSequence
     end
 )

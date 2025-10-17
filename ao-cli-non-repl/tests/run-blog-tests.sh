@@ -379,21 +379,22 @@ echo "初始化json库并发送消息..."
 inbox_before_operation=$(get_current_inbox_length "$PROCESS_ID")
 echo "📊 Inbox长度(操作前): $inbox_before_operation"
 
-# Execute GetArticleIdSequence - handler now returns result directly
-echo "📤 执行GetArticleIdSequence请求 (handler直接返回结果)"
-echo "执行: ao-cli eval $PROCESS_ID --data 'Send({Target=\"$PROCESS_ID\", Tags={Action=\"GetArticleIdSequence\"}})' --wait"
+# Execute GetArticleIdSequence - handler sets global variable
+echo "📤 执行GetArticleIdSequence请求 (handler设置全局变量)"
+echo "执行: ao-cli eval $PROCESS_ID --data 'Send({Target=\"$PROCESS_ID\", Tags={Action=\"GetArticleIdSequence\"}}); return _G.GetArticleIdSequenceResult' --wait"
 
-EVAL_OUTPUT=$(run_ao_cli eval "$PROCESS_ID" --data "Send({Target=\"$PROCESS_ID\", Tags={Action=\"GetArticleIdSequence\"}})" --wait 2>&1)
+EVAL_OUTPUT=$(run_ao_cli eval "$PROCESS_ID" --data "Send({Target=\"$PROCESS_ID\", Tags={Action=\"GetArticleIdSequence\"}}); return _G.GetArticleIdSequenceResult" --wait 2>&1)
 
 # Check if eval was successful and parse the returned result
 if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
     echo "✅ GetArticleIdSequence eval成功"
 
     # Parse the returned ArticleIdSequence value from eval output
-    # Handler returns ArticleIdSequence directly, so look for it in the Data field
-    returned_sequence=$(echo "$EVAL_OUTPUT" | sed -n '/^📋 EVAL #1 RESULT:/,/^Prompt:/p' | grep '^   Data: "[0-9]*"$' | sed 's/   Data: "//' | sed 's/"$//' | head -1)
+    # Handler sets global variable, so the return statement gets the value
+    returned_sequence=$(echo "$EVAL_OUTPUT" | sed -n '/^📋 EVAL #1 RESULT:/,/^Prompt:/p' | grep '^   Data: "' | sed 's/   Data: "//' | sed 's/"$//' | head -1)
 
-    if [[ "$returned_sequence" =~ ^[0-9]+$ ]]; then
+    # Check if it's a table format like "{ 0 }"
+    if [[ "$returned_sequence" =~ \{.*\} ]]; then
         echo "✅ GetArticleIdSequence验证成功: 返回的序列号 = $returned_sequence"
         success=true
 
@@ -401,7 +402,7 @@ if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
         echo "   📋 Eval输出详情 (最后 $RESPONSE_DISPLAY_LINES 行):"
         echo "$EVAL_OUTPUT" | sed -n '/📋 EVAL #1 RESULT:/,/^Prompt:/p' | tail -$RESPONSE_DISPLAY_LINES
     else
-        echo "❌ GetArticleIdSequence解析失败: 无法从eval输出中提取序列号"
+        echo "❌ GetArticleIdSequence解析失败: 返回值格式不正确"
         echo "   📋 Eval输出详情: $EVAL_OUTPUT"
         success=false
     fi
