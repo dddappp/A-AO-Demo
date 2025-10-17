@@ -180,7 +180,9 @@ Handlers.add(
     "get_article_id_sequence",
     Handlers.utils.hasMatchingTag("Action", "GetArticleIdSequence"),
     function(msg, env, response)
-        messaging.respond(true, ArticleIdSequence, msg)
+        -- 直接返回结果，不依赖网络回复机制
+        -- 这样在eval上下文中可以直接获取返回值
+        return ArticleIdSequence
     end
 )
 
