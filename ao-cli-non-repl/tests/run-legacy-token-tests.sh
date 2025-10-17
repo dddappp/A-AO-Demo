@@ -1,12 +1,19 @@
 #!/bin/bash
 
-# 视网络环境，可能需要设置代理，例如：
+# Depending on network environment, proxy may need to be set, for example:
 # export HTTPS_PROXY=http://127.0.0.1:1235  HTTP_PROXY=http://127.0.0.1:1235  ALL_PROXY=socks5://127.0.0.1:1234
 # export NO_PROXY="localhost,127.0.0.1"
 
 echo "=== AO Legacy Token Blueprint Automation Test Script ==="
 echo "Testing legacy network compatible version based on official Token Blueprint"
 echo ""
+echo "🔍 Pitfall Summary (Development Debugging Process):"
+echo "  • eval + Send cross-process communication: Actually works! From='Unknown' doesn't affect message delivery"
+echo "  • Inbox verification strategy: Relative change detection more reliable than absolute length prediction"
+echo "  • Network latency: AO network is slow, cross-process responses may take 10-30 seconds, set adequate timeouts"
+echo "  • ao-cli inbox: Sends messages itself, affects Inbox length, don't use for length queries"
+echo "  • Inter-process communication: Contract processes can successfully query other contracts, no external client needed"
+echo "  • Testing methodology: eval + Inbox verification is closest to real contract interaction"
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -206,8 +213,8 @@ echo "  2. ✅ Test Info function - Get token basic information (eval → direct
 echo "  3. ✅ Test Balance function - Query account balance (eval → direct verification)"
 echo "  4. ✅ Test Transfer function - Token transfer (eval → sender/receiver Inbox verification)"
 echo "  5. ✅ Test Balances function - Query all account balances (eval → Inbox verification)"
-echo "  6. ✅ Test Mint function - Mint new tokens (eval → direct verification)"
-echo "  7. ✅ Test Total-Supply function - Query total supply (eval → helper Inbox verification)"
+echo "  6. ✅ Test Mint function - Mint new tokens (eval → Inbox verification)"
+echo "  7. ✅ Test Total-Supply function - Query total supply (cross-process eval → receiver Inbox verification)"
 echo "  8. 🔄 Test Burn function - Burn tokens (NOT IMPLEMENTED in blueprint)"
 echo ""
 
@@ -280,7 +287,7 @@ echo "Verify token basic attributes: Name, Ticker, Logo, Denomination, etc."
 
 # Record inbox length before operation for relative change detection
 inbox_before_operation=$(get_current_inbox_length "$TOKEN_PROCESS_ID")
-echo "📊 Inbox长度(操作前): $inbox_before_operation"
+echo "📊 Inbox length (before operation): $inbox_before_operation"
 
 # Execute Info request using eval command (internal send triggers Send() to self)
 echo "📤 Sending Info request via eval command (internal send → Send() → Inbox)"
@@ -315,13 +322,13 @@ if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
         if [[ "$final_inbox_length" =~ ^[0-9]+$ ]] && [[ "$inbox_before_operation" =~ ^[0-9]+$ ]]; then
             final_growth=$((final_inbox_length - inbox_before_operation))
             echo "❌ Info Inbox verification failed: Response not received in Inbox"
-            echo "   📊 最终状态: $inbox_before_operation → $final_inbox_length (增长: +$final_growth)"
+            echo "   📊 Final state: $inbox_before_operation → $final_inbox_length (growth: +$final_growth)"
         else
             echo "❌ Info Inbox verification failed: Response not received in Inbox"
-            echo "   📊 最终状态: inbox_before=$inbox_before_operation, final=$final_inbox_length"
-            echo "   ⚠️ 无法计算增长：变量包含非数字字符"
+            echo "   📊 Final state: inbox_before=$inbox_before_operation, final=$final_inbox_length"
+            echo "   ⚠️ Unable to calculate growth: Variables contain non-numeric characters"
         fi
-        echo "   🔍 调试信息: Info handler应该发送响应到Inbox"
+        echo "   🔍 Debug info: Info handler should send response to Inbox"
         STEP_2_SUCCESS=false
     fi
 else
@@ -341,7 +348,7 @@ echo "📝 Note: According to contract logic, initial 10000 tokens are allocated
 
 # Record inbox length before operation for relative change detection
 inbox_before_operation=$(get_current_inbox_length "$TOKEN_PROCESS_ID")
-echo "📊 Inbox长度(操作前): $inbox_before_operation"
+echo "📊 Inbox length (before operation): $inbox_before_operation"
 
 echo "📤 Sending Balance request via eval command (internal send → Send() → Inbox)"
 echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data 'Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Balance\", Target=\"$TOKEN_PROCESS_ID\"})' --wait"
@@ -375,13 +382,13 @@ if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
         if [[ "$final_inbox_length" =~ ^[0-9]+$ ]] && [[ "$inbox_before_operation" =~ ^[0-9]+$ ]]; then
             final_growth=$((final_inbox_length - inbox_before_operation))
             echo "❌ Balance Inbox verification failed: Response not received in Inbox"
-            echo "   📊 最终状态: $inbox_before_operation → $final_inbox_length (增长: +$final_growth)"
+            echo "   📊 Final state: $inbox_before_operation → $final_inbox_length (growth: +$final_growth)"
         else
             echo "❌ Balance Inbox verification failed: Response not received in Inbox"
-            echo "   📊 最终状态: inbox_before=$inbox_before_operation, final=$final_inbox_length"
-            echo "   ⚠️ 无法计算增长：变量包含非数字字符"
+            echo "   📊 Final state: inbox_before=$inbox_before_operation, final=$final_inbox_length"
+            echo "   ⚠️ Unable to calculate growth: Variables contain non-numeric characters"
         fi
-        echo "   🔍 调试信息: Balance handler应该发送响应到Inbox"
+        echo "   🔍 Debug info: Balance handler should send response to Inbox"
         STEP_3_SUCCESS=false
     fi
 else
@@ -506,7 +513,7 @@ echo "Test Balances query function (return all balances as JSON)"
 
 # Record inbox length before operation for relative change detection
 inbox_before_operation=$(get_current_inbox_length "$TOKEN_PROCESS_ID")
-echo "📊 Inbox长度(操作前): $inbox_before_operation"
+echo "📊 Inbox length (before operation): $inbox_before_operation"
 
 # Execute Balances request using eval command (internal send triggers Send() to self)
 echo "📤 Sending Balances request via eval command (internal send → Send() → Inbox)"
@@ -541,13 +548,13 @@ if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
         if [[ "$final_inbox_length" =~ ^[0-9]+$ ]] && [[ "$inbox_before_operation" =~ ^[0-9]+$ ]]; then
             final_growth=$((final_inbox_length - inbox_before_operation))
             echo "❌ Balances Inbox verification failed: Response not received in Inbox"
-            echo "   📊 最终状态: $inbox_before_operation → $final_inbox_length (增长: +$final_growth)"
+            echo "   📊 Final state: $inbox_before_operation → $final_inbox_length (growth: +$final_growth)"
         else
             echo "❌ Balances Inbox verification failed: Response not received in Inbox"
-            echo "   📊 最终状态: inbox_before=$inbox_before_operation, final=$final_inbox_length"
-            echo "   ⚠️ 无法计算增长：变量包含非数字字符"
+            echo "   📊 Final state: inbox_before=$inbox_before_operation, final=$final_inbox_length"
+            echo "   ⚠️ Unable to calculate growth: Variables contain non-numeric characters"
         fi
-        echo "   🔍 调试信息: 检查Balances handler是否正确使用Send()发送响应"
+        echo "   🔍 Debug info: Check if Balances handler correctly uses Send() to send response"
         STEP_4_SUCCESS=false
     fi
 else
@@ -570,7 +577,7 @@ MINT_LUA_CODE="Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Mint\", Quantity=\"$
 
 # Record inbox length before operation for relative change detection
 inbox_before_operation=$(get_current_inbox_length "$TOKEN_PROCESS_ID")
-echo "📊 Inbox长度(操作前): $inbox_before_operation"
+echo "📊 Inbox length (before operation): $inbox_before_operation"
 
 # Execute Mint request using eval command (internal send triggers handler)
 echo "📤 Sending Mint request via eval command (internal send → handler processing)"
@@ -604,13 +611,13 @@ if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
         if [[ "$final_inbox_length" =~ ^[0-9]+$ ]] && [[ "$inbox_before_operation" =~ ^[0-9]+$ ]]; then
             final_growth=$((final_inbox_length - inbox_before_operation))
             echo "❌ Mint Inbox verification failed: Response not received in Inbox"
-            echo "   📊 最终状态: $inbox_before_operation → $final_inbox_length (增长: +$final_growth)"
+            echo "   📊 Final state: $inbox_before_operation → $final_inbox_length (growth: +$final_growth)"
         else
             echo "❌ Mint Inbox verification failed: Response not received in Inbox"
-            echo "   📊 最终状态: inbox_before=$inbox_before_operation, final=$final_inbox_length"
-            echo "   ⚠️ 无法计算增长：变量包含非数字字符"
+            echo "   📊 Final state: inbox_before=$inbox_before_operation, final=$final_inbox_length"
+            echo "   ⚠️ Unable to calculate growth: Variables contain non-numeric characters"
         fi
-        echo "   🔍 调试信息: Mint handler应该发送响应到Inbox"
+        echo "   🔍 Debug info: Mint handler should send response to Inbox"
         STEP_6_SUCCESS=false
     fi
 else
@@ -622,42 +629,50 @@ echo ""
 
 # 7. Test Total-Supply function - Query total supply
 echo "=== Step 7: Test Total-Supply function - Query total supply ==="
-echo "Test Total-Supply by directly checking TotalSupply variable (handler cannot be called from same process)"
+echo "Test Total-Supply by calling handler from different process (cannot be called from same process)"
+echo "Pitfall experience: eval + Send cross-process messaging actually works, but responses take time to arrive. From='Unknown' doesn't affect cross-process communication."
 
-# Query the TotalSupply variable directly from token process
-echo "🔍 Querying TotalSupply variable directly from token process"
-echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data 'return TotalSupply' --wait"
+# Check if receiver process still exists (from Transfer test)
+if [ -n "$RECEIVER_PROCESS_ID" ]; then
+    echo "✅ Using existing receiver process: $RECEIVER_PROCESS_ID"
 
-TOTAL_SUPPLY_RESULT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "return TotalSupply" --wait 2>&1)
+    inbox_before_operation=$(get_current_inbox_length "$RECEIVER_PROCESS_ID")
+    echo "📊 Inbox length before operation: $inbox_before_operation"
 
-if echo "$TOTAL_SUPPLY_RESULT" | grep -q "EVAL.*RESULT"; then
-    # Extract the TotalSupply value
-    total_supply_value=$(echo "$TOTAL_SUPPLY_RESULT" | sed -n '/📋 EVAL #1 RESULT:/,/^Prompt:/p' | grep "Data:" | head -1 | sed 's/.*Data: "//' | sed 's/"$//')
+    echo "📤 Sending Total-Supply request from receiver process to token process..."
+    echo "   📝 Cross-process message: receiver → token (From='Unknown' doesn't affect message delivery)"
+    eval_output=$(run_ao_cli eval "$RECEIVER_PROCESS_ID" --data "Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Total-Supply\"})" --wait 2>&1)
+    echo "Eval output: $eval_output"
 
-    if [[ "$total_supply_value" =~ ^[0-9]+$ ]]; then
-        echo "✅ Total-Supply verification successful"
-        echo "   📊 Total Supply: $total_supply_value"
-        echo "   💰 This represents the current total token supply in the system"
-        echo "   📝 Note: Total-Supply handler cannot be called from same process, so we verify the variable directly"
+    # Pitfall experience: Cross-process message delivery needs sufficient wait time, AO network latency can be significant
+    echo "⏳ Waiting for response in receiver process Inbox..."
+    echo "   📝 Experience: Cross-process responses may take 10-30 seconds, even slower in poor network conditions"
+    wait_for_expected_inbox_length "$RECEIVER_PROCESS_ID" $((inbox_before_operation + 1)) $INBOX_MAX_WAIT_TIME
 
+    final_inbox_length=$(get_current_inbox_length "$RECEIVER_PROCESS_ID")
+    inbox_growth=$((final_inbox_length - inbox_before_operation))
+
+    if [ "$inbox_growth" -gt 0 ]; then
+        echo "✅ Total-Supply query successful!"
+        echo "   📝 Verification: Response successfully reached receiver Inbox, cross-process communication works normally"
+        display_latest_inbox_message "$RECEIVER_PROCESS_ID"
         STEP_7_SUCCESS=true
         ((STEP_SUCCESS_COUNT++))
         echo "   🎯 Step 7 successful, current success count: $STEP_SUCCESS_COUNT"
     else
-        echo "❌ Total-Supply query failed - invalid response format"
-        echo "   📋 Response: $total_supply_value"
+        echo "❌ Total-Supply query failed - no response received"
+        echo "   📝 Pitfall: If failed, may be due to excessive network latency, suggest manual testing to confirm"
+        echo "📊 Final state: $inbox_before_operation → $final_inbox_length (growth: +$inbox_growth)"
         STEP_7_SUCCESS=false
     fi
-else
-    echo "❌ Total-Supply query failed - eval did not complete successfully"
-    echo "Eval output: $TOTAL_SUPPLY_RESULT"
-    STEP_7_SUCCESS=false
-fi
 
-# Clean up receiver process if it exists (from Transfer test)
-if [ -n "$RECEIVER_PROCESS_ID" ]; then
+    # Clean up receiver process (from Transfer test)
     echo "🧹 Cleaning up receiver process: $RECEIVER_PROCESS_ID"
     ao-cli terminate "$RECEIVER_PROCESS_ID" >/dev/null 2>&1 || true
+else
+    echo "❌ Receiver process not available for Total-Supply test"
+    echo "   📝 Transfer test may have failed or receiver process was cleaned up"
+    STEP_7_SUCCESS=false
 fi
 echo ""
 
@@ -746,7 +761,7 @@ echo "  • ✅ Balance function: balance query via eval → Send() → Inbox ve
 echo "  • ✅ Transfer function: token transfer via eval → Send() → sender/receiver Inbox[Debit/Credit-Notice]"
 echo "  • ✅ Balances function: all balances query via eval → Send() → Inbox verification"
 echo "  • ✅ Mint function: token minting via eval → Send() → Inbox verification"
-echo "  • ✅ Total-Supply function: supply query via direct variable access (handler restriction)"
+echo "  • ✅ Total-Supply function: supply query via external message (full request-response cycle)"
 echo "  • ✅ Direct verification: parse EVAL RESULT for msg.reply() handlers"
 echo "  • ✅ Inbox verification: used for Send() handlers (Balances, Transfer, Total-Supply)"
 echo "  • ✅ wait_for_expected_inbox_length(): efficient Inbox tracking when needed"
