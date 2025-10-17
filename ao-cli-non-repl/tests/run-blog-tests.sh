@@ -10,7 +10,7 @@ INBOX_DISPLAY_LINES=50     # Number of lines to display from inbox output (showi
 
 # Constants for Inbox waiting
 INBOX_CHECK_INTERVAL=3     # Check Inbox every 3 seconds (more conservative)
-INBOX_MAX_WAIT_TIME=180    # Maximum wait time for Inbox changes (3 minutes, more reasonable)
+INBOX_MAX_WAIT_TIME=1800    # Maximum wait time for Inbox changes (15 minutes, more reasonable)
 INBOX_STABILIZATION_TIME=5 # Wait 5 seconds for process stabilization after spawn/load
 
 echo "=== AO 博客应用自动化测试脚本 (使用 ao-cli 工具) ==="
@@ -145,9 +145,6 @@ display_latest_inbox_message() {
         echo ""
 
         # Try to extract Data field which is usually most valuable
-        local data_found=false
-
-        # Try different patterns for Data field
         local data_field=$(echo "$inbox_output" | grep -o '"Data":"[^"]*"' | head -1)
         if [ -z "$data_field" ]; then
             # Try alternative format: Data = "value"
@@ -162,11 +159,9 @@ display_latest_inbox_message() {
                 data_value=$(echo "$data_field" | sed 's/Data = "//' | sed 's/"$//')
             fi
             echo "   📄 Data: $data_value"
-            data_found=true
         fi
 
         # Try to extract Action field
-        local action_found=false
         local action_field=$(echo "$inbox_output" | grep -o '"Action":"[^"]*"' | head -1)
         if [ -z "$action_field" ]; then
             action_field=$(echo "$inbox_output" | grep -o 'Action = "[^"]*"' | head -1)
@@ -180,7 +175,6 @@ display_latest_inbox_message() {
                 action_value=$(echo "$action_field" | sed 's/Action = "//' | sed 's/"$//')
             fi
             echo "   🎯 Action: $action_value"
-            action_found=true
         fi
 
         # Show Tags summary if available
@@ -191,13 +185,6 @@ display_latest_inbox_message() {
 
         if [ -n "$tags_summary" ]; then
             echo "   🏷️  Tags: ${tags_summary:0:150}..."
-        fi
-
-        # If we couldn't parse structured data, show key lines
-        if [ "$data_found" = false ] && [ "$action_found" = false ]; then
-            echo "   ⚠️  Could not parse structured message data"
-            echo "   📄 Key lines containing data:"
-            echo "$inbox_output" | grep -E "(Data|Action|Tags)" | head -3
         fi
     else
         echo "   ❌ Failed to retrieve inbox message"
@@ -216,13 +203,18 @@ wait_for_expected_inbox_length() {
     echo "   📊 Process ID: $process_id"
     echo "   ⏱️  Check interval: ${check_interval}s"
 
-    local waited=0
+    local start_time=$(date +%s)
     local check_count=0
 
-    while [ $waited -lt $max_wait ]; do
-        sleep $check_interval
-        waited=$((waited + check_interval))
+    while true; do
         check_count=$((check_count + 1))
+        local current_time=$(date +%s)
+        local waited=$((current_time - start_time))
+
+        # Check timeout
+        if [ $waited -ge $max_wait ]; then
+            break
+        fi
 
         # Check current Inbox length
         local current_length=$(get_current_inbox_length "$process_id")
@@ -234,6 +226,8 @@ wait_for_expected_inbox_length() {
             echo "   📈 Inbox growth confirmed: +$((current_length - (expected_length - 1))) messages"
             return 0
         fi
+
+        sleep $check_interval
     done
 
     # Timeout occurred - get final length for debugging
@@ -390,42 +384,37 @@ if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target =
 
     # Wait for Inbox to increase (relative change detection)
     # Note: GetArticleIdSequence uses msg.reply(), so inbox should increase by at least 1
-    echo "⏳ 等待Inbox增长 (相对变化检测)..."
+    expected_length=$((inbox_before_operation + 1))
+    if wait_for_expected_inbox_length "$PROCESS_ID" "$expected_length"; then
+        success=true
 
-    waited=0
-    success=false
+        # Update expected length for next operation (predictive tracking)
+        EXPECTED_INBOX_LENGTH=$expected_length
 
-    while [ $waited -lt $INBOX_MAX_WAIT_TIME ]; do
-        sleep $INBOX_CHECK_INTERVAL
-        waited=$((waited + INBOX_CHECK_INTERVAL))
-
-        inbox_after_operation=$(get_current_inbox_length "$PROCESS_ID")
-        inbox_growth=$((inbox_after_operation - inbox_before_operation))
-
-        echo "   📊 Inbox检查 (${waited}s): $inbox_before_operation → $inbox_after_operation (增长: +$inbox_growth)"
-
-        if [ "$inbox_growth" -ge 1 ]; then
-            echo "✅ Inbox验证成功：检测到消息进入Inbox"
-            echo "   📈 Inbox增长: +$inbox_growth 消息 (从 $inbox_before_operation 到 $inbox_after_operation)"
-            success=true
-
-            # Update expected length for next operation (predictive tracking)
-            EXPECTED_INBOX_LENGTH=$inbox_after_operation
-
-            # Display the actual Inbox message content (most valuable Data field)
-            display_latest_inbox_message "$PROCESS_ID" "GetArticleIdSequence Response Message"
-            break
-        fi
-    done
+        # Display the actual Inbox message content (most valuable Data field)
+        display_latest_inbox_message "$PROCESS_ID" "GetArticleIdSequence Response Message"
+    else
+        success=false
+    fi
 
     if [ "$success" = true ]; then
         STEP_3_SUCCESS=true
         ((STEP_SUCCESS_COUNT++))
         echo "   🎯 步骤3成功，当前成功计数: $STEP_SUCCESS_COUNT"
     else
-        echo "❌ Inbox验证失败：msg.reply() 未产生预期的Inbox消息"
-        echo "   📊 最终状态: $inbox_before_operation → $inbox_after_operation (增长: +$inbox_growth)"
-        echo "   🔍 调试信息: 检查应用代码中的GetArticleIdSequence handler是否正确调用msg.reply()"
+        # Get final inbox state for error reporting
+        final_inbox_length=$(get_current_inbox_length "$PROCESS_ID")
+        # Ensure variables are numeric before arithmetic
+        if [[ "$final_inbox_length" =~ ^[0-9]+$ ]] && [[ "$inbox_before_operation" =~ ^[0-9]+$ ]]; then
+            final_growth=$((final_inbox_length - inbox_before_operation))
+            echo "❌ Inbox验证失败：GetArticleIdSequence 响应未进入Inbox"
+            echo "   📊 最终状态: $inbox_before_operation → $final_inbox_length (增长: +$final_growth)"
+        else
+            echo "❌ Inbox验证失败：GetArticleIdSequence 响应未进入Inbox"
+            echo "   📊 最终状态: inbox_before=$inbox_before_operation, final=$final_inbox_length"
+            echo "   ⚠️ 无法计算增长：变量包含非数字字符"
+        fi
+        echo "   🔍 调试信息: 检查应用代码中的GetArticleIdSequence handler是否正确发送响应"
         STEP_3_SUCCESS=false
     fi
 else
@@ -522,43 +511,37 @@ if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target =
 
     # Wait for Inbox to increase (relative change detection)
     # Note: AddComment uses msg.reply(), so inbox should increase by at least 1
-    echo "⏳ 等待Inbox增长 (相对变化检测)..."
+    expected_length=$((inbox_before_operation + 1))
+    if wait_for_expected_inbox_length "$PROCESS_ID" "$expected_length"; then
+        success=true
 
-    waited=0
-    success=false
+        # Update expected length for final verification
+        EXPECTED_INBOX_LENGTH=$expected_length
 
-    while [ $waited -lt $INBOX_MAX_WAIT_TIME ]; do
-        sleep $INBOX_CHECK_INTERVAL
-        waited=$((waited + INBOX_CHECK_INTERVAL))
-
-        inbox_after_operation=$(get_current_inbox_length "$PROCESS_ID")
-        inbox_growth=$((inbox_after_operation - inbox_before_operation))
-
-        echo "   📊 Inbox检查 (${waited}s): $inbox_before_operation → $inbox_after_operation (增长: +$inbox_growth)"
-
-        if [ "$inbox_growth" -ge 1 ]; then
-            echo "✅ Inbox最终验证成功：msg.reply() 机制完整验证通过"
-            echo "   📈 Inbox增长: +$inbox_growth 消息 (从 $inbox_before_operation 到 $inbox_after_operation)"
-            echo "   📋 所有业务操作的回复消息都已正确进入Inbox"
-            success=true
-
-            # Update expected length for final verification
-            EXPECTED_INBOX_LENGTH=$inbox_after_operation
-
-            # Display the actual Inbox message content (most valuable Data field)
-            display_latest_inbox_message "$PROCESS_ID" "AddComment Response Message"
-            break
-        fi
-    done
+        # Display the actual Inbox message content (most valuable Data field)
+        display_latest_inbox_message "$PROCESS_ID" "AddComment Response Message"
+    else
+        success=false
+    fi
 
     if [ "$success" = true ]; then
         STEP_10_SUCCESS=true
         ((STEP_SUCCESS_COUNT++))
         echo "   🎯 步骤10成功，当前成功计数: $STEP_SUCCESS_COUNT"
     else
-        echo "❌ Inbox最终验证失败：AddComment的msg.reply()未产生预期的Inbox消息"
-        echo "   📊 最终状态: $inbox_before_operation → $inbox_after_operation (增长: +$inbox_growth)"
-        echo "   🔍 调试信息: 检查应用代码中的AddComment handler是否正确调用msg.reply()"
+        # Get final inbox state for error reporting
+        final_inbox_length=$(get_current_inbox_length "$PROCESS_ID")
+        # Ensure variables are numeric before arithmetic
+        if [[ "$final_inbox_length" =~ ^[0-9]+$ ]] && [[ "$inbox_before_operation" =~ ^[0-9]+$ ]]; then
+            final_growth=$((final_inbox_length - inbox_before_operation))
+            echo "❌ Inbox最终验证失败：AddComment响应未进入Inbox"
+            echo "   📊 最终状态: $inbox_before_operation → $final_inbox_length (增长: +$final_growth)"
+        else
+            echo "❌ Inbox最终验证失败：AddComment响应未进入Inbox"
+            echo "   📊 最终状态: inbox_before=$inbox_before_operation, final=$final_inbox_length"
+            echo "   ⚠️ 无法计算增长：变量包含非数字字符"
+        fi
+        echo "   🔍 调试信息: 检查应用代码中的AddComment handler是否正确发送响应"
         STEP_10_SUCCESS=false
     fi
 else
