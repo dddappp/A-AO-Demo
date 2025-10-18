@@ -126,19 +126,21 @@ end
 function messaging.respond(status, result_or_error, request_msg)
     local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
 
-    -- -- Extract saga information from data
+    -- Extract saga information from data
     local x_tags = messaging.extract_cached_x_tags_from_message(request_msg)
     local response_action = x_tags[messaging.X_TAGS.RESPONSE_ACTION]
     -- Use request_msg.From as response target
     -- local target = request_msg.From
 
-    -- if (type(data) == "table") then
-    --     for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
-    --         if x_tags[x_tag] then
-    --             data[x_tag] = x_tags[x_tag]
-    --         end
-    --     end
-    -- end
+    if (type(data) == "table") then
+        -- todo 如果 data 是类似 `{1, 2, 3}` 的数组，如果再设置 data["KEY"] = value，按照经验 json.encode 会报错。
+        -- 这里需要增加一些防御性编码
+        for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
+            if x_tags[x_tag] then
+                data[x_tag] = x_tags[x_tag]
+            end
+        end
+    end
     -- -- TODO 如果 data 不是 table，那么报错？忽略？还是将结果包装到一个 table 中？
 
     local message = {
