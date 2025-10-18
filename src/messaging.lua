@@ -97,34 +97,60 @@ function messaging.extract_error_code(err)
 end
 
 function messaging.respond(status, result_or_error, request_msg)
-    local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
-
     -- Extract saga information from data
     local x_tags = messaging.extract_cached_x_tags_from_message(request_msg)
     local response_action = x_tags[messaging.X_TAGS.RESPONSE_ACTION]
 
-    -- Use request_msg.From as response target
-    local target = request_msg.From
+    -- Use msg.reply if available (for eval context), otherwise use Send
+    if request_msg.reply then
+        -- Use AO's built-in reply mechanism - keep same data structure as Send
+        local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
 
-    local message = {
-        Target = target,
-        Data = json.encode(data)
-    }
-
-    -- If there is response_action, set it to the Action field in Tags
-    if response_action then
-        message.Tags = { Action = response_action }
-    end
-
-    for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
-        if x_tags[x_tag] then
-            data[x_tag] = x_tags[x_tag]
+        -- Add saga information to data
+        for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
+            if x_tags[x_tag] then
+                data[x_tag] = x_tags[x_tag]
+            end
         end
+
+        -- Use msg.reply with same data structure as Send
+        if response_action then
+            request_msg.reply({
+                Action = response_action,
+                Data = json.encode(data)
+            })
+        else
+            request_msg.reply({
+                Data = json.encode(data)
+            })
+        end
+    else
+        -- Fallback to Send for non-eval contexts
+        local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
+
+        -- Use request_msg.From as response target
+        local target = request_msg.From
+
+        local message = {
+            Target = target,
+            Data = json.encode(data)
+        }
+
+        -- If there is response_action, set it to the Action field in Tags
+        if response_action then
+            message.Tags = { Action = response_action }
+        end
+
+        for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
+            if x_tags[x_tag] then
+                data[x_tag] = x_tags[x_tag]
+            end
+        end
+
+        message.Data = json.encode(data)
+
+        Send(message)
     end
-
-    message.Data = json.encode(data)
-
-    Send(message)
 end
 
 function messaging.process_operation_result(status, result_or_error, commit, request_msg)
@@ -142,7 +168,7 @@ end
 
 -- todo 这个 local 函数只有一个地方使用，是否直接内联到使用它的地方就好？
 local function send(target, data, tags)
-    Send({
+    ao.send({
         Target = target,
         Data = json.encode(data),
         Tags = tags
