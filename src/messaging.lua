@@ -37,20 +37,44 @@ function messaging.extract_cached_x_tags_from_message(msg)
         return x_tags
     end
     x_tags = {}
+
+    -- 安全地处理msg.Data
     local data = msg.Data
     if (data) then
-        if (type(msg.Data) == "string") then
-            data = json.decode(data)
+        if (type(data) == "string") then
+            -- 使用pcall保护json.decode，避免解析错误导致崩溃
+            local success, decoded = pcall(json.decode, data)
+            if success and type(decoded) == "table" then
+                data = decoded
+            else
+                -- JSON解析失败，返回空结果
+                msg[messaging.X_TAGS_KEY] = x_tags
+                return x_tags
+            end
+        elseif (type(data) ~= "table") then
+            -- data不是字符串也不是table，返回空结果
+            msg[messaging.X_TAGS_KEY] = x_tags
+            return x_tags
         end
-    end
-    if (type(data) ~= "table") then
+    else
+        -- 没有Data字段，返回空结果
+        msg[messaging.X_TAGS_KEY] = x_tags
         return x_tags
     end
+
+    -- 确保data是table
+    if (type(data) ~= "table") then
+        msg[messaging.X_TAGS_KEY] = x_tags
+        return x_tags
+    end
+
+    -- 安全地提取X_TAGS
     for _, v in pairs(X_TAGS) do
-        if (data[v]) then
+        if type(v) == "string" and data[v] ~= nil then
             x_tags[v] = data[v]
         end
     end
+
     msg[messaging.X_TAGS_KEY] = x_tags
     return x_tags
 end
@@ -102,20 +126,20 @@ end
 function messaging.respond(status, result_or_error, request_msg)
     local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
 
-    -- Extract saga information from data
+    -- -- Extract saga information from data
     local x_tags = messaging.extract_cached_x_tags_from_message(request_msg)
     local response_action = x_tags[messaging.X_TAGS.RESPONSE_ACTION]
     -- Use request_msg.From as response target
     -- local target = request_msg.From
 
-    if (type(data) == "table") then
-        for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
-            if x_tags[x_tag] then
-                data[x_tag] = x_tags[x_tag]
-            end
-        end
-    end
-    -- TODO 如果 data 不是 table，那么报错？忽略？还是将结果包装到一个 table 中？
+    -- if (type(data) == "table") then
+    --     for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
+    --         if x_tags[x_tag] then
+    --             data[x_tag] = x_tags[x_tag]
+    --         end
+    --     end
+    -- end
+    -- -- TODO 如果 data 不是 table，那么报错？忽略？还是将结果包装到一个 table 中？
 
     local message = {
         -- Target = target,
