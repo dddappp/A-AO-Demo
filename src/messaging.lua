@@ -132,16 +132,15 @@ function messaging.respond(status, result_or_error, request_msg)
     -- Use request_msg.From as response target
     -- local target = request_msg.From
 
+    -- NOTE 如果 data 是类似 `{1, 2, 3}` 的数组，如果再设置 data["KEY"] = value，按照经验 json.encode 会报错，此时需要增加一些防御性编码。
+    -- 不过，目前 data 总是 `{result=...}` 或 `{error=...}` 格式的对象，不会是数组，所以向其中添加字符串 key 是安全的。
     if (type(data) == "table") then
-        -- todo 如果 data 是类似 `{1, 2, 3}` 的数组，如果再设置 data["KEY"] = value，按照经验 json.encode 会报错。
-        -- 这里需要增加一些防御性编码
         for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
             if x_tags[x_tag] then
                 data[x_tag] = x_tags[x_tag]
             end
         end
     end
-    -- -- TODO 如果 data 不是 table，那么报错？忽略？还是将结果包装到一个 table 中？
 
     local message = {
         -- Target = target,
