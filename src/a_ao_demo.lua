@@ -57,8 +57,6 @@ local article_aggregate = require("article_aggregate")
 local inventory_item_aggregate = require("inventory_item_aggregate")
 local inventory_service = require("inventory_service")
 
-print("DEBUG: Initializing handlers, Handlers type: " .. type(Handlers))
-
 article_aggregate.init(ArticleTable, ArticleIdSequence, CommentTable)
 
 inventory_item_aggregate.init(InventoryItemTable)
@@ -73,11 +71,7 @@ local function get_article(msg, env, response)
         local _state = entity_coll.get(ArticleTable, article_id)
         return _state
     end))
-    if msg.reply then
-        msg.reply(result)
-    else
-        Send({Target = msg.From, Data = json.encode(result)})
-    end
+    messaging.respond(status, result, msg)
 end
 
 local function get_comment(msg, env, response)
@@ -88,11 +82,7 @@ local function get_comment(msg, env, response)
         local _state = entity_coll.get(CommentTable, _key)
         return _state
     end))
-    if msg.reply then
-        msg.reply(result)
-    else
-        Send({Target = msg.From, Data = json.encode(result)})
-    end
+    messaging.respond(status, result, msg)
 end
 
 local function update_article_body(msg, env, response)
@@ -151,11 +141,7 @@ local function get_inventory_item(msg, env, response)
         local _state = entity_coll.get(InventoryItemTable, _key)
         return _state
     end))
-    if msg.reply then
-        msg.reply(result)
-    else
-        Send({Target = msg.From, Data = json.encode(result)})
-    end
+    messaging.respond(status, result, msg)
 end
 
 local function add_inventory_item_entry(msg, env, response)
@@ -179,28 +165,14 @@ Handlers.add(
 )
 
 Handlers.add(
-    "debug_all_messages",
-    function(msg) return true end,  -- 匹配所有消息
-    function(msg, env, response)
-        print("DEBUG: Message received - Action: " .. tostring(msg.Tags.Action) .. ", From: " .. tostring(msg.From))
-        return true
-    end
-)
-
-Handlers.add(
     "get_article_count",
     Handlers.utils.hasMatchingTag("Action", "GetArticleCount"),
     function(msg, env, response)
-        print("DEBUG GetArticleCount: called")
         local count = 0
         for _ in pairs(ArticleTable) do
             count = count + 1
         end
-        if msg.reply then
-            msg.reply({count = count})
-        else
-            Send({Target = msg.From, Data = json.encode({count = count})})
-        end
+        messaging.respond(true, count, msg)
     end
 )
 
@@ -208,30 +180,7 @@ Handlers.add(
     "get_article_id_sequence",
     Handlers.utils.hasMatchingTag("Action", "GetArticleIdSequence"),
     function(msg, env, response)
-        -- 调试：打印msg.From的值
-        print("DEBUG GetArticleIdSequence: msg.From = " .. tostring(msg.From))
-        print("DEBUG GetArticleIdSequence: ao.id = " .. tostring(ao.id))
-        print("DEBUG GetArticleIdSequence: ArticleIdSequence = " .. tostring(ArticleIdSequence))
-
-        -- 尝试像token应用一样回复
-        if msg.reply then
-            print("DEBUG: using msg.reply")
-            msg.reply({
-                Action = "GetArticleIdSequence_Response",
-                Result = ArticleIdSequence
-            })
-        else
-            print("DEBUG: using Send to msg.From")
-            Send({
-                Target = msg.From,
-                Action = "GetArticleIdSequence_Response",
-                Result = ArticleIdSequence
-            })
-        end
-
-        -- 设置全局变量
-        _G.GetArticleIdSequenceResult = ArticleIdSequence
-        return ArticleIdSequence
+        messaging.respond(true, ArticleIdSequence, msg)
     end
 )
 
@@ -285,11 +234,7 @@ Handlers.add(
         for _ in pairs(InventoryItemTable) do
             count = count + 1
         end
-        if msg.reply then
-            msg.reply({count = count})
-        else
-            Send({Target = msg.From, Data = json.encode({count = count})})
-        end
+        messaging.respond(true, count, msg)
     end
 )
 
@@ -303,11 +248,7 @@ Handlers.add(
             n = n + 1
             keys[n] = k
         end
-        if msg.reply then
-            msg.reply({keys = keys})
-        else
-            Send({Target = msg.From, Data = json.encode({keys = keys})})
-        end
+        messaging.respond(true, keys, msg)
     end
 )
 
@@ -325,11 +266,7 @@ Handlers.add(
         local cmd = json.decode(msg.Data)
         local saga_id = cmd.saga_id
         local s = entity_coll.get(SagaInstances, saga_id)
-        if msg.reply then
-            msg.reply(s)
-        else
-            Send({Target = msg.From, Data = json.encode(s)})
-        end
+        messaging.respond(true, s, msg)
     end
 )
 
@@ -338,11 +275,7 @@ Handlers.add(
     "get_sage_id_sequence",
     Handlers.utils.hasMatchingTag("Action", "GetSagaIdSequence"),
     function(msg, env, response)
-        if msg.reply then
-            msg.reply(SagaIdSequence)
-        else
-            Send({Target = msg.From, Data = json.encode(SagaIdSequence)})
-        end
+        messaging.respond(true, SagaIdSequence, msg)
     end
 )
 

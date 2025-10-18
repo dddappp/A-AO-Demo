@@ -43,6 +43,9 @@ function messaging.extract_cached_x_tags_from_message(msg)
             data = json.decode(data)
         end
     end
+    if (type(data) ~= "table") then
+        return x_tags
+    end
     for _, v in pairs(X_TAGS) do
         if (data[v]) then
             x_tags[v] = data[v]
@@ -97,58 +100,38 @@ function messaging.extract_error_code(err)
 end
 
 function messaging.respond(status, result_or_error, request_msg)
+    local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
+
     -- Extract saga information from data
     local x_tags = messaging.extract_cached_x_tags_from_message(request_msg)
     local response_action = x_tags[messaging.X_TAGS.RESPONSE_ACTION]
+    -- Use request_msg.From as response target
+    -- local target = request_msg.From
 
-    -- Use msg.reply if available (for eval context), otherwise use Send
-    if request_msg.reply then
-        -- Use AO's built-in reply mechanism - keep same data structure as Send
-        local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
-
-        -- Add saga information to data
+    if (type(data) == "table") then
         for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
             if x_tags[x_tag] then
                 data[x_tag] = x_tags[x_tag]
             end
         end
+    end
+    -- TODO 如果 data 不是 table，那么报错？忽略？还是将结果包装到一个 table 中？
 
-        -- Use msg.reply with same data structure as Send
-        if response_action then
-            request_msg.reply({
-                Action = response_action,
-                Data = json.encode(data)
-            })
-        else
-            request_msg.reply({
-                Data = json.encode(data)
-            })
-        end
+    local message = {
+        -- Target = target,
+        Data = json.encode(data)
+    }
+
+    -- If there is response_action, set it to the Action field
+    if response_action then
+        -- message.Tags = { Action = response_action }
+        message.Action = response_action
+    end
+
+    if request_msg.reply then 
+        request_msg.reply(message)
     else
-        -- Fallback to Send for non-eval contexts
-        local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
-
-        -- Use request_msg.From as response target
-        local target = request_msg.From
-
-        local message = {
-            Target = target,
-            Data = json.encode(data)
-        }
-
-        -- If there is response_action, set it to the Action field in Tags
-        if response_action then
-            message.Tags = { Action = response_action }
-        end
-
-        for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
-            if x_tags[x_tag] then
-                data[x_tag] = x_tags[x_tag]
-            end
-        end
-
-        message.Data = json.encode(data)
-
+        message.Target = request_msg.From
         Send(message)
     end
 end
@@ -166,14 +149,14 @@ function messaging.process_operation_result(status, result_or_error, commit, req
     end
 end
 
--- todo 这个 local 函数只有一个地方使用，是否直接内联到使用它的地方就好？
-local function send(target, data, tags)
-    ao.send({
-        Target = target,
-        Data = json.encode(data),
-        Tags = tags
-    })
-end
+-- NOTE 这个 local 函数只有一个地方使用，是否直接内联到使用它的地方就好？
+-- local function send(target, data, tags)
+--     ao.send({
+--         Target = target,
+--         Data = json.encode(data),
+--         Tags = tags
+--     })
+-- end
 
 -- todo 这个函数是否接受一个“请求消息”参数更好？可以搜索使用使用 commit_send_or_error 的地方，看看是否可以传入“请求消息”参数。
 --   或者，让这个函数保留原样（目前看这个更好），专门用于主动对外发送消息的场景。
@@ -181,7 +164,11 @@ end
 function messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
     if (status) then
         commit()
-        send(target, request_or_error, tags)
+        Send({
+            Target = target,
+            Data = json.encode(request_or_error),
+            Tags = tags
+        })
     else
         error(request_or_error)
     end
