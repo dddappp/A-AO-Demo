@@ -147,8 +147,9 @@ display_latest_inbox_message() {
         # Try to extract Data field which is usually most valuable
         local data_field=$(echo "$inbox_output" | grep -o '"Data":"[^"]*"' | head -1)
         if [ -z "$data_field" ]; then
-            # Try alternative format: Data = "value"
-            data_field=$(echo "$inbox_output" | grep -o 'Data = "[^"]*"' | head -1)
+            # Try alternative format: Data = "value" (handle JSON strings with quotes)
+            # Use sed to extract from 'Data = "' to the last '"' on the line
+            data_field=$(echo "$inbox_output" | grep 'Data = "' | sed 's/.*Data = "\(.*\)".*/Data = "\1"/' | head -1)
         fi
 
         if [ -n "$data_field" ]; then
