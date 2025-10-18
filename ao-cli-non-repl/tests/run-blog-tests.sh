@@ -379,38 +379,23 @@ echo "初始化json库并发送消息..."
 inbox_before_operation=$(get_current_inbox_length "$PROCESS_ID")
 echo "📊 Inbox长度(操作前): $inbox_before_operation"
 
-# Execute GetArticleIdSequence - handler sets global variable
-echo "📤 执行GetArticleIdSequence请求 (handler设置全局变量)"
-echo "执行: ao-cli eval $PROCESS_ID --data 'Send({Target=\"$PROCESS_ID\", Tags={Action=\"GetArticleIdSequence\"}}); return _G.GetArticleIdSequenceResult' --wait"
+if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = '$PROCESS_ID', Tags = { Action = 'GetArticleIdSequence' } })" --wait; then
+    echo "✅ 消息发送成功 (eval command completed)"
 
-EVAL_OUTPUT=$(run_ao_cli eval "$PROCESS_ID" --data "Send({Target=\"$PROCESS_ID\", Tags={Action=\"GetArticleIdSequence\"}}); return _G.GetArticleIdSequenceResult" --wait 2>&1)
-
-# Check if eval was successful and parse the returned result
-if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
-    echo "✅ GetArticleIdSequence eval成功"
-
-    # Parse the returned ArticleIdSequence value from eval output
-    # Handler sets global variable, so the return statement gets the value
-    returned_sequence=$(echo "$EVAL_OUTPUT" | sed -n '/^📋 EVAL #1 RESULT:/,/^Prompt:/p' | grep '^   Data: "' | sed 's/   Data: "//' | sed 's/"$//' | head -1)
-
-    # Check if it's a table format like "{ 0 }"
-    if [[ "$returned_sequence" =~ \{.*\} ]]; then
-        echo "✅ GetArticleIdSequence验证成功: 返回的序列号 = $returned_sequence"
+    # Wait for Inbox to increase (relative change detection)
+    # Note: GetArticleIdSequence uses msg.reply(), so inbox should increase by at least 1
+    expected_length=$((inbox_before_operation + 1))
+    if wait_for_expected_inbox_length "$PROCESS_ID" "$expected_length"; then
         success=true
 
-        # Display the eval output details
-        echo "   📋 Eval输出详情 (最后 $RESPONSE_DISPLAY_LINES 行):"
-        echo "$EVAL_OUTPUT" | sed -n '/📋 EVAL #1 RESULT:/,/^Prompt:/p' | tail -$RESPONSE_DISPLAY_LINES
+        # Update expected length for next operation (predictive tracking)
+        EXPECTED_INBOX_LENGTH=$expected_length
+
+        # Display the actual Inbox message content (most valuable Data field)
+        display_latest_inbox_message "$PROCESS_ID" "GetArticleIdSequence Response Message"
     else
-        echo "❌ GetArticleIdSequence解析失败: 返回值格式不正确"
-        echo "   📋 Eval输出详情: $EVAL_OUTPUT"
         success=false
     fi
-else
-    echo "❌ GetArticleIdSequence eval失败"
-    echo "Eval输出: $EVAL_OUTPUT"
-    success=false
-fi
 
     if [ "$success" = true ]; then
         STEP_3_SUCCESS=true
