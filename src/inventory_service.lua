@@ -125,6 +125,7 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_create_single_line_in_out_action() }
 
+    -- NOTE 这里的 original_message 没有用到？是否可以移除？
     -- The original_message contains only some metadata from the original message
     local original_message = {
         from = msg.From,
@@ -238,6 +239,7 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_add_inventory_item_entry_action() }
 
+    -- NOTE 这里的 original_message 没有用到？是否可以移除？
     -- The original_message contains only some metadata from the original message
     local original_message = {
         from = msg.From,
@@ -313,6 +315,7 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_complete_in_out_action() }
 
+    -- NOTE 这里的 original_message 没有用到？是否可以移除？
     -- The original_message contains only some metadata from the original message
     local original_message = {
         from = msg.From,

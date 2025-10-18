@@ -101,6 +101,7 @@ function saga_messaging.execute_proxy_compensation(saga_instance, compensation_c
                 Target = proxy_contract.config.external_config.target,
                 Tags = {
                     Action = compensation_request.action,
+                    -- todo 这个做法真的有必要？随着 ao 升级，这里已经不能依赖“自定义” Tag，需要有替代方案
                     ["X-CompensationSagaId"] = saga_instance.saga_id,
                     ["X-CompensationType"] = compensation_type
                 },
@@ -199,6 +200,7 @@ function saga_messaging.get_proxy_compensation_function(saga_instance, compensat
                 Target = proxy_contract.config.external_config.target,
                 Tags = {
                     Action = compensation_request.action,
+                    -- todo 这个做法真的有必要？随着 ao 升级，这里已经不能依赖“自定义” Tag，需要有替代方案
                     ["X-CompensationSagaId"] = saga_instance.saga_id,
                     ["X-CompensationType"] = compensation_type
                 },
