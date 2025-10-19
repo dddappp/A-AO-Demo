@@ -174,18 +174,9 @@ function messaging.process_operation_result(status, result_or_error, commit, req
     end
 end
 
--- NOTE 这个 local 函数只有一个地方使用，是否直接内联到使用它的地方就好？
--- local function send(target, data, tags)
---     ao.send({
---         Target = target,
---         Data = json.encode(data),
---         Tags = tags
---     })
--- end
 
--- todo 这个函数是否接受一个“请求消息”参数更好？可以搜索使用使用 commit_send_or_error 的地方，看看是否可以传入“请求消息”参数。
---   或者，让这个函数保留原样（目前看这个更好），专门用于主动对外发送消息的场景。
---   然后增加一个 commit_respond_or_error 函数，专门用于发送响应消息（存在对应的请求消息）的场景。
+-- commit_send_or_error: 专门用于主动对外发送消息的场景 (saga 模式)
+-- commit_respond_or_error: 专门用于发送响应消息的场景 (存在对应的请求消息)
 function messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
     if (status) then
         commit()
@@ -196,6 +187,17 @@ function messaging.commit_send_or_error(status, request_or_error, commit, target
         })
     else
         error(request_or_error)
+    end
+end
+
+-- commit_respond_or_error: commit 然后回复消息，或者报错
+-- 参数: status (是否成功), result_or_error (结果或错误), commit (提交函数), request_msg (请求消息)
+function messaging.commit_respond_or_error(status, result_or_error, commit, request_msg)
+    if (status) then
+        commit()
+        messaging.respond(status, result_or_error, request_msg)
+    else
+        error(result_or_error)
     end
 end
 
