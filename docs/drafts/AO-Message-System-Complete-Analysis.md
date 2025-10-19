@@ -1,10 +1,13 @@
-# AO 消息构造等价性发现
+# AO 消息系统完整分析
 
 **日期**: 2025-10-19
 **发现者**: AI Assistant
-**验证**: 通过 AO 代码库源码分析
+**验证**: 通过 AO/AOS 代码库源码深度分析
+**涵盖内容**: 消息构造等价性、同步机制、属性命名规范、实际使用示例
 
 ## 🎯 核心发现
+
+### 消息构造等价性
 
 在 AO 系统中，以下两种消息构造方式是**完全等价**的：
 
@@ -17,6 +20,66 @@ Send({Target = ao.id, Tags = {Action = "GetArticleIdSequence"}})
 ```
 
 两种方式最终都产生相同的消息结构，对 Handler 匹配行为完全一致。
+
+### 消息根部属性命名规范
+
+基于对 `ao-legacy-token-blueprint.lua` 的分析，**消息根部属性命名基本没有限制**，开发者可以自由选择属性名。
+
+#### ✅ 实际使用示例
+
+**Info Handler**:
+```lua
+Send({Target = msg.From,
+  name = Name,           -- 自定义业务属性
+  ticker = Ticker,       -- 自定义业务属性
+  logo = Logo,           -- 自定义业务属性
+  denomination = ...,    -- 自定义业务属性
+  supply = TotalSupply   -- 自定义业务属性
+})
+```
+
+**Balance Handler**:
+```lua
+Send({
+  Target = msg.From,
+  Balance = bal,                    -- 自定义业务属性
+  Ticker = Ticker,                  -- 自定义业务属性
+  Account = ...,                    -- 自定义业务属性
+  Data = bal                        -- 系统属性（可重用）
+})
+```
+
+**Transfer Handler**:
+```lua
+local debitNotice = {
+  Action = 'Debit-Notice',      -- 系统约定属性
+  Recipient = msg.Recipient,    -- 业务属性
+  Quantity = msg.Quantity,      -- 业务属性
+  Data = "..."                  -- 系统属性
+}
+```
+
+#### ⚠️ 需要注意的限制
+
+**AO Send 函数排除列表**:
+```lua
+-- 这些属性不会被转换为 Tag（因为它们有特殊含义）
+excluded = {"Target", "Data", "Anchor", "Tags", "From"}
+```
+
+**接收端 nonExtractableTags 列表**:
+```lua
+-- 这些 Tag 不会被提取到消息根部属性
+nonExtractableTags = {
+  'Data-Protocol', 'Variant', 'From-Process', 'From-Module', 'Type',
+  'From', 'Owner', 'Anchor', 'Target', 'Data', 'Tags'
+}
+```
+
+#### 💡 使用建议
+- 使用语义化的业务属性名：`Balance`, `Ticker`, `Account`, `name`, `ticker` 等
+- 可以重用 `Data`, `Action` 等系统属性
+- 避免使用排除列表中的属性名作为业务属性名
 
 ## 🔍 技术机制分析
 
