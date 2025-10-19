@@ -6,6 +6,7 @@ local saga_messaging = {}
 -- 从消息中提取完整的回复上下文
 function saga_messaging.extract_reply_context(msg)
     return {
+        reply = msg.reply,
         From = msg.From,  -- 回复目标地址
         Data = {},        -- 回复数据（总是空对象）
         [messaging.X_TAGS_KEY] = messaging.extract_cached_x_tags_from_message(msg)  -- 预提取的X-Tags
