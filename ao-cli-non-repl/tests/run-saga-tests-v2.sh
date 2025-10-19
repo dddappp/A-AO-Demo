@@ -327,7 +327,7 @@ echo "检查多进程Saga事务的最终结果"
 
 # 改进等待机制：循环检测等待 SAGA 执行完成
 # 首先等待基础时间，然后循环检测直到完成或超时
-MAX_SAGA_WAIT_TIME="${AO_MAX_SAGA_WAIT_TIME:-300}"  # 默认5分钟最大等待时间
+MAX_SAGA_WAIT_TIME="${AO_MAX_SAGA_WAIT_TIME:-3000}"  # 默认50分钟最大等待时间
 CHECK_INTERVAL="${AO_CHECK_INTERVAL:-$SAGA_WAIT_TIME}"  # 每次检查间隔，默认等于基础等待时间
 
 echo "等待 $SAGA_WAIT_TIME 秒基础时间..."

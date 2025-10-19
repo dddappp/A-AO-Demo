@@ -26,15 +26,10 @@ Handlers.add(
     "create_single_line_in_out",
     Handlers.utils.hasMatchingTag("Action", "CreateSingleLineInOut"),
     function(msg, env, response)
-        local result = {
+        messaging.respond(true, {
             in_out_id = 1,
             version = 0,
-        }
-        if msg.reply then
-            msg.reply(result)
-        else
-            Send({Target = msg.From, Data = json.encode(result)})
-        end
+        }, msg)
         -- messaging.respond(false, "TEST_CREATE_SINGLE_LINE_IN_OUT_ERROR", msg) -- error
     end
 )
@@ -46,14 +41,9 @@ Handlers.add(
     "complete_in_out",
     Handlers.utils.hasMatchingTag("Action", "CompleteInOut"),
     function(msg, env, response)
-        local result = {
+        messaging.respond(true, {
             --
-        }
-        if msg.reply then
-            msg.reply(result)
-        else
-            Send({Target = msg.From, Data = json.encode(result)})
-        end
+        }, msg)
         -- messaging.respond(false, "TEST_COMPLETE_IN_OUT_ERROR", msg) -- error
     end
 )
@@ -63,14 +53,9 @@ Handlers.add(
     "void_in_out",
     Handlers.utils.hasMatchingTag("Action", "VoidInOut"),
     function(msg, env, response)
-        local result = {
+        messaging.respond(true, {
             --
-        }
-        if msg.reply then
-            msg.reply(result)
-        else
-            Send({Target = msg.From, Data = json.encode(result)})
-        end
+        }, msg)
     end
 )
 
@@ -83,17 +68,15 @@ Handlers.add(
     inventory_item_config.get_get_inventory_item_action(),
     Handlers.utils.hasMatchingTag("Action", inventory_item_config.get_get_inventory_item_action()),
     function(msg, env, response)
-        local result = {
-            -- product_id = 1,
-            -- location = "x",
-            version = 11,
-            quantity = 100, -- Test short-circuited logic, return quantity equal to "quantity" in the original request
-        }
-        if msg.reply then
-            msg.reply(result)
-        else
-            Send({Target = msg.From, Data = json.encode(result)})
-        end
+        messaging.respond(true,
+            -- { product_id = 1, location = "x", version = 11, quantity = 110 },
+            {
+                -- product_id = 1,
+                -- location = "x",
+                version = 11,
+                quantity = 100, -- Test short-circuited logic, return quantity equal to "quantity" in the original request
+            },
+            msg
         )
         -- messaging.respond(false, "TEST_GET_INVENTORY_ITEM_ERROR", msg) -- error
     end
@@ -109,13 +92,11 @@ Handlers.add(
     Handlers.utils.hasMatchingTag("Action", inventory_item_config.get_add_inventory_item_entry_action()),
     function(msg, env, response)
         -- success:
-        local result = {
-        }
-        if msg.reply then
-            msg.reply(result)
-        else
-            Send({Target = msg.From, Data = json.encode(result)})
-        end
+        messaging.respond(true,
+            {
+            },
+            msg
+        )
         -- error:
         -- messaging.respond(false, "TEST_ADD_INVENTORY_ITEM_ENTRY_ERROR", msg)
     end
