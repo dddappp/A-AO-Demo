@@ -64,7 +64,93 @@ local result = big_num + bint("987654321098765432109876543210")
 - ✅ **标准语法**：使用标准的 Lua require 语法
 - ✅ **全局可用**：在所有 AO Lua 进程中都预加载
 
-### 4. 加载机制详解
+### 4. Lua 运算符重载详解
+
+**这就是 Lua 的运算符重载实现方式：**
+
+#### 元表设置
+```lua
+-- bint.lua 中的设置
+local bint = {}
+bint.__index = bint  -- 设置 __index 元方法
+
+-- 创建实例时设置元表
+local instance = setmetatable({}, bint)
+```
+
+#### Lua 运算符重载的实现方式
+bint 库通过以下元方法实现运算符重载：
+
+| 运算符 | 元方法   | 功能         |
+| ------ | -------- | ------------ |
+| `+`    | `__add`  | 加法运算     |
+| `-`    | `__sub`  | 减法运算     |
+| `*`    | `__mul`  | 乘法运算     |
+| `//`   | `__idiv` | 整数除法     |
+| `/`    | `__div`  | 浮点除法     |
+| `%`    | `__mod`  | 取模运算     |
+| `^`    | `__pow`  | 幂运算       |
+| `==`   | `__eq`   | 等于比较     |
+| `<`    | `__lt`   | 小于比较     |
+| `<=`   | `__le`   | 小于等于比较 |
+| `&`    | `__band` | 位与运算     |
+| `\|`   | `__bor`  | 位或运算     |
+| `~`    | `__bxor` | 位异或运算   |
+| `<<`   | `__shl`  | 左移运算     |
+| `>>`   | `__shr`  | 右移运算     |
+
+#### 其他重要的元方法
+| 函数调用        | 元方法       | 功能       |
+| --------------- | ------------ | ---------- |
+| `tostring(obj)` | `__tostring` | 字符串转换 |
+| `obj()`         | `__call`     | 函数调用   |
+| `#obj`          | `__len`      | 长度获取   |
+
+**bint 模块的 `__call` 实现（创建实例的关键）：**
+```lua
+-- 允许通过调用 bint 模块本身来创建实例
+setmetatable(bint, {
+  __call = function(_, x)
+    return bint.new(x)  -- 调用 bint.new(x)
+  end
+})
+```
+
+**bint 的 `__tostring` 实现：**
+```lua
+function bint:__tostring()
+  return self:tobase(10)  -- 转换为10进制字符串
+end
+```
+
+#### 实际运算示例
+```lua
+local bint = require('.bint')(256)
+
+-- bint("...") 调用 bint 模块的 __call 元方法 → bint.new(...)
+local a = bint("1000000000000000000")  -- 调用 bint.__call(bint, "1000000000000000000")
+local b = bint("2000000000000000000")  -- 调用 bint.__call(bint, "2000000000000000000")
+
+-- 以下所有运算都通过元方法实现
+local sum = a + b        -- 调用 bint.__add(a, b)
+local diff = a - b       -- 调用 bint.__sub(a, b)
+local prod = a * b       -- 调用 bint.__mul(a, b)
+local quot = a // b      -- 调用 bint.__idiv(a, b)
+local equal = a == b     -- 调用 bint.__eq(a, b)
+
+-- 字符串转换也通过元方法重载
+local str = tostring(a)  -- 调用 bint.__tostring(a)
+print(a)                 -- 自动调用 tostring，输出: 1000000000000000000
+```
+
+**技术本质：**
+- ✅ **运算符重载**：这就是 Lua 的运算符重载实现方式
+- ✅ **元方法机制**：`__add`、`__sub`、`__tostring` 等都是运算符重载的钩子函数
+- ✅ **函数重载**：`tostring()` 函数也被重载了
+- ✅ **类型安全**：所有操作都返回正确的 bint 类型
+- ✅ **性能优化**：内部使用整数数组而非字符串操作
+
+### 5. 加载机制详解
 
 #### AO 基础设施的模块预加载机制
 
@@ -93,7 +179,7 @@ local bint_module = _G.package.loaded['.bint']
 local bint = bint_module(256)
 ```
 
-### 5. 模块初始化时机
+### 6. 模块初始化时机
 
 **BigInteger 在 AO 网络中的可用性：**
 
@@ -101,7 +187,7 @@ local bint = bint_module(256)
 2. **WASM 执行时**：所有 Lua 代码都可以直接使用 `require('.bint')`
 3. **无需额外配置**：无论是用 AOS 还是直接用 aoconnect SDK 都可用
 
-### 6. WASM 构建过程
+### 7. WASM 构建过程
 
 **AOS 的构建过程：**
 AOS 使用 `ao build` 命令构建 WASM 模块：
