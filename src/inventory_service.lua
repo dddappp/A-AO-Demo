@@ -71,12 +71,8 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_get_inventory_item_action() }
 
-    -- The original_message contains only some metadata from the original message
-    local original_message = {
-        from = msg.From,
-        response_action = messaging.get_response_action(msg),
-        no_response_required = messaging.get_no_response_required(msg),
-    }
+    -- Extract reply context with pre-computed X-Tags
+    local original_message = saga_messaging.extract_reply_context(msg)
 
     local status, request_or_error, commit = pcall((function()
         local saga_instance, commit = saga.create_saga_instance(ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE, target,

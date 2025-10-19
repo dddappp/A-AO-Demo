@@ -3,26 +3,24 @@ local messaging = require("messaging")
 
 local saga_messaging = {}
 
+-- 从消息中提取完整的回复上下文
+function saga_messaging.extract_reply_context(msg)
+    return {
+        From = msg.From,  -- 回复目标地址
+        Data = {},        -- 回复数据（总是空对象）
+        [messaging.X_TAGS_KEY] = messaging.extract_cached_x_tags_from_message(msg)  -- 预提取的X-Tags
+    }
+end
 
 local function respond_original_requester(saga_instance, result_or_error, is_error)
-    local original_message_from = saga_instance.original_message and saga_instance.original_message.from or nil
-    local response_action = saga_instance.original_message and saga_instance.original_message.response_action or nil
-    local no_response_required = saga_instance.original_message and saga_instance.original_message.no_response_required or nil
-
-    -- NOTE: Constructing message XTags directly seems better
-    local x_tags = {}
-    x_tags[messaging.X_TAGS.RESPONSE_ACTION] = response_action
-    x_tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED] = no_response_required
+    local reply_context = saga_instance.original_message
 
     if is_error and not result_or_error then
         result_or_error = saga_instance.error or "INTERNAL_ERROR"
     end
-    messaging.process_operation_result(not is_error, result_or_error, function() end, {
-        From = original_message_from,
-        -- Data = require("json").encode(mock_msg_data),
-        Data = {},
-        [messaging.X_TAGS_KEY] = x_tags,
-    })
+
+    -- 直接使用预构造的回复消息对象
+    messaging.process_operation_result(not is_error, result_or_error, function() end, reply_context)
 end
 
 function saga_messaging.execute_local_compensations(local_compensations, context)
