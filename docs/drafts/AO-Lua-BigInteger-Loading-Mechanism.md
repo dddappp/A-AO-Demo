@@ -270,6 +270,56 @@ aos/
 3. **兼容性**：所有 AO 进程都支持相同的 BigInteger 接口
 4. **开发自由**：可以选择使用 AOS 或直接用 aoconnect SDK
 
+## bint 与 JSON 序列化
+
+在 AO 的消息传递和状态存储中，一个核心问题是如何处理 `bint` 这样的自定义对象。答案是：**`bint` 对象不能被自动序列化为 JSON**。
+
+### 核心原因
+
+1.  **`bint` 是自定义对象**：`bint` 对象在 Lua 中是一个 `userdata` 类型，它通过元表（metatable）实现了丰富的运算符重载。
+2.  **JSON 库的限制**：标准的 JSON 编码器（如 `require('json')`）只认识 Lua 的内置类型（`string`, `number`, `table`, `boolean`, `nil`）。当遇到不认识的 `userdata` 时，它不知道如何将其转换为一个有意义的字符串表示，通常会导致错误或无用的输出。
+
+### AO 中的标准实践：使用字符串
+
+为了解决这个问题，AO 生态中的标准实践是：**始终使用字符串来存储和传输大数**。
+
+这个模式在 `ao-legacy-token-blueprint.lua` 等标准合约中得到了清晰的体现：
+
+1.  **消息中断言**：合约强制要求传入的消息中使用字符串来表示数量。
+    ```lua
+    -- 在 transfer 处理函数中
+    assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+    ```
+
+2.  **状态存储**：`Balances` 表中存储的所有余额都是字符串。
+    ```lua
+    -- Balances 表中的值是字符串
+    Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Quantity)
+    ```
+
+3.  **“即时”计算模式**：
+    - **输入**：从消息或状态中读取字符串形式的数值。
+    - **计算**：在进行数学运算时，临时将这些字符串转换为 `bint` 对象。
+    - **输出**：运算结果会立即被转换回字符串，用于更新状态或在新的消息中发送。
+
+    ```lua
+    -- 比较时：bint(string) <= bint(string)
+    if bint(msg.Quantity) <= bint(Balances[msg.From]) then
+        -- 运算结果被工具函数自动转为字符串
+        Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Quantity)
+        Balances[msg.Recipient] = utils.add(Balances[msg.Recipient], msg.Quantity)
+    end
+    ```
+
+### 结论
+
+在开发 AO 合约时，必须遵循以下规则：
+- **数据传输**：在进程间发送的消息（`Message`）中，所有大数都必须是字符串格式。
+- **状态持久化**：写入进程状态（`State`）的大数也必须是字符串格式。
+- **内部计算**：仅在函数内部的计算环节，才将字符串临时转换为 `bint` 对象。
+
+这确保了数据在序列化、传输和存储过程中的一致性和正确性。
+
 ## 🔗 参考链接
 
 ### AO 代码库
@@ -282,3 +332,66 @@ aos/
 
 ### 相关项目
 - **lua-bint 项目**：https://github.com/edubart/lua-bint
+
+## `bint` 对象与 Table Key
+
+在使用 `bint` 对象时，一个自然而然的问题是：“我能否直接使用一个 `bint` 对象作为 table 的 key？”
+
+一个常见的误解是，因为 `bint` 通过 `__eq` 元方法重载了 `==` 运算符，所以 table 应该能够用它来正确地比较 key。然而，事实并非如此。
+
+### 核心机制：哈希查找 vs. `__eq` 元方法
+
+答案是：**不行**。即使 `bint` 重载了 `==`，它在大多数情况下也**不能**被安全地用作 table 的 key。这源于 Lua 内部对 table key 的处理机制：
+
+1.  **`==` 运算符**：当执行 `a == b` 时，如果 `a` 或 `b` 是带有 `__eq` 元方法的 `userdata`，Lua 会调用该方法来判断两者是否相等。
+
+2.  **Table Key 查找**：当执行 `my_table[key]` 时，Lua 采用的是一个**基于哈希**的查找算法。对于 `userdata` 类型的 key（`bint` 即是如此），哈希值是根据其**内存地址（引用）**计算的。在这个过程中，Lua **完全不会**调用 `__eq` 元方法。
+
+### 实例演示
+
+下面的代码清晰地展示了这个问题：
+
+```lua
+local bint = require('.bint')(256)
+
+-- 创建两个 bint 对象。它们的值相同，但内存地址不同。
+local key1 = bint("12345")
+local key2 = bint("12345")
+
+-- 1. `==` 运算符按预期工作
+--    (调用 __eq 元方法，比较它们的值)
+print(key1 == key2) --> 输出: true
+
+-- 2. 将 key1 用作 table 的 key
+local my_table = {}
+my_table[key1] = "Value for key1"
+
+-- 3. 尝试用 key2 去访问
+--    (Lua 根据 key2 的内存地址计算哈希，与 key1 的哈希值不同)
+print(my_table[key2]) --> 输出: nil (查找失败！)
+```
+
+### 结论与最佳实践
+
+- **`__eq` 只对 `==` 和 `~=` 生效**，不影响 table 的 key 查找。
+- **`userdata` 和 `table` 作为 key 时，采用的是引用判等**。
+
+因此，两个值相同但引用不同的 `bint` 对象会被视为两个完全不同的 key。
+
+**最佳实践**：为了确保 key 的唯一性和可预测性，必须将 `bint` 这类自定义对象转换为一个确定的、值唯一的**字符串**，然后再用这个字符串作为 table 的 key。
+
+```lua
+-- 正确的做法
+local bint_key = bint("12345")
+local string_key = tostring(bint_key) -- 转换为字符串
+
+my_table[string_key] = "Correct Value"
+
+-- 之后可以用同样的方法获取
+local another_bint_key = bint("12345")
+local another_string_key = tostring(another_bint_key)
+
+print(my_table[another_string_key]) --> 输出: Correct Value
+```
+
+这个原则与上一节“bint 与 JSON 序列化”中的结论完全一致，共同构成了在 AO 中处理大数的黄金法则：**对外用字符串，对内用 `bint`**。
