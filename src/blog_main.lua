@@ -45,6 +45,8 @@ local entity_coll = require("entity_coll")
 local messaging = require("messaging")
 local saga = require("saga")
 local article_aggregate = require("article_aggregate")
+local article_comment_id = require("article_comment_id")
+
 
 article_aggregate.init(ArticleTable, ArticleIdSequence, CommentTable)
 
