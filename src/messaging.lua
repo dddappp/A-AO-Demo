@@ -38,37 +38,36 @@ function messaging.extract_cached_x_tags_from_message(msg)
     end
     x_tags = {}
 
-    -- 安全地处理msg.Data
+    -- Safely handle msg.Data
     local data = msg.Data
     if (data) then
         if (type(data) == "string") then
-            -- 使用pcall保护json.decode，避免解析错误导致崩溃
             local success, decoded = pcall(json.decode, data)
             if success and type(decoded) == "table" then
                 data = decoded
             else
-                -- JSON解析失败，返回空结果
+                -- JSON parsing failed, return empty result
                 msg[messaging.X_TAGS_KEY] = x_tags
                 return x_tags
             end
         elseif (type(data) ~= "table") then
-            -- data不是字符串也不是table，返回空结果
+            -- data is neither string nor table, return empty result
             msg[messaging.X_TAGS_KEY] = x_tags
             return x_tags
         end
     else
-        -- 没有Data字段，返回空结果
+        -- No Data field, return empty result
         msg[messaging.X_TAGS_KEY] = x_tags
         return x_tags
     end
 
-    -- 确保data是table
+    -- Ensure data is a table
     if (type(data) ~= "table") then
         msg[messaging.X_TAGS_KEY] = x_tags
         return x_tags
     end
 
-    -- 安全地提取X_TAGS
+    -- Safely extract X_TAGS
     for _, v in pairs(X_TAGS) do
         if type(v) == "string" and data[v] ~= nil then
             x_tags[v] = data[v]
@@ -129,11 +128,10 @@ function messaging.respond(status, result_or_error, request_msg)
     -- Extract saga information from data
     local x_tags = messaging.extract_cached_x_tags_from_message(request_msg)
     local response_action = x_tags[messaging.X_TAGS.RESPONSE_ACTION]
+
     -- Use request_msg.From as response target
     -- local target = request_msg.From
 
-    -- NOTE 如果 data 是类似 `{1, 2, 3}` 的数组，如果再设置 data["KEY"] = value，按照经验 json.encode 会报错，此时需要增加一些防御性编码。
-    -- 不过，目前 data 总是 `{result=...}` 或 `{error=...}` 格式的对象，不会是数组，所以向其中添加字符串 key 是安全的。
     if (type(data) == "table") then
         for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
             if x_tags[x_tag] then
@@ -153,7 +151,7 @@ function messaging.respond(status, result_or_error, request_msg)
         message.Action = response_action
     end
 
-    if request_msg.reply then 
+    if request_msg.reply then
         request_msg.reply(message)
     else
         message.Target = request_msg.From
@@ -174,9 +172,8 @@ function messaging.process_operation_result(status, result_or_error, commit, req
     end
 end
 
-
--- commit_send_or_error: 专门用于主动对外发送消息的场景 (saga 模式)
--- commit_respond_or_error: 专门用于发送响应消息的场景 (存在对应的请求消息)
+-- commit_send_or_error: specifically for sending messages to external parties (saga mode)
+-- commit_respond_or_error: specifically for responding to messages (when request message exists)
 function messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
     if (status) then
         commit()
@@ -190,8 +187,8 @@ function messaging.commit_send_or_error(status, request_or_error, commit, target
     end
 end
 
--- commit_respond_or_error: commit 然后回复消息，或者报错
--- 参数: status (是否成功), result_or_error (结果或错误), commit (提交函数), request_msg (请求消息)
+-- commit_respond_or_error: commit then respond to message, or throw error
+-- Parameters: status (success or not), result_or_error (result or error), commit (commit function), request_msg (request message)
 function messaging.commit_respond_or_error(status, result_or_error, commit, request_msg)
     if (status) then
         commit()

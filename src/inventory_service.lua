@@ -71,10 +71,10 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_get_inventory_item_action() }
 
+    local status, request_or_error, commit = pcall((function()
     -- Extract reply context with pre-computed X-Tags
     local original_message = saga_messaging.extract_reply_context(msg)
 
-    local status, request_or_error, commit = pcall((function()
         local saga_instance, commit = saga.create_saga_instance(ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE, target,
             tags,
             context,
@@ -120,14 +120,6 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
 
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_create_single_line_in_out_action() }
-
-    -- NOTE 这里的 original_message 没有用到？是否可以移除？
-    -- The original_message contains only some metadata from the original message
-    local original_message = {
-        from = msg.From,
-        response_action = messaging.get_response_action(msg),
-        no_response_required = messaging.get_no_response_required(msg),
-    }
 
     local status, request_or_error, commit = pcall((function()
         local request = {
@@ -235,14 +227,6 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
     local target = inventory_item_config.get_target()
     local tags = { Action = inventory_item_config.get_add_inventory_item_entry_action() }
 
-    -- NOTE 这里的 original_message 没有用到？是否可以移除？
-    -- The original_message contains only some metadata from the original message
-    local original_message = {
-        from = msg.From,
-        response_action = messaging.get_response_action(msg),
-        no_response_required = messaging.get_no_response_required(msg),
-    }
-
     local status, request_or_error, commit = pcall((function()
         local request = {
             inventory_item_id = context.inventory_item_id,
@@ -310,14 +294,6 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
 
     local target = in_out_config.get_target()
     local tags = { Action = in_out_config.get_complete_in_out_action() }
-
-    -- NOTE 这里的 original_message 没有用到？是否可以移除？
-    -- The original_message contains only some metadata from the original message
-    local original_message = {
-        from = msg.From,
-        response_action = messaging.get_response_action(msg),
-        no_response_required = messaging.get_no_response_required(msg),
-    }
 
     local status, request_or_error, commit = pcall((function()
         local request = {
