@@ -1,0 +1,188 @@
+---
+name: "A-AO-Demo Project Rules"
+description: "Comprehensive development rules and constraints for the A-AO-Demo project"
+type: "always"
+version: "1.0.0"
+created: "2025-10-20"
+updated: "2025-10-20"
+tags: ["lua", "ao", "dddml", "saga", "microservices"]
+globs: ["**/*.lua", "**/*.yaml", "**/*.java", "**/*.js"]
+priority: 10
+---
+
+# A-AO-Demo 项目规则 (Project Rules)
+
+## 🔍 项目识别规则
+
+### 技术栈识别
+- **主要语言**: Lua (AO 智能合约), Java (Maven), JavaScript/Node.js
+- **框架**: AO (Arweave Overlay), DDDML (低代码), Docker
+- **架构**: 微服务 + Saga 事务 + 最终一致性
+
+### 文件类型规则
+- **`.lua` 文件**: AO 智能合约代码，遵循 Lua 5.1 + AO 扩展语法
+- **`.yaml` 文件**: DDDML 领域模型定义
+- **`.java` 文件**: Java 演示应用 (Maven 项目)
+- **`.js` 文件**: JavaScript AO 连接演示
+- **`.sh` 文件**: 测试和部署脚本
+
+## 💻 代码生成和修改规则
+
+### DDDML 代码生成
+```bash
+# 标准代码生成命令
+docker run --rm \
+  -v .:/myapp \
+  wubuku/dddappp-ao:latest \
+  --dddmlDirectoryPath /myapp/dddml \
+  --boundedContextName A.AO.Demo \
+  --aoLuaProjectDirectoryPath /myapp/src
+```
+
+### 可修改文件规则
+- ✅ **可以修改**: `*_logic.lua` 文件 (业务逻辑实现)
+- ✅ **可以修改**: `*_config.lua` 文件 (配置设置)
+- ✅ **可以修改**: `*_mock.lua` 文件 (模拟实现)
+- ❌ **禁止修改**: 其他自动生成的文件 (会被覆盖)
+
+### 消息处理规则
+```lua
+-- 标准消息处理器格式
+Handlers.add(
+    "handler_name",
+    Handlers.utils.hasMatchingTag("Action", "ActionName"),
+    function(msg, env)
+        -- 业务逻辑
+        messaging.respond(true, result, msg)
+    end
+)
+```
+
+## 🔧 开发环境规则
+
+### AO 进程管理
+- **进程命名**: `process_alice`, `process_bob`, `process_inventory`, `process_blog`
+- **加载顺序**: 先启动进程，再加载代码
+- **调试命令**: 使用 `Inbox[#Inbox]` 查看消息
+
+### 测试环境设置
+- **单进程测试**: 使用 `src/a_ao_demo.lua`
+- **多进程测试**: 使用 `src/*_main.lua` 文件
+- **跨进程通信**: 通过 `*_config.lua` 配置目标进程 ID
+
+## ⚠️ 关键技术约束
+
+### Lua 语言约束
+- **Table Key 安全**: 只能使用 `string`, `number`, `boolean`
+- **复杂对象 Key**: 必须 `json.encode()` 转换为字符串
+- **数值处理**: 传输用字符串，计算用 `bint` 对象
+
+### AO 平台约束
+- **消息序列化**: 所有消息数据必须可 JSON 序列化
+- **异步通信**: 所有进程间交互通过异步消息
+- **最终一致性**: 接受分布式事务的特性
+
+### Saga 事务约束
+- **步骤返回**: Saga 步骤返回函数，接受 `commit` 参数
+- **错误处理**: 使用补偿操作处理失败情况
+- **状态修改**: 只有在 `commit` 为 true 时才修改状态
+
+## 🧪 测试规则
+
+### 测试类型
+- **单元测试**: 函数级逻辑验证
+- **集成测试**: 跨组件交互验证
+- **Saga 测试**: 跨进程事务验证
+- **端到端测试**: 完整业务流程验证
+
+### 自动化测试脚本
+- `run-saga-tests.sh`: Saga 事务测试
+- `run-blog-tests.sh`: 博客功能测试
+- `run-official-token-tests.sh`: Token 合约测试
+
+## 📋 代码质量规则
+
+### 错误处理
+```lua
+-- 标准错误处理模式
+local status, result = pcall(function()
+    -- 可能失败的操作
+end)
+if not status then
+    messaging.respond(false, result, msg)
+    return
+end
+```
+
+### 日志记录
+```lua
+-- 调试日志
+print("Debug: " .. variable_name)
+
+-- 错误日志
+error("Error message: " .. details)
+```
+
+### 注释规范
+- **函数注释**: 说明参数、返回值和异常情况
+- **复杂逻辑**: 解释业务规则和算法
+- **TODO 标记**: 标注待完成的工作
+
+## 🚀 部署规则
+
+### 生产部署
+- **多进程架构**: 每个业务模块独立进程
+- **配置管理**: 使用环境变量或配置文件
+- **监控告警**: 关注进程状态和消息队列
+
+### 版本管理
+- **代码版本**: 使用 Git 管理源码
+- **依赖版本**: 固定 Docker 镜像版本
+- **配置版本**: 区分开发/测试/生产环境
+
+## 🔒 安全规则
+
+### 访问控制
+- **进程隔离**: 不同业务模块使用独立进程
+- **消息验证**: 验证消息来源和权限
+- **状态保护**: 防止未经授权的状态修改
+
+### 数据保护
+- **序列化安全**: 避免序列化敏感信息
+- **错误信息**: 不暴露内部实现细节
+- **日志安全**: 不记录敏感数据
+
+## 📚 文档规则
+
+### 文档类型
+- **README**: 项目概述和快速开始
+- **API 文档**: 消息接口和数据格式
+- **部署文档**: 环境配置和部署步骤
+- **测试文档**: 测试用例和验证方法
+
+### 更新频率
+- **代码变更**: 及时更新相关文档
+- **架构调整**: 更新架构和部署文档
+- **新功能**: 补充功能说明和使用示例
+
+---
+
+## 🎯 快速检查清单
+
+### 代码提交前检查
+- [ ] 修改的文件是否在允许列表中
+- [ ] 消息处理器是否正确注册
+- [ ] 错误处理是否完整
+- [ ] 测试是否通过
+
+### 部署前检查
+- [ ] 进程配置是否正确
+- [ ] 依赖服务是否可用
+- [ ] 环境变量是否设置
+- [ ] 监控告警是否配置
+
+### 新功能开发检查
+- [ ] 领域模型是否更新
+- [ ] 代码是否重新生成
+- [ ] 业务逻辑是否实现
+- [ ] 测试用例是否编写

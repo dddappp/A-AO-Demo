@@ -1,0 +1,190 @@
+---
+name: "AO Development Best Practices"
+description: "Specific rules and constraints for AO blockchain development"
+type: "auto-attached"
+version: "1.0.0"
+created: "2025-10-20"
+updated: "2025-10-20"
+tags: ["ao", "blockchain", "lua", "async", "serialization"]
+globs: ["src/**/*.lua", "**/*.lua"]
+priority: 8
+---
+
+# AO 开发最佳实践规则
+
+## 🔒 序列化安全规则
+
+### 消息数据类型限制
+- **禁止使用**: `userdata` 类型 (如 `bint` 对象) 直接作为消息数据
+- **推荐使用**: `string`, `number`, `boolean`, `table` (包含基本类型)
+- **序列化方法**: 所有消息数据必须可被 `json.encode()` 处理
+
+```lua
+-- ❌ 错误示例
+Send({
+    Target = target,
+    Quantity = bint("1000")  -- bint 对象无法序列化
+})
+
+-- ✅ 正确示例
+Send({
+    Target = target,
+    Quantity = "1000"  -- 使用字符串
+})
+```
+
+### 数值处理规范
+- **传输格式**: 所有数值在进程间传递时使用字符串格式
+- **计算格式**: 内部计算时将字符串转换为 `bint` 对象
+- **存储格式**: 状态数据以字符串格式持久化
+
+```lua
+-- 标准数值处理模式
+local function transfer_tokens(from, to, amount_str)
+    -- 1. 字符串输入验证
+    assert(type(amount_str) == 'string', 'Amount must be string')
+
+    -- 2. 转换为 bint 进行计算
+    local amount = bint(amount_str)
+    local balance = bint(Balances[from])
+
+    -- 3. 执行计算
+    if amount <= balance then
+        -- 4. 结果转回字符串存储
+        Balances[from] = tostring(balance - amount)
+        Balances[to] = tostring(bint(Balances[to]) + amount)
+    end
+end
+```
+
+## 🏗️ 异步编程模式
+
+### Handler 注册规范
+- **统一格式**: 使用 `Handlers.utils.hasMatchingTag()` 进行消息过滤
+- **错误处理**: 所有 handler 必须使用 `pcall` 包装业务逻辑
+- **响应机制**: 使用 `messaging.respond()` 发送响应
+
+```lua
+-- 标准 Handler 格式
+Handlers.add(
+    "transfer_handler",
+    Handlers.utils.hasMatchingTag("Action", "Transfer"),
+    function(msg)
+        local status, result = pcall(function()
+            -- 业务逻辑实现
+            return process_transfer(msg)
+        end)
+
+        messaging.respond(status, result, msg)
+    end
+)
+```
+
+### Saga 事务模式
+- **步骤函数**: 每个步骤返回一个函数，接受 `commit` 参数
+- **条件执行**: 只有在 `commit` 为 `true` 时才修改状态
+- **错误处理**: 失败时返回错误信息，不修改状态
+
+```lua
+-- 正确的 Saga 步骤实现
+function saga_step_create_order(context)
+    return function(commit)
+        if commit then
+            -- 只有在 commit 时才真正创建订单
+            Orders[order_id] = order_data
+            context.order_created = true
+        end
+        return {order_id = order_id}
+    end
+end
+```
+
+## 🔑 Table Key 安全规则
+
+### 允许的 Key 类型
+- ✅ **字符串 (string)**: `"user_123"`, `"order_456"`
+- ✅ **数字 (number)**: `123`, `456.789`
+- ✅ **布尔值 (boolean)**: `true`, `false`
+
+### 禁止的 Key 类型
+- ❌ **Table**: `{id = 123}` - 使用引用判等
+- ❌ **Function**: 每次创建都是新实例
+- ❌ **Userdata**: 依赖具体实现
+
+### 复合 Key 解决方案
+```lua
+-- ❌ 不安全的做法
+local item_id = {product_id = 123, location = "A1"}
+InventoryTable[item_id] = data  -- 引用判等问题
+
+-- ✅ 安全的做法
+local key = json.encode({
+    product_id = 123,
+    location = "A1"
+})
+InventoryTable[key] = data  -- 字符串 key，确保一致性
+```
+
+## 📦 模块化开发规范
+
+### 文件职责分离
+- **自动生成文件**: `*_aggregate.lua`, `*_main.lua` - 不可修改
+- **业务逻辑文件**: `*_logic.lua` - 仅修改这些文件
+- **配置文**: `*_config.lua` - 环境特定配置
+
+### 依赖管理
+- **显式导入**: 使用 `require()` 显式声明依赖
+- **相对路径**: 开发环境使用相对路径
+- **模块隔离**: 不同进程的代码在独立运行时中执行
+
+## 🧪 测试和调试规范
+
+### 进程命名约定
+```bash
+# 开发环境
+aos process_alice    # 主测试进程
+aos process_bob      # 从测试进程
+
+# 生产环境
+aos process_inventory_item    # 库存聚合进程
+aos process_inventory_service # 库存服务进程
+aos process_blog             # 博客进程
+```
+
+### 调试命令
+```lua
+-- 查看最新消息
+Inbox[#Inbox]
+
+-- 检查进程状态
+print("Process ID:", ao.id)
+print("Loaded modules:", _G)
+
+-- 发送测试消息
+Send({
+    Target = "PROCESS_ID",
+    Action = "TestAction",
+    Data = json.encode({test = "data"})
+})
+```
+
+## 🚨 常见陷阱提醒
+
+### 异步执行陷阱
+- **问题**: 在异步操作中直接修改共享状态
+- **后果**: 竞态条件，数据不一致
+- **解决方案**: 使用 Saga 模式确保事务性
+
+### 序列化失败
+- **问题**: 发送包含 `userdata` 的消息
+- **后果**: 消息发送失败，进程崩溃
+- **解决方案**: 所有传输数据转换为基本类型
+
+### 内存泄漏
+- **问题**: 在全局 table 中累积大量数据
+- **后果**: 进程内存溢出，性能下降
+- **解决方案**: 定期清理过期数据，实现数据清理策略
+
+---
+
+*遵循这些规则可以确保 AO 应用的可靠性和可维护性。*
