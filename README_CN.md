@@ -392,8 +392,8 @@ Handlers.add(
     Handlers.utils.hasMatchingTag("Action", "CreateSingleLineInOut"),
     function(msg, env, response)
         messaging.respond(true, {
-            in_out_id = 1,
-            version = 0,
+            in_out_id = "1",
+            version = "0",
         }, msg)
         -- messaging.respond(false, "TEST_CREATE_SINGLE_LINE_IN_OUT_ERROR", msg) -- error
     end
@@ -480,7 +480,7 @@ return {
 在库存服务进程中启动 Saga：
 
 ```lua
-Send({ Target = "INVENTORY_SERVICE_PROCESS_ID", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "test", quantity = 100 }) })
+Send({ Target = "INVENTORY_SERVICE_PROCESS_ID", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = "1", location = "test", quantity = 100 }) })
 ```
 
 Saga 将自动跨进程调用：
@@ -498,7 +498,7 @@ Saga 将自动跨进程调用：
 Send({ Target = "INVENTORY_SERVICE_PROCESS_ID", Tags = { Action = "GetSagaInstance" }, Data = json.encode({ saga_id = 1 }) })
 
 # 在InventoryItem进程中查看库存变化
-Send({ Target = "INVENTORY_ITEM_PROCESS_ID", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "test" } }) })
+Send({ Target = "INVENTORY_ITEM_PROCESS_ID", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "test" } }) })
 ```
 
 这种多进程架构展示了 DDDML 工具的强大能力：将复杂的业务逻辑分解为多个独立的、可协同工作的进程，实现真正的分布式架构。
@@ -541,23 +541,23 @@ json = require("json")
 在进程 `__PROCESS_ALICE__` 中执行下面的命令，通过“添加库存项目条目”来更新库存项目（Inventory Item）：
 
 ```lua
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 100}) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "x" }, movement_quantity = 100}) })
 
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" }, movement_quantity = 130, version = 0}) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "x" }, movement_quantity = 130, version = "0"}) })
 
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }, movement_quantity = 100}) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }, movement_quantity = 100}) })
 
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }, movement_quantity = 101, version = 0}) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } }, movement_quantity = 101, version = "0"}) })
 ```
 
 查看库存项目的内容：
 
 ```lua
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" } }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "x" } }) })
 
 Inbox[#Inbox]
 
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } } }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "x", inventory_attribute_set = { foo = "foo", bar = "bar" } } }) })
 
 Inbox[#Inbox]
 ```
@@ -578,7 +578,7 @@ Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action =
 
 
 ```lua
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "x", quantity = 100 }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = "1", location = "x", quantity = 100 }) })
 ```
 
 这会创建一个新的 Saga 实例。如果之前没有执行过下面的命令，那么显然这个 Saga 实例的序号应该是 `1`。
@@ -593,14 +593,14 @@ Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action =
 查询库存项目的版本号：
 
 ```lua
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "x" } }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "x" } }) })
 -- Inbox[#Inbox]
 ```
 
 发送消息，将 Saga 实例推进到下一步（注意替换占位符 `__ITEM_VERSION__` 为上面查询到的库存项目的版本号，以及替换占位符 `__SAGA_ID__` 为上面创建的 Saga 实例的序号）：
 
 ```lua
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = { product_id = 1, location = "x", version = __ITEM_VERSION__, quantity = 110 } }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_GetInventoryItem_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = { product_id = "1", location = "x", version = __ITEM_VERSION__, quantity = 110 } }) })
 ```
 
 查看序号为 `__SAGA_ID__` 的 Saga 实例的内容是否已更新：
@@ -613,7 +613,7 @@ Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action =
 继续发送 mock 消息，以推进 Saga 实例（注意替换占位符 `__SAGA_ID__`）：
 
 ```lua
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = { in_out_id = 1, version = 0 } }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage_CreateSingleLineInOut_Callback", ["X-SagaId"] = "__SAGA_ID__" }, Data = json.encode({ result = { in_out_id = "1", version = "0" } }) })
 ```
 
 继续发送 mock 消息，以推进 Saga 实例：
@@ -715,20 +715,20 @@ Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action =
 （注意替换占位符 `__PROCESS_ALICE__` 为实际的进程 ID，比如 `M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg`）：
 
 ```lua
-Send({ Target = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "y" }, movement_quantity = 100}) })
+Send({ Target = "M20crpocF94ZfgJHfSN6UC2I_JLyimOduXtgRAwgjpg", Tags = { Action = "AddInventoryItemEntry" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "y" }, movement_quantity = 100}) })
 ```
 
 在 `__PROCESS_ALICE__` 进程中，执行下面的命令，“启动”进程 `__PROCESS_BOB__` 中的 `InventoryService` 的 `ProcessInventorySurplusOrShortage` 方法：
 
 ```lua
-Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = 1, location = "y", quantity = 119 }) })
+Send({ Target = "cDSVWmDmsu19OjlRvHMJ9SnmKBx_KocP82NuOS1iQOg", Tags = { Action = "InventoryService_ProcessInventorySurplusOrShortage" }, Data = json.encode({ product_id = "1", location = "y", quantity = 119 }) })
 -- New Message From u37...zs4: Data = {"result":{"in_out_i...
 ```
 
 查看进程 `__PROCESS_ALICE__` 中的库存项目：
 
 ```lua
-Send({ Target = "__PROCESS_ALICE__", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = 1, location = "y" } }) })
+Send({ Target = "__PROCESS_ALICE__", Tags = { Action = "GetInventoryItem" }, Data = json.encode({ inventory_item_id = { product_id = "1", location = "y" } }) })
 
 Inbox[#Inbox]
 ```

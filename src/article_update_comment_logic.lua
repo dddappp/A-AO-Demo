@@ -9,7 +9,7 @@ local article_update_comment_logic = {}
 
 --- Verifies the Article.UpdateComment command.
 -- @param _state table The current state of the Article
--- @param comment_seq_id number 
+-- @param comment_seq_id bint 
 -- @param commenter string 
 -- @param body string 
 -- @param cmd table The command

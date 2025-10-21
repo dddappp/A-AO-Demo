@@ -9,7 +9,7 @@ local article_remove_comment_logic = {}
 
 --- Verifies the Article.RemoveComment command.
 -- @param _state table The current state of the Article
--- @param comment_seq_id number 
+-- @param comment_seq_id bint 
 -- @param cmd table The command
 -- @param msg any The original message. Properties of an AO msg may include `Timestamp`, `Block-Height`, `Owner`, `Nonce`, etc.
 -- @param env table The environment context

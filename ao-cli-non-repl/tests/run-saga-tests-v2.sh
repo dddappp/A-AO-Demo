@@ -292,7 +292,7 @@ echo ""
 
 # 3. 创建库存项目
 echo "=== 步骤 3: 在inventory_item进程中创建库存项目 ==="
-if ao-cli message "$INVENTORY_ITEM_PROCESS_ID" "AddInventoryItemEntry" --data '{"inventory_item_id": {"product_id": 1, "location": "test"}, "movement_quantity": 100}' --wait >/dev/null 2>&1; then
+if ao-cli message "$INVENTORY_ITEM_PROCESS_ID" "AddInventoryItemEntry" --data '{"inventory_item_id": {"product_id": "1", "location": "test"}, "movement_quantity": 100}' --wait >/dev/null 2>&1; then
     echo "✅ 库存项目创建成功"
     STEP_3_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
@@ -308,7 +308,7 @@ echo ""
 echo "=== 步骤 4: 在inventory_service进程中触发SAGA ==="
 echo "通过inventory_service进程发起Saga事务"
 
-if ao-cli message "$INVENTORY_SERVICE_PROCESS_ID" "InventoryService_ProcessInventorySurplusOrShortage" --data '{"product_id": 1, "location": "test", "quantity": 119}' --wait >/dev/null 2>&1; then
+if ao-cli message "$INVENTORY_SERVICE_PROCESS_ID" "InventoryService_ProcessInventorySurplusOrShortage" --data '{"product_id": "1", "location": "test", "quantity": 119}' --wait >/dev/null 2>&1; then
     echo "✅ SAGA触发成功"
     echo "⏳ SAGA将在多进程间异步执行..."
     STEP_4_SUCCESS=true
@@ -378,13 +378,13 @@ echo "Saga执行后的库存数量: $INVENTORY_AFTER"
 echo ""
 echo "🔍 检查inventory_service进程中的SAGA实例状态..."
 # 直接查询SagaIdSequence全局变量（它是一个表，第一个元素是当前序号）
-SAGA_ID_SEQ=$(run_ao_cli eval "$INVENTORY_SERVICE_PROCESS_ID" --data "return SagaIdSequence[1] or 0" --wait 2>/dev/null | grep 'Data:' | tail -1 | grep -o '[0-9]*' || echo "0")
+SAGA_ID_SEQ=$(run_ao_cli eval "$INVENTORY_SERVICE_PROCESS_ID" --data "return SagaIdSequence.current or \"0\"" --wait 2>/dev/null | grep 'Data:' | tail -1 | grep -o '"[^"]*"' | tr -d '"' || echo "0")
 echo "SAGA ID序列: $SAGA_ID_SEQ"
 
 # 如果有SAGA实例，查询最新的SAGA状态
-if [ "$SAGA_ID_SEQ" -gt 0 ]; then
+if [ "$SAGA_ID_SEQ" != "0" ]; then
     # 获取完整的响应，包括嵌套的JSON结构
-    SAGA_RESPONSE=$(run_ao_cli message "$INVENTORY_SERVICE_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": $SAGA_ID_SEQ}" --wait 2>/dev/null || echo "")
+    SAGA_RESPONSE=$(run_ao_cli message "$INVENTORY_SERVICE_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": \"$SAGA_ID_SEQ\"}" --wait 2>/dev/null || echo "")
 
     # 调试模式：输出完整响应（如果设置了DEBUG环境变量）
     if [ "${DEBUG}" = "1" ]; then
@@ -419,7 +419,7 @@ if [ "$INVENTORY_AFTER" = "119" ]; then
     if $inventory_updated_correctly; then
         echo "✅ 库存更新在循环检测中已确认完成"
     fi
-    if [ "$SAGA_ID_SEQ" -gt 0 ]; then
+    if [ "$SAGA_ID_SEQ" != "0" ]; then
         SAGA_ID=$SAGA_ID_SEQ
         echo "✅ SAGA实例已创建，ID: $SAGA_ID"
         SAGA_COMPLETED=true

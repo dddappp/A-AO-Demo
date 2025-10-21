@@ -20,7 +20,7 @@ article.ERRORS = ERRORS
 -- @return table A new state table representing the Article.
 function article.new(title, body, author, tags)
     local state = {
-        version = 0,
+        version = "0",
         title = title,
         body = body,
         author = author,
@@ -43,7 +43,7 @@ function article.new_article_body_updated(_state, body)
 end
 
 --- Creates a new ArticleCreated event.
--- @param article_id number The ArticleId of the Article
+-- @param article_id bint The ArticleId of the Article
 -- @param title string 
 -- @param body string 
 -- @param tags table 
@@ -79,7 +79,7 @@ end
 
 --- Creates a new CommentAdded event.
 -- @param _state table The current state of the Article
--- @param comment_seq_id number 
+-- @param comment_seq_id bint 
 -- @param commenter string 
 -- @param body string 
 -- @return table
@@ -96,7 +96,7 @@ end
 
 --- Creates a new CommentUpdated event.
 -- @param _state table The current state of the Article
--- @param comment_seq_id number 
+-- @param comment_seq_id bint 
 -- @param commenter string 
 -- @param body string 
 -- @return table
@@ -113,7 +113,7 @@ end
 
 --- Creates a new CommentRemoved event.
 -- @param _state table The current state of the Article
--- @param comment_seq_id number 
+-- @param comment_seq_id bint 
 -- @return table
 function article.new_comment_removed(_state, comment_seq_id)
     local event = {}

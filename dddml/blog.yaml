@@ -14,7 +14,8 @@ aggregates:
       CRUD_IT_NO_DELETE: true
     id:
       name: ArticleId
-      type: number
+      # type: number
+      type: bint
       generator:
         class: sequence
         structName: ArticleIdSequence
@@ -38,7 +39,8 @@ aggregates:
           Preprocessors: ["CRUD_IT"]
         id:
           name: CommentSeqId
-          type: number
+          # type: number
+          type: bint
           generator:
             class: sequence
             #structName: CommentSeqIdGenerator # Default name

@@ -10,7 +10,8 @@ valueObjects:
     module: "InventoryItem"
     properties:
       ProductId:
-        type: number
+        # type: number
+        type: bint
       Location:
         type: string
       InventoryAttributeSet:
@@ -65,7 +66,8 @@ services:
           MessagingCommandName: "CreateSingleLineInOut"
         parameters:
           ProductId:
-            type: number
+            # type: number
+            type: bint
           Location:
             type: string
           MovementQuantity:
@@ -77,25 +79,31 @@ services:
           MessagingCommandName: "CompleteInOut"
         parameters:
           InOutId:
-            type: number
+            # type: number
+            type: bint
           Version:
-            type: number
+            # type: number
+            type: bint
       VoidInOut:
         metadata:
           MessagingCommandName: "VoidInOut"
         parameters:
           InOutId:
-            type: number
+            # type: number
+            type: bint
           Version:
-            type: number
+            # type: number
+            type: bint
     valueObjects:
       CreateSingleLineInOutResult:
         module: "InOutService"
         properties:
           InOutId:
-            type: number
+            # type: number
+            type: bint
           Version:
-            type: number
+            # type: number
+            type: bint
 
   InventoryService:
     module: "InventoryService"
@@ -116,7 +124,8 @@ services:
         # Generated code: Creates an orchestration-based SAGA coordinator, automatically managing step execution, failure compensation, and async message flow
         parameters:
           ProductId:
-            type: number
+            # type: number
+            type: bint
             # 产品ID：标识具体的产品
             # Product ID: Identifies the specific product
           Location:

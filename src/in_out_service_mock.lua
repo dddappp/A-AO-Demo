@@ -27,8 +27,8 @@ Handlers.add(
     Handlers.utils.hasMatchingTag("Action", "CreateSingleLineInOut"),
     function(msg, env, response)
         messaging.respond(true, {
-            in_out_id = 1,
-            version = 0,
+            in_out_id = "1",
+            version = "0",
         }, msg)
         -- messaging.respond(false, "TEST_CREATE_SINGLE_LINE_IN_OUT_ERROR", msg) -- error
     end

@@ -288,7 +288,7 @@ echo ""
 
 # 4. 在alice进程中创建库存项目
 echo "=== 步骤 4: 在alice进程中创建库存项目 ==="
-if ao-cli message "$ALICE_PROCESS_ID" "AddInventoryItemEntry" --data '{"inventory_item_id": {"product_id": 1, "location": "y"}, "movement_quantity": 100}' --wait >/dev/null 2>&1; then
+if ao-cli message "$ALICE_PROCESS_ID" "AddInventoryItemEntry" --data '{"inventory_item_id": {"product_id": "1", "location": "y"}, "movement_quantity": 100}' --wait >/dev/null 2>&1; then
     echo "✅ 库存项目创建成功"
     STEP_4_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
@@ -306,7 +306,7 @@ echo "🎯 重现README_CN.md：使用eval在alice进程内执行Send()"
 echo "📋 Send({ Target = bob, ...})发送给bob，bob的SAGA handlers处理响应消息"
 echo "   SAGA流程：alice→bob创建SAGA → bob→alice查询库存 → bob→alice创建出入库单 → bob→alice更新库存 → bob→alice完成出入库单"
 echo "   注意：SAGA的callback消息由handlers处理，不会进入Inbox"
-if run_ao_cli eval "$ALICE_PROCESS_ID" --data "json = require('json'); Send({ Target = '$BOB_PROCESS_ID', Tags = { Action = 'InventoryService_ProcessInventorySurplusOrShortage' }, Data = json.encode({ product_id = 1, location = 'y', quantity = 119 }) })" --wait; then
+if run_ao_cli eval "$ALICE_PROCESS_ID" --data "json = require('json'); Send({ Target = '$BOB_PROCESS_ID', Tags = { Action = 'InventoryService_ProcessInventorySurplusOrShortage' }, Data = json.encode({ product_id = \"1\", location = 'y', quantity = 119 }) })" --wait; then
     STEP_5_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ SAGA触发消息已添加到alice的outbox"
@@ -376,13 +376,13 @@ echo "SAGA执行后的库存数量: $INVENTORY_AFTER"
 echo ""
 echo "🔍 检查bob进程中的SAGA实例状态..."
 # 直接查询SagaIdSequence全局变量（它是一个表，第一个元素是当前序号）
-SAGA_ID_SEQ=$(run_ao_cli eval "$BOB_PROCESS_ID" --data "return SagaIdSequence[1] or 0" --wait 2>/dev/null | grep 'Data:' | tail -1 | grep -o '[0-9]*' || echo "0")
+SAGA_ID_SEQ=$(run_ao_cli eval "$BOB_PROCESS_ID" --data "return SagaIdSequence.current or \"0\"" --wait 2>/dev/null | grep 'Data:' | tail -1 | grep -o '"[^"]*"' | tr -d '"' || echo "0")
 echo "SAGA ID序列: $SAGA_ID_SEQ"
 
 # 如果有SAGA实例，查询最新的SAGA状态
-if [ "$SAGA_ID_SEQ" -gt 0 ]; then
+if [ "$SAGA_ID_SEQ" != "0" ]; then
     # 获取完整的响应，包括嵌套的JSON结构
-    SAGA_RESPONSE=$(run_ao_cli message "$BOB_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": $SAGA_ID_SEQ}" --wait 2>/dev/null || echo "")
+    SAGA_RESPONSE=$(run_ao_cli message "$BOB_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": \"$SAGA_ID_SEQ\"}" --wait 2>/dev/null || echo "")
     
     # 调试模式：输出完整响应（如果设置了DEBUG环境变量）
     if [ "${DEBUG}" = "1" ]; then

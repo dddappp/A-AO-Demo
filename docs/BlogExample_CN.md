@@ -117,7 +117,7 @@ Send({ Target = ao.id, Tags = { Action = "GetArticleIdSequence" } })
 查看序号为 `1` 的文章的内容（在输出消息的 `Data` 属性中）：
 
 ```lua
-Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode({ article_id = 1 }) })
+Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode({ article_id = "1" }) })
 
 Inbox[#Inbox]
 ```
@@ -125,14 +125,14 @@ Inbox[#Inbox]
 更新序号为 `1` 的文章（注意 `version` 的值应该与上面看到的当前文章的版本号一致）：
 
 ```lua
-Send({ Target = ao.id, Tags = { Action = "UpdateArticle" }, Data = json.encode({ article_id = 1, version = 0, title = "new_title_1", body = "new_body_1" }) })
+Send({ Target = ao.id, Tags = { Action = "UpdateArticle" }, Data = json.encode({ article_id = "1", version = "0", title = "new_title_1", body = "new_body_1" }) })
 ```
 
 
 再次查看序号为 `1` 的文章的内容：
 
 ```lua
-Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode({ article_id = 1 }) })
+Send({ Target = ao.id, Tags = { Action = "GetArticle" }, Data = json.encode({ article_id = "1" }) })
 
 Inbox[#Inbox]
 ```
@@ -140,22 +140,21 @@ Inbox[#Inbox]
 使用 DDDML 模型中定义的 `UpdateBody` 方法更新文章的正文：
 
 ```lua
-Send({ Target = ao.id, Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = 1, version = 0, body = "new_body_1" }) })
+Send({ Target = ao.id, Tags = { Action = "UpdateArticleBody" }, Data = json.encode({ article_id = "1", version = "1", body = "new_body_1" }) })
 ```
 
-### “评论”相关的测试
+### "评论"相关的测试
 
 添加评论：
 
 ```lua
-Send({ Target = ao.id, Tags = { Action = "AddComment" }, Data = json.encode({ article_id = 1, commenter = "alice", body = "comment_body_1" }) })
+Send({ Target = ao.id, Tags = { Action = "AddComment" }, Data = json.encode({ article_id = "1", version = "2", commenter = "alice", body = "comment_body_1" }) })
 ```
 
 查看评论信息：
 
 ```lua
-Send({ Target = ao.id, Tags = { Action = "GetComment" }, Data = json.encode({ article_comment_id = { article_id = 1, comment_seq_id = 1 } }) })
+Send({ Target = ao.id, Tags = { Action = "GetComment" }, Data = json.encode({ article_comment_id = { article_id = "1", comment_seq_id = "1" } }) })
 
 Inbox[#Inbox]
 ```
-

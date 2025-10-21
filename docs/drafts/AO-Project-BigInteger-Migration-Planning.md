@@ -406,7 +406,223 @@ ArticleIdSequence = ArticleIdSequence and (
 2. **模式复用**: 将来如需迁移其他字段可参考此模式
 3. **学习价值**: 理解渐进式数据迁移的实现方式
 
-### 📊 **格式验证策略**
+---
+
+## 🎯 DDDML 中 bint 字段的实现
+
+本节详细记录 DDDML 模型中定义的 bint 字段在 AO Lua 实现中的处理方式。这些字段在消息传递和持久化存储中使用字符串格式，在算术运算时转换为 bint 对象。
+
+### 1. DDDML 模型中的 bint 字段定义
+
+#### **InventoryItemId (值对象)**
+
+```yaml
+valueObjects:
+  InventoryItemId:
+    properties:
+      ProductId:
+        type: bint
+      Location:
+        type: string
+```
+
+**实现细节:**
+- **消息格式**: `{"product_id": "1", "location": "y"}`
+- **存储格式**: 作为字符串保存在 `inventory_item_id` 对象中
+- **使用位置**: `inventory_service_local.lua` 行 48-50，`inventory_service.lua` 行 126
+- **处理方式**: 保持字符串格式，无需转换为 bint（不进行算术运算）
+
+#### **InOutService 方法参数**
+
+**CreateSingleLineInOut**
+
+```yaml
+methods:
+  CreateSingleLineInOut:
+    parameters:
+      ProductId:
+        type: bint
+      Location:
+        type: string
+      MovementQuantity:
+        type: number
+```
+
+**实现细节:**
+- **消息格式**: `{"product_id": "1", "location": "y", "movement_quantity": 100}`
+- **处理方式**: ProductId 作为字符串传递，无需转换
+- **修改文件**: 
+  - `ao-cli-non-repl/tests/run-saga-tests.sh` 行 309
+  - `ao-cli-non-repl/tests/run-saga-tests-v2.sh` 行 311
+
+**CompleteInOut / VoidInOut**
+
+```yaml
+methods:
+  CompleteInOut:
+    parameters:
+      InOutId:
+        type: bint
+      Version:
+        type: bint
+  VoidInOut:
+    parameters:
+      InOutId:
+        type: bint
+      Version:
+        type: bint
+```
+
+**实现细节:**
+- **消息格式**: `{"in_out_id": "1", "version": "0"}`
+- **返回格式**: `{in_out_id = "1", version = "0"}`
+- **处理方式**: 作为字符串传递和存储，无需算术运算
+- **修改文件**: `src/in_out_service_mock.lua` 行 29-31
+
+**CreateSingleLineInOutResult**
+
+```yaml
+valueObjects:
+  CreateSingleLineInOutResult:
+    properties:
+      InOutId:
+        type: bint
+      Version:
+        type: bint
+```
+
+**实现细节:**
+- **返回格式**: `{in_out_id = "1", version = "0"}`
+- **使用位置**: `src/inventory_service.lua` 行 202-203 存储到 context
+- **处理方式**: 直接从消息中提取字符串值，无需转换
+
+#### **InventoryService 方法参数**
+
+**ProcessInventorySurplusOrShortage**
+
+```yaml
+methods:
+  ProcessInventorySurplusOrShortage:
+    parameters:
+      ProductId:
+        type: bint
+      Location:
+        type: string
+      Quantity:
+        type: number
+```
+
+**实现细节:**
+- **消息格式**: `{"product_id": "1", "location": "y", "quantity": 119}`
+- **处理方式**: ProductId 作为字符串传递
+- **修改文件**:
+  - `ao-cli-non-repl/tests/run-saga-tests.sh` 行 309
+  - `ao-cli-non-repl/tests/run-saga-tests-v2.sh` 行 311
+
+### 2. 实现模式
+
+#### **模式 1: 字符串传递，无需转换（大多数 bint 字段）**
+
+**使用场景**: 用作标识符（ID），不进行算术运算
+
+```lua
+-- 消息中接收
+local cmd = json.decode(msg.Data)
+local product_id = cmd.product_id  -- 保持为字符串
+
+-- 作为对象属性存储
+local inventory_item_id = {
+    product_id = product_id,  -- 字符串
+    location = location,
+}
+
+-- 作为消息字段传递
+local request = {
+    product_id = context.product_id,  -- 字符串
+    location = context.location,
+}
+```
+
+#### **模式 2: 字符串存储，bint 运算，字符串返回（版本字段）**
+
+**使用场景**: 需要算术运算但不需要极大数字
+
+```lua
+local bint = require('.bint')(256)
+
+-- 从消息接收（字符串）
+local version = cmd.version  -- "0"
+
+-- 进行算术运算
+local next_version_bint = bint(version) + 1
+
+-- 转回字符串存储
+_new_state.version = tostring(next_version_bint)
+```
+
+### 3. 已完成的实现修改
+
+#### **核心 Lua 文件修改**
+
+1. **in_out_service_mock.lua**
+   - 更新 CreateSingleLineInOut 处理器返回 `in_out_id = "1"`, `version = "0"`
+   
+2. **inventory_item.lua**
+   - 行 23: 更新 version 初始值从 `0` 为 `"0"`
+
+3. **article_aggregate.lua**
+   - 添加 bint require
+   - 修改版本号递增使用 bint 运算
+   - 修改 next_article_id() 和 current_article_id() 返回字符串
+
+4. **saga.lua**
+   - 添加 bint require
+   - 修改 next_saga_id() 返回字符串
+
+5. **inventory_item_aggregate.lua**
+   - 添加 bint require
+   - 版本号处理改为 bint 运算
+
+6. **inventory_item_add_inventory_item_entry_logic.lua**
+   - 添加 bint require
+   - 数量加法改为 bint 运算
+
+7. **article_add_comment_logic.lua**
+   - 添加 bint require
+   - 评论序号生成改为 bint 运算
+
+#### **测试脚本和文档修改**
+
+1. **run-saga-tests.sh**
+   - 更新 AddInventoryItemEntry 调用，ProductId 使用字符串 `"1"`
+   - 更新 ProcessInventorySurplusOrShortage 调用，ProductId 使用字符串 `"1"`
+
+2. **run-saga-tests-v2.sh**
+   - 更新 AddInventoryItemEntry 调用，ProductId 使用字符串 `"1"`
+   - 更新 ProcessInventorySurplusOrShortage 调用，ProductId 使用字符串 `"1"`
+
+3. **run-blog-tests.sh**
+   - 更新所有 article_id 和 version 参数使用字符串格式
+
+4. **README.md 和 README_CN.md**
+   - 更新所有示例代码中的 bint 字段使用字符串格式
+
+5. **文档文件** (AO-Testing-with-iTerm-MCP-Server.md, BlogExample.md, BlogExample_CN.md)
+   - 更新所有示例 Send 命令中的 bint 字段使用字符串格式
+
+#### **无需修改的部分**
+
+1. **inventory_service.lua**
+   - ProductId 从 context 中获取，已是字符串格式
+   - InOutId 和 Version 从返回结果中直接提取，已是字符串格式
+
+2. **inventory_service_local.lua**
+   - ProductId 从 context 复制，保持字符串格式
+   - 数值运算（第 81-83 行）使用的是 number 类型字段（quantity），已使用 bint
+
+---
+
+### 📊 格式验证策略
 
 #### **数据格式一致性检查**
 ```lua

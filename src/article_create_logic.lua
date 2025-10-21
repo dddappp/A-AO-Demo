@@ -8,7 +8,7 @@ local article_create_logic = {}
 
 
 --- Verifies the Article.Create command.
--- @param article_id number The ArticleId of the Article
+-- @param article_id bint The ArticleId of the Article
 -- @param title string 
 -- @param body string 
 -- @param tags table 
