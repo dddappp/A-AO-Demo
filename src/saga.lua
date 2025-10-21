@@ -1,5 +1,5 @@
-local bint = require('.bint')(256)
 local entity_coll = require("entity_coll")
+local bint = require('.bint')(256)
 
 local saga = {}
 

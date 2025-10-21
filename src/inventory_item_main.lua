@@ -24,6 +24,10 @@ SagaIdSequence = SagaIdSequence and (
         if type(old_data) == "table" and type(old_data[1]) == "number" then
             return { current = tostring(old_data[1]) }
         end
+        -- If already object format but value is number, convert to string
+        if type(old_data) == "table" and type(old_data.current) == "number" then
+            return { current = tostring(old_data.current) }
+        end
         return old_data
     end
 )(SagaIdSequence) or { current = "0" }

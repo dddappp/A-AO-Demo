@@ -2,8 +2,8 @@
 --
 -- @module article_add_comment_logic
 
-local bint = require('.bint')(256)
 local article = require("article")
+local bint = require('.bint')(256)
 
 local article_add_comment_logic = {}
 
@@ -17,9 +17,7 @@ local article_add_comment_logic = {}
 -- @param env table The environment context
 -- @return table The event, can use `article.new_comment_added` to create it
 function article_add_comment_logic.verify(_state, commenter, body, cmd, msg, env)
-    local current_gen = bint(_state.comment_seq_id_generator or "0")
-    local next_gen = current_gen + 1
-    _state.comment_seq_id_generator = tostring(next_gen)
+    _state.comment_seq_id_generator = tostring(bint(_state.comment_seq_id_generator or "0") + 1)
     local comment_seq_id = _state.comment_seq_id_generator
     return article.new_comment_added(_state, comment_seq_id, commenter, body)
 end
