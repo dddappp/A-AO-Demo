@@ -438,7 +438,7 @@ echo ""
 
 # 5. 获取文章
 echo "=== 步骤 5: 获取文章 ==="
-if run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": 1}' --wait; then
+if run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": "1"}' --wait; then
     STEP_5_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -450,7 +450,7 @@ echo ""
 
 # 6. 更新文章 (使用正确版本: 刚创建的文章版本是0)
 echo "=== 步骤 6: 更新文章 ==="
-if run_ao_cli message "$PROCESS_ID" UpdateArticle --data '{"article_id": 1, "version": 0, "title": "new_title_1", "body": "new_body_1"}' --wait; then
+if run_ao_cli message "$PROCESS_ID" UpdateArticle --data '{"article_id": "1", "version": "0", "title": "new_title_1", "body": "new_body_1"}' --wait; then
     STEP_6_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -462,7 +462,7 @@ echo ""
 
 # 7. 获取文章 (验证版本递增到1)
 echo "=== 步骤 7: 获取文章 (验证版本递增) ==="
-if run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": 1}' --wait; then
+if run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": "1"}' --wait; then
     STEP_7_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -474,7 +474,7 @@ echo ""
 
 # 8. 更新正文 (使用正确版本: 当前版本是1)
 echo "=== 步骤 8: 更新正文 ==="
-if run_ao_cli message "$PROCESS_ID" UpdateArticleBody --data '{"article_id": 1, "version": 1, "body": "updated_body_manual"}' --wait; then
+if run_ao_cli message "$PROCESS_ID" UpdateArticleBody --data '{"article_id": "1", "version": "1", "body": "updated_body_manual"}' --wait; then
     STEP_8_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -486,7 +486,7 @@ echo ""
 
 # 9. 获取文章 (验证正文更新，版本递增到2)
 echo "=== 步骤 9: 获取文章 (验证正文更新) ==="
-if run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": 1}' --wait; then
+if run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": "1"}' --wait; then
     STEP_9_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -507,7 +507,7 @@ echo "初始化json库并发送消息..."
 inbox_before_operation=$(get_current_inbox_length "$PROCESS_ID")
 echo "📊 Inbox长度(操作前): $inbox_before_operation"
 
-if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = '$PROCESS_ID', Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = 1, version = 2, commenter = 'alice', body = 'comment_body_manual' }) })" --wait; then
+if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = '$PROCESS_ID', Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = \"1\", version = \"2\", commenter = 'alice', body = 'comment_body_manual' }) })" --wait; then
     echo "✅ 消息发送成功 (eval command completed)"
 
     # Wait for Inbox to increase (relative change detection)

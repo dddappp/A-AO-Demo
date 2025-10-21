@@ -12,10 +12,13 @@ ArticleTable = ArticleTable and (
 
 ArticleIdSequence = ArticleIdSequence and (
     function(old_data)
-        -- May need to migrate old data
+        -- Migrate from array format {0} to object format {current = "0"}
+        if type(old_data) == "table" and type(old_data[1]) == "number" then
+            return { current = tostring(old_data[1]) }
+        end
         return old_data
     end
-)(ArticleIdSequence) or { 0 }
+)(ArticleIdSequence) or { current = "0" }
 
 CommentTable = CommentTable and (
     function(old_data)
@@ -41,10 +44,13 @@ SagaInstances = SagaInstances and (
 
 SagaIdSequence = SagaIdSequence and (
     function(old_data)
-        -- May need to migrate old data
+        -- Migrate from array format {0} to object format {current = "0"}
+        if type(old_data) == "table" and type(old_data[1]) == "number" then
+            return { current = tostring(old_data[1]) }
+        end
         return old_data
     end
-)(SagaIdSequence) or { 0 }
+)(SagaIdSequence) or { current = "0" }
 
 
 local json = require("json")

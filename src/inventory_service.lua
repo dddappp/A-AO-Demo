@@ -84,7 +84,7 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
         local saga_id = saga_instance.saga_id
         local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
         -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
+        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
         return request, commit
     end))
 
@@ -92,7 +92,7 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback(msg, env, response)
-    local saga_id = tonumber(messaging.get_saga_id(msg))
+    local saga_id = messaging.get_saga_id(msg)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 1 or saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -129,7 +129,7 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
         }
         local commit = saga.move_saga_instance_forward(saga_id, 1, target, tags, context)
         -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK)
+        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK)
         return request, commit
     end))
 
@@ -140,7 +140,7 @@ end
 function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_compensation_callback(
     msg, env, response
 )
-    local saga_id = tonumber(messaging.get_saga_id(msg))
+    local saga_id = messaging.get_saga_id(msg)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 2 or not saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -169,7 +169,7 @@ local function process_inventory_surplus_or_shortage_compensate_create_single_li
 
         local commit = saga.rollback_saga_instance(saga_id, pre_local_step_count + 1, target, tags, context, _err)
         -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK)
+        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK)
         return request, commit
     end))
     local total_commit = function()
@@ -185,7 +185,7 @@ end
 
 
 function inventory_service.process_inventory_surplus_or_shortage_create_single_line_in_out_callback(msg, env, response)
-    local saga_id = tonumber(messaging.get_saga_id(msg))
+    local saga_id = messaging.get_saga_id(msg)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 2 or saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -235,7 +235,7 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
         }
         local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, target, tags, context)
         -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK)
+        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK)
         return request, commit
     end))
 
@@ -249,7 +249,7 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_add_inventory_item_entry_callback(msg, env, response)
-    local saga_id = tonumber(messaging.get_saga_id(msg))
+    local saga_id = messaging.get_saga_id(msg)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 4 or saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)
@@ -302,7 +302,7 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
         }
         local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, target, tags, context)
         -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, tostring(saga_id), ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK)
+        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK)
         return request, commit
     end))
 
@@ -316,7 +316,7 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
 end
 
 function inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback(msg, env, response)
-    local saga_id = tonumber(messaging.get_saga_id(msg))
+    local saga_id = messaging.get_saga_id(msg)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     if (saga_instance.current_step ~= 6 or saga_instance.compensating) then
         error(ERRORS.INVALID_MESSAGE)

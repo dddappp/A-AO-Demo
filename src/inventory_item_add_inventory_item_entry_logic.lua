@@ -1,3 +1,4 @@
+local bint = require('.bint')(256)
 local inventory_item = require("inventory_item")
 
 local inventory_item_add_inventory_item_entry_logic = {}
@@ -11,7 +12,7 @@ function inventory_item_add_inventory_item_entry_logic.mutate(state, event, msg,
     if (not state) then
         state = inventory_item.new(event.inventory_item_id, event.movement_quantity)
     else
-        state.quantity = (state.quantity or 0) + event.movement_quantity
+        state.quantity = tostring(bint(state.quantity or "0") + bint(event.movement_quantity))
     end
     if (not state.entries) then
         state.entries = {}
