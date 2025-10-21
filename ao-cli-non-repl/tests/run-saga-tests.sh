@@ -342,7 +342,7 @@ while [ $total_waited -lt $MAX_SAGA_WAIT_TIME ]; do
     echo "⏳ 已等待 ${total_waited} 秒，正在检查 SAGA 状态..."
 
     # 检查库存状态
-    INVENTORY_AFTER=$(run_ao_cli message "$ALICE_PROCESS_ID" "GetInventoryItem" --data '{"inventory_item_id": {"product_id": 1, "location": "y"}}' --wait 2>&1 | grep '"quantity"' | grep -o '[0-9]*' | head -1 || echo "0")
+    INVENTORY_AFTER=$(run_ao_cli message "$ALICE_PROCESS_ID" "GetInventoryItem" --data '{"inventory_item_id": {"product_id": "1", "location": "y"}}' --wait 2>&1 | grep '"quantity"' | grep -o '[0-9]*' | head -1 || echo "0")
 
     echo "   当前库存数量: $INVENTORY_AFTER"
 
