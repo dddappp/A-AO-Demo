@@ -92,16 +92,16 @@ echo "   出入库服务mock代码: $IN_OUT_SERVICE_MOCK"
 echo "   ao-cli 版本: $(ao-cli --version)"
 echo ""
 
-# 辅助函数：根据进程ID是否以-开头来决定是否使用--
+# 辅助函数：根据进程ID是否以-开头来决定是否使用--，并统一处理JSON模式
 run_ao_cli() {
     local command="$1"
     local process_id="$2"
     shift 2  # 移除前两个参数
 
     if [[ "$process_id" == -* ]]; then
-        ao-cli "$command" -- "$process_id" "$@"
+        ao-cli "$command" -- "$process_id" --json "$@" 2>/dev/null
     else
-        ao-cli "$command" "$process_id" "$@"
+        ao-cli "$command" "$process_id" --json "$@" 2>/dev/null
     fi
 }
 
@@ -188,7 +188,8 @@ echo "=== 步骤 1: 生成三个进程并加载代码 ==="
 echo "按DDDML模块创建独立的AO进程"
 
 # 检查是否可以连接到AO网络
-if ao-cli spawn default --name "test-connection-$(date +%s)" 2>/dev/null | grep -q "Error\|fetch failed"; then
+JSON_OUTPUT=$(ao-cli spawn default --name "test-connection-$(date +%s)" --json 2>/dev/null)
+if ! echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "❌ AO网络连接失败。请确保："
     echo "   1. AOS正在运行: aos"
     echo "   2. 网络连接正常"
@@ -201,7 +202,12 @@ fi
 
 # 生成inventory_item进程
 echo "正在生成inventory_item进程..."
-INVENTORY_ITEM_PROCESS_ID=$(ao-cli spawn default --name "inventory-item-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
+JSON_OUTPUT=$(ao-cli spawn default --name "inventory-item-$(date +%s)" --json 2>/dev/null)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
+    INVENTORY_ITEM_PROCESS_ID=$(echo "$JSON_OUTPUT" | jq -r '.data.processId')
+else
+    INVENTORY_ITEM_PROCESS_ID=""
+fi
 echo "inventory_item进程 ID: '$INVENTORY_ITEM_PROCESS_ID'"
 
 if [ -z "$INVENTORY_ITEM_PROCESS_ID" ]; then
@@ -213,7 +219,12 @@ fi
 
 # 生成inventory_service进程
 echo "正在生成inventory_service进程..."
-INVENTORY_SERVICE_PROCESS_ID=$(ao-cli spawn default --name "inventory-service-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
+JSON_OUTPUT=$(ao-cli spawn default --name "inventory-service-$(date +%s)" --json 2>/dev/null)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
+    INVENTORY_SERVICE_PROCESS_ID=$(echo "$JSON_OUTPUT" | jq -r '.data.processId')
+else
+    INVENTORY_SERVICE_PROCESS_ID=""
+fi
 echo "inventory_service进程 ID: '$INVENTORY_SERVICE_PROCESS_ID'"
 
 if [ -z "$INVENTORY_SERVICE_PROCESS_ID" ]; then
@@ -225,7 +236,12 @@ fi
 
 # 生成in_out_service进程
 echo "正在生成in_out_service进程..."
-IN_OUT_SERVICE_PROCESS_ID=$(ao-cli spawn default --name "in-out-service-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
+JSON_OUTPUT=$(ao-cli spawn default --name "in-out-service-$(date +%s)" --json 2>/dev/null)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
+    IN_OUT_SERVICE_PROCESS_ID=$(echo "$JSON_OUTPUT" | jq -r '.data.processId')
+else
+    IN_OUT_SERVICE_PROCESS_ID=""
+fi
 echo "in_out_service进程 ID: '$IN_OUT_SERVICE_PROCESS_ID'"
 
 if [ -z "$IN_OUT_SERVICE_PROCESS_ID" ]; then
@@ -237,7 +253,8 @@ fi
 
 # 加载代码到各个进程
 echo "正在加载inventory_item_main.lua到inventory_item进程..."
-if run_ao_cli load "$INVENTORY_ITEM_PROCESS_ID" "$INVENTORY_ITEM_MAIN" --wait; then
+JSON_OUTPUT=$(run_ao_cli load "$INVENTORY_ITEM_PROCESS_ID" "$INVENTORY_ITEM_MAIN" --wait)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
     echo "✅ inventory_item进程代码加载成功"
 else
     STEP_1_SUCCESS=false
@@ -247,7 +264,8 @@ else
 fi
 
 echo "正在加载inventory_service_main.lua到inventory_service进程..."
-if run_ao_cli load "$INVENTORY_SERVICE_PROCESS_ID" "$INVENTORY_SERVICE_MAIN" --wait; then
+JSON_OUTPUT=$(run_ao_cli load "$INVENTORY_SERVICE_PROCESS_ID" "$INVENTORY_SERVICE_MAIN" --wait)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
     echo "✅ inventory_service进程代码加载成功"
 else
     STEP_1_SUCCESS=false
@@ -257,7 +275,8 @@ else
 fi
 
 echo "正在加载in_out_service_mock.lua到in_out_service进程..."
-if run_ao_cli load "$IN_OUT_SERVICE_PROCESS_ID" "$IN_OUT_SERVICE_MOCK" --wait; then
+JSON_OUTPUT=$(run_ao_cli load "$IN_OUT_SERVICE_PROCESS_ID" "$IN_OUT_SERVICE_MOCK" --wait)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
     echo "✅ in_out_service进程代码加载成功"
     STEP_1_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
@@ -274,8 +293,9 @@ echo ""
 echo "=== 步骤 2: 配置进程间通信 ==="
 echo "设置inventory_service进程与其他进程的通信目标"
 
-if run_ao_cli eval "$INVENTORY_SERVICE_PROCESS_ID" --data "INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = '$INVENTORY_ITEM_PROCESS_ID'" --wait && \
-   run_ao_cli eval "$INVENTORY_SERVICE_PROCESS_ID" --data "INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = '$IN_OUT_SERVICE_PROCESS_ID'" --wait; then
+JSON_OUTPUT1=$(run_ao_cli eval "$INVENTORY_SERVICE_PROCESS_ID" --data "INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = '$INVENTORY_ITEM_PROCESS_ID'" --wait)
+JSON_OUTPUT2=$(run_ao_cli eval "$INVENTORY_SERVICE_PROCESS_ID" --data "INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = '$IN_OUT_SERVICE_PROCESS_ID'" --wait)
+if echo "$JSON_OUTPUT1" | jq -e ".success == true" >/dev/null 2>&1 && echo "$JSON_OUTPUT2" | jq -e ".success == true" >/dev/null 2>&1; then
     echo "✅ 进程间通信配置成功"
     echo "   📦 inventory_item进程: $INVENTORY_ITEM_PROCESS_ID"
     echo "   🎯 inventory_service进程: $INVENTORY_SERVICE_PROCESS_ID (Saga协调器)"
@@ -292,7 +312,8 @@ echo ""
 
 # 3. 创建库存项目
 echo "=== 步骤 3: 在inventory_item进程中创建库存项目 ==="
-if ao-cli message "$INVENTORY_ITEM_PROCESS_ID" "AddInventoryItemEntry" --data '{"inventory_item_id": {"product_id": "1", "location": "test"}, "movement_quantity": 100}' --wait >/dev/null 2>&1; then
+JSON_OUTPUT=$(ao-cli message "$INVENTORY_ITEM_PROCESS_ID" "AddInventoryItemEntry" --data '{"inventory_item_id": {"product_id": "1", "location": "test"}, "movement_quantity": 100}' --wait --json 2>/dev/null)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
     echo "✅ 库存项目创建成功"
     STEP_3_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
@@ -308,7 +329,8 @@ echo ""
 echo "=== 步骤 4: 在inventory_service进程中触发SAGA ==="
 echo "通过inventory_service进程发起Saga事务"
 
-if ao-cli message "$INVENTORY_SERVICE_PROCESS_ID" "InventoryService_ProcessInventorySurplusOrShortage" --data '{"product_id": "1", "location": "test", "quantity": 119}' --wait >/dev/null 2>&1; then
+JSON_OUTPUT=$(ao-cli message "$INVENTORY_SERVICE_PROCESS_ID" "InventoryService_ProcessInventorySurplusOrShortage" --data '{"product_id": "1", "location": "test", "quantity": 119}' --wait --json 2>/dev/null)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
     echo "✅ SAGA触发成功"
     echo "⏳ SAGA将在多进程间异步执行..."
     STEP_4_SUCCESS=true
@@ -345,7 +367,14 @@ while [ $total_waited -lt $MAX_SAGA_WAIT_TIME ]; do
     echo "⏳ 已等待 ${total_waited} 秒，正在检查 SAGA 状态..."
 
     # 检查库存状态
-    INVENTORY_AFTER=$(run_ao_cli message "$INVENTORY_ITEM_PROCESS_ID" "GetInventoryItem" --data '{"inventory_item_id": {"product_id": "1", "location": "test"}}' --wait 2>&1 | grep '"quantity"' | grep -o '[0-9]*' | head -1 || echo "0")
+    JSON_OUTPUT=$(run_ao_cli message "$INVENTORY_ITEM_PROCESS_ID" "GetInventoryItem" --data '{"inventory_item_id": {"product_id": "1", "location": "test"}}' --wait)
+    if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
+        # 从 Messages[0].Data.result.quantity 中提取库存数量
+        FINAL_JSON=$(echo "$JSON_OUTPUT" | jq -s '.[-1]' 2>/dev/null)
+        INVENTORY_AFTER=$(echo "$FINAL_JSON" | jq -r '.data.result.Messages[0].Data.result.quantity // "0"' 2>/dev/null || echo "0")
+    else
+        INVENTORY_AFTER="0"
+    fi
 
     echo "   当前库存数量: $INVENTORY_AFTER"
 
@@ -378,13 +407,23 @@ echo "Saga执行后的库存数量: $INVENTORY_AFTER"
 echo ""
 echo "🔍 检查inventory_service进程中的SAGA实例状态..."
 # 直接查询SagaIdSequence全局变量（它是一个表，第一个元素是当前序号）
-SAGA_ID_SEQ=$(run_ao_cli eval "$INVENTORY_SERVICE_PROCESS_ID" --data "return SagaIdSequence.current or \"0\"" --wait 2>/dev/null | grep 'Data:' | tail -1 | grep -o '"[^"]*"' | tr -d '"' || echo "0")
+JSON_OUTPUT=$(run_ao_cli eval "$INVENTORY_SERVICE_PROCESS_ID" --data "return SagaIdSequence.current or \"0\"" --wait)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
+    SAGA_ID_SEQ=$(echo "$JSON_OUTPUT" | jq -r '.data.result.Output.data // "0"')
+else
+    SAGA_ID_SEQ="0"
+fi
 echo "SAGA ID序列: $SAGA_ID_SEQ"
 
 # 如果有SAGA实例，查询最新的SAGA状态
 if [ "$SAGA_ID_SEQ" != "0" ]; then
     # 获取完整的响应，包括嵌套的JSON结构
-    SAGA_RESPONSE=$(run_ao_cli message "$INVENTORY_SERVICE_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": \"$SAGA_ID_SEQ\"}" --wait 2>/dev/null || echo "")
+    SAGA_JSON=$(run_ao_cli message "$INVENTORY_SERVICE_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": \"$SAGA_ID_SEQ\"}" --wait)
+    if echo "$SAGA_JSON" | jq -e ".success == true" >/dev/null 2>&1; then
+        SAGA_RESPONSE=$(echo "$SAGA_JSON" | jq -r '.data.result.Output.data // "{}"' 2>/dev/null || echo "{}")
+    else
+        SAGA_RESPONSE="{}"
+    fi
 
     # 调试模式：输出完整响应（如果设置了DEBUG环境变量）
     if [ "${DEBUG}" = "1" ]; then
@@ -393,11 +432,11 @@ if [ "$SAGA_ID_SEQ" != "0" ]; then
         echo ""
     fi
 
-    # 提取current_step和completed状态（注意JSON中可能有空格）
-    SAGA_CURRENT_STEP=$(echo "$SAGA_RESPONSE" | grep -o '"current_step":[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "unknown")
-    SAGA_COMPLETED_FLAG=$(echo "$SAGA_RESPONSE" | grep -o '"completed":[[:space:]]*true' || echo "")
+    # 提取current_step和completed状态（从JSON字符串中解析）
+    SAGA_CURRENT_STEP=$(echo "$SAGA_RESPONSE" | jq -r '.current_step // "unknown"' 2>/dev/null || echo "unknown")
+    SAGA_COMPLETED_FLAG=$(echo "$SAGA_RESPONSE" | jq -r '.completed // false' 2>/dev/null || echo "false")
 
-    if [ -n "$SAGA_COMPLETED_FLAG" ]; then
+    if [ "$SAGA_COMPLETED_FLAG" = "true" ]; then
         SAGA_STATUS="id=$SAGA_ID_SEQ, current_step=$SAGA_CURRENT_STEP, completed=true"
         SAGA_COMPLETED=true
     else
