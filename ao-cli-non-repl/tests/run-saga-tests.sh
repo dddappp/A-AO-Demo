@@ -90,16 +90,16 @@ echo "   出入库服务代码: $IN_OUT_SERVICE_FILE"
 echo "   ao-cli 版本: $(ao-cli --version)"
 echo ""
 
-# 辅助函数：根据进程ID是否以-开头来决定是否使用--
+# 辅助函数：根据进程ID是否以-开头来决定是否使用--，并统一处理JSON模式
 run_ao_cli() {
     local command="$1"
     local process_id="$2"
     shift 2  # 移除前两个参数
 
     if [[ "$process_id" == -* ]]; then
-        ao-cli "$command" -- "$process_id" "$@"
+        ao-cli "$command" -- "$process_id" --json "$@" 2>/dev/null
     else
-        ao-cli "$command" "$process_id" "$@"
+        ao-cli "$command" "$process_id" --json "$@" 2>/dev/null
     fi
 }
 
@@ -193,7 +193,8 @@ echo "alice进程将提供：库存聚合服务 + 出入库服务mock"
 echo "正在生成alice进程..."
 
 # 检查是否可以连接到AO网络
-if ao-cli spawn default --name "test-connection-$(date +%s)" 2>/dev/null | grep -q "Error\|fetch failed"; then
+JSON_OUTPUT=$(ao-cli spawn default --name "test-connection-$(date +%s)" --json 2>/dev/null)
+if ! echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
     echo "❌ AO网络连接失败。请确保："
     echo "   1. AOS正在运行: aos"
     echo "   2. 网络连接正常"
@@ -204,7 +205,12 @@ if ao-cli spawn default --name "test-connection-$(date +%s)" 2>/dev/null | grep 
     exit 1
 fi
 
-ALICE_PROCESS_ID=$(ao-cli spawn default --name "alice-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
+JSON_OUTPUT=$(ao-cli spawn default --name "alice-$(date +%s)" --json 2>/dev/null)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
+    ALICE_PROCESS_ID=$(echo "$JSON_OUTPUT" | jq -r '.data.processId')
+else
+    ALICE_PROCESS_ID=""
+fi
 echo "alice进程 ID: '$ALICE_PROCESS_ID'"
 
 if [ -z "$ALICE_PROCESS_ID" ]; then
@@ -215,7 +221,8 @@ if [ -z "$ALICE_PROCESS_ID" ]; then
 fi
 
 echo "正在加载a_ao_demo.lua到alice进程（提供库存聚合服务）..."
-if run_ao_cli load "$ALICE_PROCESS_ID" "$APP_FILE" --wait; then
+JSON_OUTPUT=$(run_ao_cli load "$ALICE_PROCESS_ID" "$APP_FILE" --wait)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
     echo "✅ a_ao_demo.lua加载成功"
 else
     STEP_1_SUCCESS=false
@@ -225,7 +232,8 @@ else
 fi
 
 echo "正在加载in_out_service_mock.lua到alice进程（提供出入库服务mock）..."
-if run_ao_cli load "$ALICE_PROCESS_ID" "$IN_OUT_SERVICE_FILE" --wait; then
+JSON_OUTPUT=$(run_ao_cli load "$ALICE_PROCESS_ID" "$IN_OUT_SERVICE_FILE" --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ in_out_service_mock.lua加载成功"
     STEP_1_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
@@ -242,7 +250,12 @@ echo ""
 echo "=== 步骤 2: 生成bob进程并加载代码 ==="
 echo "bob进程将作为SAGA协调器，包含库存服务逻辑"
 echo "正在生成bob进程..."
-BOB_PROCESS_ID=$(ao-cli spawn default --name "bob-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
+JSON_OUTPUT=$(ao-cli spawn default --name "bob-$(date +%s)" --json 2>/dev/null)
+if echo "$JSON_OUTPUT" | jq -e ".success == true" >/dev/null 2>&1; then
+    BOB_PROCESS_ID=$(echo "$JSON_OUTPUT" | jq -r '.data.processId')
+else
+    BOB_PROCESS_ID=""
+fi
 echo "bob进程 ID: '$BOB_PROCESS_ID'"
 
 if [ -z "$BOB_PROCESS_ID" ]; then
@@ -253,7 +266,8 @@ if [ -z "$BOB_PROCESS_ID" ]; then
 fi
 
 echo "正在加载a_ao_demo.lua到bob进程（包含库存服务和SAGA协调逻辑）..."
-if run_ao_cli load "$BOB_PROCESS_ID" "$APP_FILE" --wait; then
+JSON_OUTPUT=$(run_ao_cli load "$BOB_PROCESS_ID" "$APP_FILE" --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ a_ao_demo.lua加载成功"
     echo "✅ bob进程现在包含InventoryService及SAGA协调器"
     STEP_2_SUCCESS=true
@@ -271,8 +285,10 @@ echo ""
 echo "=== 步骤 3: 配置bob进程的进程间通信 ==="
 echo "🎯 配置两进程SAGA：bob进程作为协调器，调用alice进程的服务"
 echo "设置bob进程的服务Target指向alice进程..."
-if run_ao_cli eval "$BOB_PROCESS_ID" --data "INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = '$ALICE_PROCESS_ID'" --wait && \
-   run_ao_cli eval "$BOB_PROCESS_ID" --data "INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = '$ALICE_PROCESS_ID'" --wait; then
+JSON_OUTPUT1=$(run_ao_cli eval "$BOB_PROCESS_ID" --data "INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = '$ALICE_PROCESS_ID'" --wait)
+JSON_OUTPUT2=$(run_ao_cli eval "$BOB_PROCESS_ID" --data "INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = '$ALICE_PROCESS_ID'" --wait)
+if echo "$JSON_OUTPUT1" | jq -e '.success == true' >/dev/null 2>&1 && \
+   echo "$JSON_OUTPUT2" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ 进程间通信配置成功"
     echo "   📡 alice进程 ($ALICE_PROCESS_ID): 提供库存聚合和出入库服务"
     echo "   🎯 bob进程 ($BOB_PROCESS_ID): SAGA协调器，调用alice的服务"
@@ -306,7 +322,9 @@ echo "🎯 重现README_CN.md：使用eval在alice进程内执行Send()"
 echo "📋 Send({ Target = bob, ...})发送给bob，bob的SAGA handlers处理响应消息"
 echo "   SAGA流程：alice→bob创建SAGA → bob→alice查询库存 → bob→alice创建出入库单 → bob→alice更新库存 → bob→alice完成出入库单"
 echo "   注意：SAGA的callback消息由handlers处理，不会进入Inbox"
-if run_ao_cli eval "$ALICE_PROCESS_ID" --data "json = require('json'); Send({ Target = '$BOB_PROCESS_ID', Tags = { Action = 'InventoryService_ProcessInventorySurplusOrShortage' }, Data = json.encode({ product_id = \"1\", location = 'y', quantity = 119 }) })" --wait; then
+RAW_OUTPUT=$(run_ao_cli eval "$ALICE_PROCESS_ID" --data "json = require('json'); Send({ Target = '$BOB_PROCESS_ID', Tags = { Action = 'InventoryService_ProcessInventorySurplusOrShortage' }, Data = json.encode({ product_id = \"1\", location = 'y', quantity = 119 }) })" --wait)
+JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     STEP_5_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ SAGA触发消息已添加到alice的outbox"
@@ -342,7 +360,9 @@ while [ $total_waited -lt $MAX_SAGA_WAIT_TIME ]; do
     echo "⏳ 已等待 ${total_waited} 秒，正在检查 SAGA 状态..."
 
     # 检查库存状态
-    INVENTORY_AFTER=$(run_ao_cli message "$ALICE_PROCESS_ID" "GetInventoryItem" --data '{"inventory_item_id": {"product_id": "1", "location": "y"}}' --wait 2>&1 | grep '"quantity"' | grep -o '[0-9]*' | head -1 || echo "0")
+    RAW_OUTPUT=$(run_ao_cli message "$ALICE_PROCESS_ID" "GetInventoryItem" --data '{"inventory_item_id": {"product_id": "1", "location": "y"}}' --wait)
+    FINAL_JSON=$(echo "$RAW_OUTPUT" | jq -s '.[-1]' 2>/dev/null)
+    INVENTORY_AFTER=$(echo "$FINAL_JSON" | jq -r '.data.result.Messages[0].Data.result.quantity // "0"' 2>/dev/null || echo "0")
 
     echo "   当前库存数量: $INVENTORY_AFTER"
 
@@ -376,24 +396,26 @@ echo "SAGA执行后的库存数量: $INVENTORY_AFTER"
 echo ""
 echo "🔍 检查bob进程中的SAGA实例状态..."
 # 直接查询SagaIdSequence全局变量（它是一个表，第一个元素是当前序号）
-SAGA_ID_SEQ=$(run_ao_cli eval "$BOB_PROCESS_ID" --data "return SagaIdSequence.current or \"0\"" --wait 2>/dev/null | grep 'Data:' | tail -1 | grep -o '"[^"]*"' | tr -d '"' || echo "0")
-echo "SAGA ID序列: $SAGA_ID_SEQ"
+RAW_OUTPUT=$(run_ao_cli eval "$BOB_PROCESS_ID" --data "return SagaIdSequence.current or \"0\"" --wait)
+JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]' 2>/dev/null)
+SAGA_ID_SEQ=$(echo "$JSON_OUTPUT" | jq -r '.data.result.Output.data // "0"' 2>/dev/null || echo "0")
 
 # 如果有SAGA实例，查询最新的SAGA状态
 if [ "$SAGA_ID_SEQ" != "0" ]; then
     # 获取完整的响应，包括嵌套的JSON结构
-    SAGA_RESPONSE=$(run_ao_cli message "$BOB_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": \"$SAGA_ID_SEQ\"}" --wait 2>/dev/null || echo "")
+    RAW_OUTPUT=$(run_ao_cli message "$BOB_PROCESS_ID" "GetSagaInstance" --data "{\"saga_id\": \"$SAGA_ID_SEQ\"}" --wait)
+    SAGA_RESPONSE=$(echo "$RAW_OUTPUT" | jq -s '.[-1]' 2>/dev/null)
     
     # 调试模式：输出完整响应（如果设置了DEBUG环境变量）
     if [ "${DEBUG}" = "1" ]; then
         echo "🔍 DEBUG: 完整SAGA响应:"
-        echo "$SAGA_RESPONSE"
+        echo "$SAGA_RESPONSE" | jq '.'
         echo ""
     fi
     
-    # 提取current_step和completed状态（注意JSON中可能有空格）
-    SAGA_CURRENT_STEP=$(echo "$SAGA_RESPONSE" | grep -o '"current_step":[[:space:]]*[0-9]*' | grep -o '[0-9]*' || echo "unknown")
-    SAGA_COMPLETED_FLAG=$(echo "$SAGA_RESPONSE" | grep -o '"completed":[[:space:]]*true' || echo "")
+    # 提取current_step和completed状态（使用JSON解析）
+    SAGA_CURRENT_STEP=$(echo "$SAGA_RESPONSE" | jq -r '.data.result // "unknown"' 2>/dev/null)
+    SAGA_COMPLETED_FLAG=$(echo "$SAGA_RESPONSE" | jq -r 'if .data.result.completed == true then "true" else "" end' 2>/dev/null)
     
     if [ -n "$SAGA_COMPLETED_FLAG" ]; then
         SAGA_STATUS="id=$SAGA_ID_SEQ, current_step=$SAGA_CURRENT_STEP, completed=true"
