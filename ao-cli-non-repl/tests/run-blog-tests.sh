@@ -94,16 +94,17 @@ echo "   应用代码: $APP_FILE"
 echo "   ao-cli 版本: $(ao-cli --version)"
 echo ""
 
-# 辅助函数：根据进程ID是否以-开头来决定是否使用--
+# 关键！隔离日志 - 按照 ao-cli 文档的正确方式
+# 处理进程ID以-开头的情况，避免被当作命令行选项
 run_ao_cli() {
     local command="$1"
     local process_id="$2"
     shift 2  # 移除前两个参数
 
     if [[ "$process_id" == -* ]]; then
-        ao-cli "$command" -- "$process_id" "$@"
+        ao-cli "$command" -- "$process_id" --json "$@" 2>/dev/null
     else
-        ao-cli "$command" "$process_id" "$@"
+        ao-cli "$command" "$process_id" --json "$@" 2>/dev/null
     fi
 }
 
@@ -113,16 +114,16 @@ get_current_inbox_length() {
 
     # Use eval to query inbox length directly without sending reply
     # This avoids the issue where ao-cli inbox command itself sends messages
-    local result=$(run_ao_cli eval "$process_id" --data "return #Inbox" --wait 2>/dev/null)
+    local raw_output=$(run_ao_cli eval "$process_id" --data "return #Inbox" --wait)
 
-    # Extract the number from the eval result Data field
-    # Look for the actual result Data field (not the input Data field)
-    # Match lines that start with "   Data: " followed by a quoted number
-    local current_length=$(echo "$result" | sed -n '/^📋 EVAL #1 RESULT:/,/^Prompt:/p' | grep '^   Data: "[0-9]*"$' | sed 's/   Data: "//' | sed 's/"$//' | head -1)
+    # Get the last JSON object (eval may return multiple JSON objects)
+    local json_output=$(echo "$raw_output" | jq -s '.[-1]' 2>/dev/null)
+
+    # Extract inbox length from data.result.Output.data
+    local current_length=$(echo "$json_output" | jq -r '.data.result.Output.data // "0"' 2>/dev/null)
 
     # If we still can't parse length, assume it's 0
     if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
-        echo "⚠️  Could not parse inbox length from eval result" >&2
         current_length=0
     fi
 
@@ -137,55 +138,30 @@ display_latest_inbox_message() {
     echo "📨 $message_title:"
 
     # Get the latest message from inbox
-    local inbox_output=$(run_ao_cli inbox "$process_id" --latest 2>/dev/null)
+    local raw_output=$(run_ao_cli inbox "$process_id" --latest)
+    local json_output=$(echo "$raw_output" | jq -s '.[-1]')
 
-    if [ $? -eq 0 ] && [ -n "$inbox_output" ]; then
-        echo "   📋 Full Inbox Output (first $INBOX_DISPLAY_LINES lines):"
-        echo "$inbox_output" | head -$INBOX_DISPLAY_LINES
+    if echo "$json_output" | jq -e '.success == true' >/dev/null 2>&1; then
+        echo "   📋 Inbox JSON data:"
+        echo "$json_output" | jq -r '.data.inbox // "No inbox data"' | head -$INBOX_DISPLAY_LINES
         echo ""
 
         # Try to extract Data field which is usually most valuable
-        local data_field=$(echo "$inbox_output" | grep -o '"Data":"[^"]*"' | head -1)
-        if [ -z "$data_field" ]; then
-            # Try alternative format: Data = "value" (handle JSON strings with quotes)
-            # Use sed to extract from 'Data = "' to the last '"' on the line
-            data_field=$(echo "$inbox_output" | grep 'Data = "' | sed 's/.*Data = "\(.*\)".*/Data = "\1"/' | head -1)
-        fi
-
-        if [ -n "$data_field" ]; then
-            local data_value
-            if [[ "$data_field" == '"Data":"'* ]]; then
-                data_value=$(echo "$data_field" | sed 's/"Data":"//' | sed 's/"$//')
-            else
-                data_value=$(echo "$data_field" | sed 's/Data = "//' | sed 's/"$//')
-            fi
+        local data_value=$(echo "$json_output" | jq -r '.data.inbox | fromjson? | .latest?.Data // empty' 2>/dev/null)
+        if [ -n "$data_value" ]; then
             echo "   📄 Data: $data_value"
         fi
 
         # Try to extract Action field
-        local action_field=$(echo "$inbox_output" | grep -o '"Action":"[^"]*"' | head -1)
-        if [ -z "$action_field" ]; then
-            action_field=$(echo "$inbox_output" | grep -o 'Action = "[^"]*"' | head -1)
-        fi
-
-        if [ -n "$action_field" ]; then
-            local action_value
-            if [[ "$action_field" == '"Action":"'* ]]; then
-                action_value=$(echo "$action_field" | sed 's/"Action":"//' | sed 's/"$//')
-            else
-                action_value=$(echo "$action_field" | sed 's/Action = "//' | sed 's/"$//')
-            fi
+        local action_value=$(echo "$json_output" | jq -r '.data.inbox | fromjson? | .latest?.Action // empty' 2>/dev/null)
+        if [ -n "$action_value" ]; then
             echo "   🎯 Action: $action_value"
         fi
 
         # Show Tags summary if available
-        local tags_summary=$(echo "$inbox_output" | grep -o '"Tags":{[^}]*}' | head -1)
-        if [ -z "$tags_summary" ]; then
-            tags_summary=$(echo "$inbox_output" | grep -o 'Tags = {[^}]*}' | head -1)
-        fi
-
-        if [ -n "$tags_summary" ]; then
-            echo "   🏷️  Tags: ${tags_summary:0:150}..."
+        local tags=$(echo "$json_output" | jq -r '.data.inbox | fromjson? | .latest?.Tags // empty' 2>/dev/null)
+        if [ -n "$tags" ]; then
+            echo "   🏷️  Tags: $tags"
         fi
     else
         echo "   ❌ Failed to retrieve inbox message"
@@ -284,23 +260,13 @@ STEP_10_SUCCESS=false
 # Track expected Inbox length for reference (relative change detection)
 EXPECTED_INBOX_LENGTH=0
 
-echo "🔍 预检查: 验证Inbox查询功能..."
-# Quick test of Inbox functionality before starting main tests
-initial_inbox_test=$(get_current_inbox_length "$PROCESS_ID" 2>/dev/null || echo "error")
-if [[ "$initial_inbox_test" =~ ^[0-9]+$ ]]; then
-    echo "✅ Inbox查询功能正常"
-else
-    echo "⚠️  Inbox查询功能可能异常，但将继续测试"
-fi
-echo ""
-
 # 执行测试
 START_TIME=$(date +%s)
 
 # 1. 生成 AO 进程
 echo "=== 步骤 1: 生成 AO 进程 ==="
-echo "正在生成AO进程..."
-PROCESS_ID=$(ao-cli spawn default --name "blog-test-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
+JSON_OUTPUT=$(run_ao_cli spawn default --name "blog-test-$(date +%s)")
+PROCESS_ID=$(echo "$JSON_OUTPUT" | jq -r '.data.processId')
 echo "进程 ID: '$PROCESS_ID'"
 
 if [ -z "$PROCESS_ID" ]; then
@@ -309,15 +275,6 @@ if [ -z "$PROCESS_ID" ]; then
     echo "由于进程生成失败，测试终止"
     exit 1
 else
-    # 立即检查新spawn进程的Inbox长度
-    initial_inbox_check=$(get_current_inbox_length "$PROCESS_ID")
-    echo "🔍 新spawn进程初始Inbox长度: $initial_inbox_check"
-
-    if [ "$initial_inbox_check" -gt 5 ]; then
-        echo "⚠️  警告: 新spawn进程初始Inbox长度异常高 ($initial_inbox_check)"
-        echo "   这可能表示有问题，正常应该接近0"
-    fi
-
     STEP_1_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 步骤1成功，当前成功计数: $STEP_SUCCESS_COUNT"
@@ -327,7 +284,8 @@ echo ""
 # 2. 加载博客应用代码
 echo "=== 步骤 2: 加载博客应用代码 ==="
 echo "正在加载代码到进程: $PROCESS_ID"
-if run_ao_cli load "$PROCESS_ID" "$APP_FILE" --wait; then
+JSON_OUTPUT=$(run_ao_cli load "$PROCESS_ID" "$APP_FILE" --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     STEP_2_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 代码加载成功，当前成功计数: $STEP_SUCCESS_COUNT"
@@ -361,26 +319,21 @@ else
 fi
 echo ""
 
-# 设置等待时间（可以根据需要调整）
-WAIT_TIME="${AO_WAIT_TIME:-3}"
-echo "等待时间设置为: ${WAIT_TIME} 秒"
-
 # **NOTE**：我们编写的代码，消息的 handlers 通常都会将回复消息发送给请求消息的发送者（`From`），如果要想让消息出现在一个进程 Inbox 里，可以在该进程内用 eval 的方式来发送消息。
-# 这样收到消息的进程就会从 From 中看到发送消息的进程 ID，然后将执行结果回复给这个 ID 指向的进程。
-# 如果收到消息的进程（原进程）没有 handler 可以处理消息，消息就会出现在原进程的 Inbox 中。
+#   这样收到消息的进程就会从 From 中看到发送消息的进程 ID，然后将执行结果回复给这个 ID 指向的进程。
+#   如果收到消息的进程（原进程）没有 handler 可以处理消息，消息就会出现在原进程的 Inbox 中。
 
 # 3. 获取文章序号
 echo "=== 步骤 3: 获取文章序号 ==="
 echo "📋 Inbox机制验证：通过Eval在进程内部执行Send，回复消息会进入Inbox"
 echo "   (外部API调用不会让消息进入Inbox，只有进程内部Send才会)"
-echo "📊 当前预期Inbox长度: $EXPECTED_INBOX_LENGTH"
-echo "初始化json库并发送消息..."
 
 # Record inbox length before operation for relative change detection
 inbox_before_operation=$(get_current_inbox_length "$PROCESS_ID")
-echo "📊 Inbox长度(操作前): $inbox_before_operation"
 
-if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = '$PROCESS_ID', Tags = { Action = 'GetArticleIdSequence' } })" --wait; then
+RAW_OUTPUT=$(run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = '$PROCESS_ID', Tags = { Action = 'GetArticleIdSequence' } })" --wait)
+JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ 消息发送成功 (eval command completed)"
 
     # Wait for Inbox to increase (relative change detection)
@@ -426,7 +379,8 @@ echo ""
 
 # 4. 创建文章
 echo "=== 步骤 4: 创建文章 ==="
-if run_ao_cli message "$PROCESS_ID" CreateArticle --data '{"title": "title_1", "body": "body_1"}' --wait; then
+JSON_OUTPUT=$(run_ao_cli message "$PROCESS_ID" CreateArticle --data '{"title": "title_1", "body": "body_1"}' --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     STEP_4_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -438,7 +392,8 @@ echo ""
 
 # 5. 获取文章
 echo "=== 步骤 5: 获取文章 ==="
-if run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": "1"}' --wait; then
+JSON_OUTPUT=$(run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": "1"}' --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     STEP_5_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -450,7 +405,8 @@ echo ""
 
 # 6. 更新文章 (使用正确版本: 刚创建的文章版本是0)
 echo "=== 步骤 6: 更新文章 ==="
-if run_ao_cli message "$PROCESS_ID" UpdateArticle --data '{"article_id": "1", "version": "0", "title": "new_title_1", "body": "new_body_1"}' --wait; then
+JSON_OUTPUT=$(run_ao_cli message "$PROCESS_ID" UpdateArticle --data '{"article_id": "1", "version": "0", "title": "new_title_1", "body": "new_body_1"}' --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     STEP_6_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -462,7 +418,8 @@ echo ""
 
 # 7. 获取文章 (验证版本递增到1)
 echo "=== 步骤 7: 获取文章 (验证版本递增) ==="
-if run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": "1"}' --wait; then
+JSON_OUTPUT=$(run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": "1"}' --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     STEP_7_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -474,7 +431,8 @@ echo ""
 
 # 8. 更新正文 (使用正确版本: 当前版本是1)
 echo "=== 步骤 8: 更新正文 ==="
-if run_ao_cli message "$PROCESS_ID" UpdateArticleBody --data '{"article_id": "1", "version": "1", "body": "updated_body_manual"}' --wait; then
+JSON_OUTPUT=$(run_ao_cli message "$PROCESS_ID" UpdateArticleBody --data '{"article_id": "1", "version": "1", "body": "updated_body_manual"}' --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     STEP_8_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -486,7 +444,8 @@ echo ""
 
 # 9. 获取文章 (验证正文更新，版本递增到2)
 echo "=== 步骤 9: 获取文章 (验证正文更新) ==="
-if run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": "1"}' --wait; then
+JSON_OUTPUT=$(run_ao_cli message "$PROCESS_ID" GetArticle --data '{"article_id": "1"}' --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     STEP_9_SUCCESS=true
     ((STEP_SUCCESS_COUNT++))
     echo "✅ 消息发送成功"
@@ -500,14 +459,13 @@ echo ""
 echo "=== 步骤 10: 添加评论 ==="
 echo "📋 Inbox机制验证：通过Eval在进程内部执行Send，回复消息会进入Inbox"
 echo "   (最终验证Inbox功能，确保所有业务回复都正确进入Inbox)"
-echo "📊 当前预期Inbox长度: $EXPECTED_INBOX_LENGTH"
-echo "初始化json库并发送消息..."
 
 # Record inbox length before operation for relative change detection
 inbox_before_operation=$(get_current_inbox_length "$PROCESS_ID")
-echo "📊 Inbox长度(操作前): $inbox_before_operation"
 
-if run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = '$PROCESS_ID', Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = \"1\", version = \"2\", commenter = 'alice', body = 'comment_body_manual' }) })" --wait; then
+RAW_OUTPUT=$(run_ao_cli eval "$PROCESS_ID" --data "json = require('json'); Send({ Target = '$PROCESS_ID', Tags = { Action = 'AddComment' }, Data = json.encode({ article_id = \"1\", version = \"2\", commenter = 'alice', body = 'comment_body_manual' }) })" --wait)
+JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ 消息发送成功 (eval command completed)"
 
     # Wait for Inbox to increase (relative change detection)
