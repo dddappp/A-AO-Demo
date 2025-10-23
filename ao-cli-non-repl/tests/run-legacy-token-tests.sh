@@ -56,18 +56,23 @@ echo "   Legacy Token Blueprint: $LEGACY_TOKEN_BLUEPRINT"
 echo "   ao-cli version: $(ao-cli --version)"
 echo ""
 
-# Helper function: decide whether to use -- based on whether process ID starts with -
+# Helper function: decide whether to use -- based on whether process ID starts with -, unified JSON mode
 run_ao_cli() {
     local command="$1"
     local process_id="$2"
     shift 2  # Remove first two parameters
 
     if [[ "$process_id" == -* ]]; then
-        ao-cli "$command" -- "$process_id" "$@"
+        ao-cli "$command" -- "$process_id" --json "$@" 2>/dev/null
     else
-        ao-cli "$command" "$process_id" "$@"
+        ao-cli "$command" "$process_id" --json "$@" 2>/dev/null
     fi
 }
+
+# JSON handling follows ao-cli documentation
+# Use: echo "$JSON" | jq -e '.success == true' for success check
+# Use: echo "$JSON" | jq -r '.error' for error messages
+# Use: echo "$JSON" | jq -r '.data.field' for data extraction
 
 # Function to get current inbox length for a process (only call when necessary)
 get_current_inbox_length() {
@@ -75,12 +80,19 @@ get_current_inbox_length() {
 
     # Use eval to query inbox length directly without sending reply
     # This avoids the issue where ao-cli inbox command itself sends messages
-    local result=$(run_ao_cli eval "$process_id" --data "return #Inbox" --wait 2>/dev/null)
+    local raw_output=$(run_ao_cli eval "$process_id" --data "return #Inbox" --wait)
 
-    # Extract the number from the eval result Data field
-    # Look for the actual result Data field (not the input Data field)
-    # Match lines that start with "   Data: " followed by a quoted number
-    local current_length=$(echo "$result" | sed -n '/^📋 EVAL #1 RESULT:/,/^Prompt:/p' | grep '^   Data: "[0-9]*"$' | sed 's/   Data: "//' | sed 's/"$//' | head -1)
+    # Get the last JSON object (eval may return multiple JSON objects)
+    local json_output=$(echo "$raw_output" | jq -s '.[-1]' 2>/dev/null)
+
+    # Check success according to ao-cli documentation
+    if ! echo "$json_output" | jq -e '.success == true' >/dev/null 2>&1; then
+        ERROR_MSG=$(echo "$json_output" | jq -r '.error // "JSON parse failed"' 2>/dev/null || echo "Command failed")
+        current_length=0
+    else
+        # Extract inbox length from data.result.Output.data
+        local current_length=$(echo "$json_output" | jq -r '.data.result.Output.data // "0"' 2>/dev/null)
+    fi
 
     # If we still can't parse length, assume it's 0
     if ! [[ "$current_length" =~ ^[0-9]+$ ]]; then
@@ -98,67 +110,30 @@ display_latest_inbox_message() {
     echo "📨 $message_title:"
 
     # Get the latest message from inbox
-    local inbox_output=$(run_ao_cli inbox "$process_id" --latest 2>/dev/null)
+    local raw_output=$(run_ao_cli inbox "$process_id" --latest)
+    local json_output=$(echo "$raw_output" | jq -s '.[-1]' 2>/dev/null)
 
-    if [ $? -eq 0 ] && [ -n "$inbox_output" ]; then
-        echo "   📋 Full Inbox Output (first $INBOX_DISPLAY_LINES lines):"
-        echo "$inbox_output" | head -$INBOX_DISPLAY_LINES
+    if echo "$json_output" | jq -e '.success == true' >/dev/null 2>&1; then
+        echo "   📋 Inbox JSON data:"
+        echo "$json_output" | jq -r '.data.inbox // "No inbox data"' | head -$INBOX_DISPLAY_LINES
         echo ""
 
         # Try to extract Data field which is usually most valuable
-        local data_found=false
-
-        # Try different patterns for Data field
-        local data_field=$(echo "$inbox_output" | grep -o '"Data":"[^"]*"' | head -1)
-        if [ -z "$data_field" ]; then
-            # Try alternative format: Data = "value"
-            data_field=$(echo "$inbox_output" | grep -o 'Data = "[^"]*"' | head -1)
-        fi
-
-        if [ -n "$data_field" ]; then
-            local data_value
-            if [[ "$data_field" == '"Data":"'* ]]; then
-                data_value=$(echo "$data_field" | sed 's/"Data":"//' | sed 's/"$//')
-            else
-                data_value=$(echo "$data_field" | sed 's/Data = "//' | sed 's/"$//')
-            fi
+        local data_value=$(echo "$json_output" | jq -r '.data.inbox | fromjson? | .latest?.Data // empty' 2>/dev/null)
+        if [ -n "$data_value" ]; then
             echo "   📄 Data: $data_value"
-            data_found=true
         fi
 
         # Try to extract Action field
-        local action_found=false
-        local action_field=$(echo "$inbox_output" | grep -o '"Action":"[^"]*"' | head -1)
-        if [ -z "$action_field" ]; then
-            action_field=$(echo "$inbox_output" | grep -o 'Action = "[^"]*"' | head -1)
-        fi
-
-        if [ -n "$action_field" ]; then
-            local action_value
-            if [[ "$action_field" == '"Action":"'* ]]; then
-                action_value=$(echo "$action_field" | sed 's/"Action":"//' | sed 's/"$//')
-            else
-                action_value=$(echo "$action_field" | sed 's/Action = "//' | sed 's/"$//')
-            fi
+        local action_value=$(echo "$json_output" | jq -r '.data.inbox | fromjson? | .latest?.Action // empty' 2>/dev/null)
+        if [ -n "$action_value" ]; then
             echo "   🎯 Action: $action_value"
-            action_found=true
         fi
 
         # Show Tags summary if available
-        local tags_summary=$(echo "$inbox_output" | grep -o '"Tags":{[^}]*}' | head -1)
-        if [ -z "$tags_summary" ]; then
-            tags_summary=$(echo "$inbox_output" | grep -o 'Tags = {[^}]*}' | head -1)
-        fi
-
-        if [ -n "$tags_summary" ]; then
-            echo "   🏷️  Tags: ${tags_summary:0:150}..."
-        fi
-
-        # If we couldn't parse structured data, show key lines
-        if [ "$data_found" = false ] && [ "$action_found" = false ]; then
-            echo "   ⚠️  Could not parse structured message data"
-            echo "   📄 Key lines containing data:"
-            echo "$inbox_output" | grep -E "(Data|Action|Tags)" | head -3
+        local tags=$(echo "$json_output" | jq -r '.data.inbox | fromjson? | .latest?.Tags // empty' 2>/dev/null)
+        if [ -n "$tags" ]; then
+            echo "   🏷️  Tags: $tags"
         fi
     else
         echo "   ❌ Failed to retrieve inbox message"
@@ -240,7 +215,12 @@ START_TIME=$(date +%s)
 echo "=== Step 1: Generate Token process and load legacy blueprint ==="
 echo "🔧 Generating Legacy Token process..."
 # Spawn process and extract Process ID (following run-blog-tests.sh pattern)
-TOKEN_PROCESS_ID=$(ao-cli spawn default --name "legacy-token-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
+JSON_OUTPUT=$(ao-cli spawn default --name "legacy-token-$(date +%s)" --json 2>/dev/null)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
+    TOKEN_PROCESS_ID=$(echo "$JSON_OUTPUT" | jq -r '.data.processId')
+else
+    TOKEN_PROCESS_ID=""
+fi
 
 if [ -z "$TOKEN_PROCESS_ID" ]; then
     echo "❌ Failed to get Token Process ID"
@@ -255,7 +235,8 @@ echo "📦 Loading Legacy Token blueprint into process..."
 echo "   📁 Blueprint file: $LEGACY_TOKEN_BLUEPRINT"
 echo "   🎯 Target process: $TOKEN_PROCESS_ID"
 
-if run_ao_cli load "$TOKEN_PROCESS_ID" "$LEGACY_TOKEN_BLUEPRINT" --wait; then
+JSON_OUTPUT=$(run_ao_cli load "$TOKEN_PROCESS_ID" "$LEGACY_TOKEN_BLUEPRINT" --wait)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ Legacy Token blueprint loaded successfully"
     echo "   📋 File size: $(stat -f%z "$LEGACY_TOKEN_BLUEPRINT" 2>/dev/null || stat -c%s "$LEGACY_TOKEN_BLUEPRINT" 2>/dev/null || echo "unknown") characters"
     echo "   🔧 Process now supports complete legacy token functionality"
@@ -294,10 +275,11 @@ echo "📤 Sending Info request via eval command (internal send → Send() → I
 echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data 'Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Info\"})' --wait"
 
 INFO_LUA_CODE="Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Info\"})"
-EVAL_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$INFO_LUA_CODE" --wait 2>&1)
+RAW_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$INFO_LUA_CODE" --wait)
+JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
 
 # Check if eval was successful
-if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ Info function eval successful: Request sent successfully"
 
     # Wait for Info response (Send() puts message in Inbox)
@@ -354,10 +336,11 @@ echo "📤 Sending Balance request via eval command (internal send → Send() �
 echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data 'Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Balance\", Target=\"$TOKEN_PROCESS_ID\"})' --wait"
 
 BALANCE_LUA_CODE="Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Balance\", Target=\"$TOKEN_PROCESS_ID\"})"
-EVAL_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$BALANCE_LUA_CODE" --wait 2>&1)
+RAW_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$BALANCE_LUA_CODE" --wait)
+JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
 
 # Check if eval was successful
-if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ Balance function eval successful: Request sent successfully"
 
     # Wait for Balance response (Send() puts message in Inbox)
@@ -404,7 +387,12 @@ echo "Transfer tokens from token process to receiver process"
 
 # Create receiver process for transfer test
 echo "🔧 Creating receiver process..."
-RECEIVER_PROCESS_ID=$(ao-cli spawn default --name "receiver-$(date +%s)" 2>/dev/null | grep "📋 Process ID:" | awk '{print $4}')
+JSON_OUTPUT=$(ao-cli spawn default --name "receiver-$(date +%s)" --json 2>/dev/null)
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
+    RECEIVER_PROCESS_ID=$(echo "$JSON_OUTPUT" | jq -r '.data.processId')
+else
+    RECEIVER_PROCESS_ID=""
+fi
 
 if [ -z "$RECEIVER_PROCESS_ID" ]; then
     echo "❌ Failed to create receiver process"
@@ -427,13 +415,14 @@ else
     echo "📤 Sending Transfer request via eval (process internal Send)"
     echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data '$TRANSFER_LUA_CODE' --wait"
 
-    EVAL_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$TRANSFER_LUA_CODE" --wait 2>&1)
+    RAW_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$TRANSFER_LUA_CODE" --wait)
+    JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
 
     # Check if eval was successful
-    if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
+    if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
         echo "✅ Transfer function verification successful: Transfer request processed successfully"
-        echo "   📋 Transfer response details (last $RESPONSE_DISPLAY_LINES lines):"
-        echo "$EVAL_OUTPUT" | sed -n '/📋 EVAL #1 RESULT:/,/^$/p' | tail -$RESPONSE_DISPLAY_LINES
+        echo "   📋 Transfer response details:"
+        echo "$JSON_OUTPUT" | jq '.data.result'
 
         # Wait for both sender and receiver to get their respective notices
         echo "⏳ Waiting for transfer notifications..."
@@ -520,10 +509,11 @@ echo "📤 Sending Balances request via eval command (internal send → Send() �
 echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data 'Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Balances\"})' --wait"
 
 BALANCES_LUA_CODE="Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Balances\"})"
-EVAL_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$BALANCES_LUA_CODE" --wait 2>&1)
+RAW_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$BALANCES_LUA_CODE" --wait)
+JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
 
 # Check if eval was successful
-if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ Balances function eval successful: Request sent successfully"
 
     # Wait for Inbox to receive the balances response (Send() puts message in Inbox)
@@ -583,10 +573,11 @@ echo "📊 Inbox length (before operation): $inbox_before_operation"
 echo "📤 Sending Mint request via eval command (internal send → handler processing)"
 echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data 'Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Mint\", Quantity=\"$MINT_QUANTITY\"})' --wait"
 
-EVAL_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$MINT_LUA_CODE" --wait 2>&1)
+RAW_OUTPUT=$(run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$MINT_LUA_CODE" --wait)
+JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
 
 # Check if eval was successful
-if echo "$EVAL_OUTPUT" | grep -q "EVAL.*RESULT"; then
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ Mint function eval successful: Request sent successfully"
 
     # Wait for Mint response (either via msg.reply or Send to Inbox)
@@ -641,8 +632,13 @@ if [ -n "$RECEIVER_PROCESS_ID" ]; then
 
     echo "📤 Sending Total-Supply request from receiver process to token process..."
     echo "   📝 Cross-process message: receiver → token (From='Unknown' doesn't affect message delivery)"
-    eval_output=$(run_ao_cli eval "$RECEIVER_PROCESS_ID" --data "Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Total-Supply\"})" --wait 2>&1)
-    echo "Eval output: $eval_output"
+    raw_output=$(run_ao_cli eval "$RECEIVER_PROCESS_ID" --data "Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Total-Supply\"})" --wait)
+    json_output=$(echo "$raw_output" | jq -s '.[-1]' 2>/dev/null)
+    if echo "$json_output" | jq -e '.success == true' >/dev/null 2>&1; then
+        echo "✅ Total-Supply request sent successfully"
+    else
+        echo "❌ Total-Supply request failed"
+    fi
 
     # Pitfall experience: Cross-process message delivery needs sufficient wait time, AO network latency can be significant
     echo "⏳ Waiting for response in receiver process Inbox..."
