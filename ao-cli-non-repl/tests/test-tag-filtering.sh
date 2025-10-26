@@ -284,4 +284,10 @@ else
     echo "❌ 测试失败！未能在 Inbox 中收到回复消息"
 fi
 
+# 🎯 测试结论总结
+# ✅ 自定义 X- 前缀标签在 AO 跨进程通信中被完全保留
+# 🔄 标签被 AO 系统规范化大小写：X-SagaId → X-Sagaid
+# ❌ msg['X-SagaId'] 直接属性不存在（nil）
+# ✅ msg.Tags['X-Sagaid'] 标签在 Tags 表中可访问
+# 📝 开发建议：使用 msg.Tags 表访问自定义标签，而非直接属性
 
