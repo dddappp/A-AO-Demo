@@ -68,6 +68,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # 使用时间戳和随机数避免文件冲突
 TEST_CODE="/tmp/tag-test-$(date +%s%N)-$RANDOM.lua"
 cat > "$TEST_CODE" << 'LUAEOF'
+-- 全局变量：存储调试信息
+DebugInfo = DebugInfo or {}
+
 -- 标签检查处理器
 -- 注意：Handler 处理的消息不会进入 Inbox，需要通过 Send() 来回复
 Handlers.add(
@@ -76,71 +79,22 @@ Handlers.add(
         return msg.Action == "CheckTags"
     end,
     function(msg)
-        -- 调试输出：打印接收到的消息完整信息到 stdout
-        io.stdout:write("\n" .. string.rep("=", 80) .. "\n")
-        io.stdout:write("📨 接收者 Handler 中收到消息\n")
-        io.stdout:write(string.rep("=", 80) .. "\n\n")
-        
-        io.stdout:write("✅ 消息基本信息:\n")
-        io.stdout:write("  Action: " .. tostring(msg.Action) .. "\n")
-        io.stdout:write("  From: " .. tostring(msg.From) .. "\n")
-        io.stdout:write("  Type: " .. tostring(msg.Type) .. "\n")
-        io.stdout:write("  Data: " .. tostring(msg.Data) .. "\n")
-        
-        io.stdout:write("\n📋 消息中的自定义标签 (X-* 开头):\n")
-        local custom_tag_count = 0
-        for key, value in pairs(msg) do
-            if type(key) == "string" and (key:sub(1, 2) == "X-" or key:sub(1, 2) == "x-") then
-                io.stdout:write(string.format("  • %s = %s\n", key, tostring(value)))
-                custom_tag_count = custom_tag_count + 1
-            end
-        end
-        if custom_tag_count == 0 then
-            io.stdout:write("  (没有找到自定义标签)\n")
-        else
-            io.stdout:write(string.format("  [共 %d 个自定义标签]\n", custom_tag_count))
-        end
-        
-        io.stdout:write("\n📊 msg.Tags 字典内容:\n")
-        if msg.Tags then
-            local tag_count = 0
-            for key, value in pairs(msg.Tags) do
-                io.stdout:write(string.format("  • %s = %s\n", tostring(key), tostring(value)))
-                tag_count = tag_count + 1
-            end
-            io.stdout:write(string.format("  [总共 %d 个标签]\n", tag_count))
-        else
-            io.stdout:write("  (msg.Tags 为 nil)\n")
-        end
-        
-        io.stdout:write("\n🔍 所有顶级属性:\n")
-        local attr_count = 0
-        for key in pairs(msg) do
-            if type(key) == "string" then
-                attr_count = attr_count + 1
-            end
-        end
-        io.stdout:write(string.format("  [总共 %d 个属性]\n", attr_count))
-        
-        io.stdout:write(string.rep("=", 80) .. "\n\n")
-        io.stdout:flush()
-        
-        -- 检查接收到的标签
+        -- 保存接收到的标签信息到全局变量
         local received_tags = {}
         
-        -- 检查所有可能的标签格式（考虑大小写规范化）
+        -- 检查所有 X- 开头的自定义标签
         for key, value in pairs(msg) do
-            if type(key) == "string" then
-                -- 保存所有 X- 开头的自定义标签
-                if key:sub(1, 2) == "X-" or key:sub(1, 2) == "x-" then
-                    received_tags[key] = value
-                end
-                -- 也保存标准标签用于对比
-                if key == "Action" or key == "From" or key == "Type" then
-                    received_tags[key] = value
-                end
+            if type(key) == "string" and (key:sub(1, 2) == "X-" or key:sub(1, 2) == "x-") then
+                received_tags[key] = value
             end
         end
+        
+        -- 保存到全局变量供之后查询
+        DebugInfo.last_received_tags = received_tags
+        DebugInfo.last_msg_tags_dict = msg.Tags
+        DebugInfo.last_msg_action = msg.Action
+        DebugInfo.last_msg_from = msg.From
+        DebugInfo.last_msg_data = msg.Data
         
         -- 通过 Send() 回复发送方，这样数据会进入发送方的 Inbox
         Send({
@@ -154,6 +108,21 @@ Handlers.add(
                 original_action = msg.Action,
                 from_process = msg.From
             })
+        })
+    end
+)
+
+-- 处理调试查询请求
+Handlers.add(
+    "GetDebugInfo",
+    function(msg)
+        return msg.Action == "GetDebugInfo"
+    end,
+    function(msg)
+        Send({
+            Target = msg.From,
+            Action = "DebugInfoResult",
+            Data = json.encode(DebugInfo)
         })
     end
 )
@@ -219,6 +188,49 @@ return json.encode(result)
 " --wait --json 2>/dev/null)
 
 INBOX_RESULT=$(echo "$INBOX_JSON" | jq -s '.[-1] | .data.result.Output.data | fromjson?' 2>/dev/null || echo "[]")
+
+# ==================== 步骤 5.5: 直接查看接收者的 Inbox ====================
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📋 步骤 5.5: 直接检查接收者的 Inbox（调试）"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# 查看接收者 Inbox 中最后一条消息的完整内容
+RECEIVER_INBOX=$(ao-cli eval "$RECEIVER_ID" --data "
+local msg = Inbox[#Inbox]  -- 获取最后一条消息
+if msg then
+    local result = {
+        index = #Inbox,
+        action = msg.Action,
+        from = msg.From,
+        data = msg.Data,
+        has_x_sagaid = msg['X-Sagaid'] ~= nil,
+        x_sagaid_value = msg['X-Sagaid'],
+        has_x_responseaction = msg['X-Responseaction'] ~= nil,
+        x_responseaction_value = msg['X-Responseaction'],
+        has_x_noresponserequired = msg['X-Noresponserequired'] ~= nil,
+        x_noresponserequired_value = msg['X-Noresponserequired'],
+        all_keys = {}
+    }
+    
+    -- 收集所有 X- 开头的键
+    for key in pairs(msg) do
+        if type(key) == 'string' and key:sub(1, 2) == 'X-' then
+            table.insert(result.all_keys, key)
+        end
+    end
+    
+    return json.encode(result)
+else
+    return json.encode({ error = 'No message in Inbox' })
+end
+" --wait --json 2>/dev/null)
+
+RECEIVER_PARSED=$(echo "$RECEIVER_INBOX" | jq -s '.[-1] | .data.result.Output.data | fromjson?' 2>/dev/null)
+
+echo "接收者 Inbox 最后一条消息内容："
+echo "$RECEIVER_PARSED" | jq '.' 2>/dev/null
+echo ""
 
 if [ "$INBOX_RESULT" != "[]" ] && [ -n "$INBOX_RESULT" ]; then
     echo "✅ 收到来自接收者的响应"
