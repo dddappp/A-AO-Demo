@@ -13,7 +13,20 @@ Handlers.add(
             end
         end
         
+        -- 打印接收到的信息（调试用）
+        print("✅ Handler 接收到消息")
+        print("   Action: " .. tostring(msg.Action))
+        print("   From: " .. tostring(msg.From))
+        print("   Data: " .. tostring(msg.Data))
+        print("   收到的自定义标签数量: " .. tostring(#received_tags))
+        
+        -- 逐个打印接收到的标签
+        for key, value in pairs(received_tags) do
+            print("   📍 " .. key .. " = " .. tostring(value))
+        end
+        
         -- 回复给发送者（使用 Send 确保消息进入 Inbox）
+        print("📤 发送回复消息给: " .. tostring(msg.From))
         Send({
             Target = msg.From,
             Action = "TagCheckReply",
@@ -25,5 +38,6 @@ Handlers.add(
                 tag_count = #received_tags
             })
         })
+        print("✅ 回复消息已发送")
     end
 )
