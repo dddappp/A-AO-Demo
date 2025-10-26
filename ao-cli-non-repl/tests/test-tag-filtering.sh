@@ -69,22 +69,39 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 TEST_CODE="/tmp/tag-test-$(date +%s%N)-$RANDOM.lua"
 cat > "$TEST_CODE" << 'LUAEOF'
 -- 标签检查处理器
--- 在 Handler 中 print 出接收到的标签，观察是否出现在 outcome 中
 Handlers.add(
     "CheckTags",
     function(msg)
         return msg.Action == "CheckTags"
     end,
     function(msg)
+        -- 调试输出
+        print("\n🔍 CheckTags Handler 处理消息:")
+        print("  Action: " .. tostring(msg.Action))
+        print("  From: " .. tostring(msg.From))
+        print("  Data: " .. tostring(msg.Data))
+        
         -- 收集所有接收到的自定义标签
         local received_tags = {}
         
         -- 检查所有 X- 开头的标签
+        print("  自定义标签 (X-*):")
+        local custom_count = 0
         for key, value in pairs(msg) do
             if type(key) == "string" and key:sub(1, 2) == "X-" then
                 received_tags[key] = value
+                print("    • " .. key .. " = " .. tostring(value))
+                custom_count = custom_count + 1
             end
         end
+        
+        if custom_count == 0 then
+            print("    (未找到自定义标签)")
+        else
+            print("  [共 " .. custom_count .. " 个自定义标签]")
+        end
+        
+        print("✅ CheckTags Handler 准备回复\n")
         
         -- 回复消息到发送者，包含接收到的完整信息
         Send({
@@ -319,3 +336,4 @@ echo "╔═══════════════════════�
 echo "║  🎯 测试完成                                                           ║"
 echo "╚════════════════════════════════════════════════════════════════════════╝"
 echo ""
+
