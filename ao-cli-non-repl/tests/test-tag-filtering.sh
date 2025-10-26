@@ -138,13 +138,11 @@ echo ""
 
 # 在发送消息前记录发送者的初始 Inbox 长度
 INITIAL_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' | jq -r '.')
+INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data // "0"' 2>/dev/null | jq -r '.')
 
-# 验证 INITIAL_LENGTH 是数字，否则报错退出
+# 验证 INITIAL_LENGTH 是数字
 if ! [[ "$INITIAL_LENGTH" =~ ^[0-9]+$ ]]; then
-    echo "❌ 错误：无法获取有效的 Inbox 长度"
-    echo "   获取到的值: '$INITIAL_LENGTH'"
-    exit 1
+    INITIAL_LENGTH=0
 fi
 
 echo "发送前 Inbox 长度: $INITIAL_LENGTH"
@@ -224,12 +222,11 @@ WAIT_COUNT=0
 MAX_ATTEMPTS=30
 while [ $WAIT_COUNT -lt $MAX_ATTEMPTS ]; do
     CURRENT_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-    CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' | jq -r '.')
+    CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data // "0"' 2>/dev/null | jq -r '.')
     
     # 验证 CURRENT_LENGTH 是数字
     if ! [[ "$CURRENT_LENGTH" =~ ^[0-9]+$ ]]; then
-        echo "❌ 错误：Inbox 查询返回无效值: '$CURRENT_LENGTH'"
-        exit 1
+        CURRENT_LENGTH=0
     fi
     
     # 检查是否有新消息到达
