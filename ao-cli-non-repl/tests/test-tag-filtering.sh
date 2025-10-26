@@ -197,10 +197,10 @@ echo ""
 echo "等待接收者的回复消息到达..."
 echo ""
 
-# 等待 Inbox 长度增加（最多等待 30 秒）
-WAIT_TIME=0
-MAX_WAIT=30
-while [ $WAIT_TIME -lt $MAX_WAIT ]; do
+# 等待 Inbox 长度增加（最多检查 30 次）
+WAIT_COUNT=0
+MAX_ATTEMPTS=30
+while [ $WAIT_COUNT -lt $MAX_ATTEMPTS ]; do
     CURRENT_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
     CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | tr -d '"' || echo "0")
     
@@ -210,14 +210,14 @@ while [ $WAIT_TIME -lt $MAX_WAIT ]; do
         break
     fi
     
-    WAIT_TIME=$((WAIT_TIME + 1))
-    if [ $WAIT_TIME -lt $MAX_WAIT ]; then
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+    if [ $WAIT_COUNT -lt $MAX_ATTEMPTS ]; then
         sleep 1
     fi
 done
 
 if [ "$CURRENT_LENGTH" -le "$INITIAL_LENGTH" ]; then
-    echo "⏱️  等待超时，未收到新消息"
+    echo "⏱️  等待超时（检查 $MAX_ATTEMPTS 次后仍未收到新消息）"
     echo ""
 else
     echo ""
