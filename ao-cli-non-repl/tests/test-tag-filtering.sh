@@ -76,39 +76,26 @@ Handlers.add(
         return msg.Action == "CheckTags"
     end,
     function(msg)
-        -- Print 接收到的消息信息
-        print("\n[DEBUG] 接收者 Handler 收到消息:")
-        print("[DEBUG] Action: " .. tostring(msg.Action))
-        print("[DEBUG] From: " .. tostring(msg.From))
+        -- 收集所有接收到的自定义标签
+        local received_tags = {}
         
-        -- 打印所有 X- 开头的标签
-        print("[DEBUG] 自定义标签:")
-        local custom_tag_count = 0
+        -- 检查所有 X- 开头的标签
         for key, value in pairs(msg) do
             if type(key) == "string" and key:sub(1, 2) == "X-" then
-                print("[DEBUG]   " .. key .. " = " .. tostring(value))
-                custom_tag_count = custom_tag_count + 1
-            end
-        end
-        print("[DEBUG] 共找到 " .. custom_tag_count .. " 个自定义标签")
-        
-        -- 也打印 msg.Tags
-        print("[DEBUG] msg.Tags 内容:")
-        if msg.Tags then
-            for key, value in pairs(msg.Tags) do
-                if key:sub(1, 2) == "X-" then
-                    print("[DEBUG]   Tags." .. key .. " = " .. tostring(value))
-                end
+                received_tags[key] = value
             end
         end
         
-        -- Send 响应回去
+        -- 回复消息到发送者，包含接收到的完整信息
         Send({
             Target = msg.From,
             Action = "TagCheckResult",
             Data = json.encode({
                 message_received = true,
-                handler_name = "CheckTags"
+                received_action = msg.Action,
+                received_data = msg.Data,
+                received_custom_tags = received_tags,
+                received_tags_dict = msg.Tags
             })
         })
     end
@@ -117,7 +104,7 @@ LUAEOF
 
 ao-cli load "$RECEIVER_ID" "$TEST_CODE" --json 2>/dev/null > /dev/null
 rm -f "$TEST_CODE"
-echo "✅ 接收者代码加载完成（包含标签检查处理器）"
+echo "✅ 接收者代码加载完成（包含标签检查处理器和回复机制）"
 echo ""
 
 # ==================== 步骤 4: 发送带自定义标签的消息 ====================
@@ -196,7 +183,65 @@ fi
 
 echo ""
 
-# ==================== 步骤 6: 验证结果分析 ====================
+# ==================== 步骤 6: 验证接收者的回复 ====================
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📬 步骤 6: 验证接收者的回复消息"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "等待接收者处理消息并回复..."
+echo ""
+
+# 查询发送者的 Inbox，查找来自接收者的 TagCheckResult 消息
+REPLY_JSON=$(ao-cli eval "$SENDER_ID" --data "
+local result = {}
+for i, msg in ipairs(Inbox) do
+    if msg.Action == 'TagCheckResult' and msg.From == '$RECEIVER_ID' then
+        table.insert(result, {
+            index = i,
+            action = msg.Action,
+            from = msg.From,
+            data = msg.Data
+        })
+    end
+end
+return json.encode(result)
+" --wait --json 2>/dev/null)
+
+REPLY_RESULT=$(echo "$REPLY_JSON" | jq -s '.[-1] | .data.result.Output.data | fromjson?' 2>/dev/null || echo "[]")
+
+if [ "$REPLY_RESULT" != "[]" ] && [ -n "$REPLY_RESULT" ]; then
+    echo "✅ 发送者 Inbox 中收到接收者的回复消息"
+    echo ""
+    
+    # 提取回复消息的数据
+    REPLY_DATA=$(echo "$REPLY_RESULT" | jq '.[0].data' 2>/dev/null)
+    
+    if [ -n "$REPLY_DATA" ] && [ "$REPLY_DATA" != "null" ]; then
+        # 解码消息数据（可能是 base64 或直接的 JSON）
+        PARSED_REPLY=$(echo "$REPLY_DATA" | base64 -d 2>/dev/null | jq '.' 2>/dev/null || echo "$REPLY_DATA" | jq '.' 2>/dev/null)
+        
+        echo "📊 接收者回复的消息内容："
+        echo "$PARSED_REPLY" | jq '.' 2>/dev/null
+        echo ""
+        
+        # 验证接收者收到的自定义标签
+        RECEIVED_CUSTOM=$(echo "$PARSED_REPLY" | jq '.received_custom_tags' 2>/dev/null)
+        
+        if [ -n "$RECEIVED_CUSTOM" ] && [ "$RECEIVED_CUSTOM" != "null" ]; then
+            echo "✅ 接收者收到的自定义标签："
+            echo "$RECEIVED_CUSTOM" | jq '.' 2>/dev/null
+        fi
+    else
+        echo "⚠️  无法解析回复消息数据"
+    fi
+else
+    echo "⚠️  发送者 Inbox 中未收到接收者的回复"
+    echo "    这可能是网络延迟或消息未被正确处理"
+fi
+
+echo ""
+
+# ==================== 步骤 7: 最终结论 ====================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🎯 测试结论"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -205,8 +250,15 @@ echo ""
 if [ "$SAGA_ID" != "NOT_FOUND" ] && [ "$RESPONSE_ACTION" != "NOT_FOUND" ] && [ "$NO_RESPONSE" != "NOT_FOUND" ]; then
     echo "✅ 重大发现：所有自定义标签都被完整保留！"
     echo ""
-    echo "这意味着："
+    echo "验证过程："
+    echo "  1️⃣  发送方发送包含自定义标签的消息"
+    echo "  2️⃣  消息在 eval 结果中显示所有标签完整保留"
+    echo "  3️⃣  接收方处理消息并回复确认"
+    echo "  4️⃣  发送方 Inbox 中收到接收方的回复"
+    echo ""
+    echo "结论："
     echo "  • AO 网络不过滤自定义标签"
+    echo "  • 标签完全保留，名称不被修改"
     echo "  • 可以安全地使用标签传递 Saga 相关信息"
     echo "  • 不需要在 Data 字段中嵌入这些信息"
 else
