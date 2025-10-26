@@ -75,6 +75,52 @@ Handlers.add(
         return msg.Action == "CheckTags"
     end,
     function(msg)
+        -- 调试输出：打印接收到的消息完整信息
+        print("\n" .. string.rep("=", 80))
+        print("📨 接收者 Handler 中收到消息")
+        print(string.rep("=", 80))
+        
+        print("\n✅ 消息基本信息:")
+        print("  Action: " .. tostring(msg.Action))
+        print("  From: " .. tostring(msg.From))
+        print("  Type: " .. tostring(msg.Type))
+        print("  Data: " .. tostring(msg.Data))
+        
+        print("\n📋 消息中的自定义标签 (X-* 开头):")
+        local custom_tag_count = 0
+        for key, value in pairs(msg) do
+            if type(key) == "string" and (key:sub(1, 2) == "X-" or key:sub(1, 2) == "x-") then
+                print(string.format("  • %s = %s", key, tostring(value)))
+                custom_tag_count = custom_tag_count + 1
+            end
+        end
+        if custom_tag_count == 0 then
+            print("  (没有找到自定义标签)")
+        end
+        
+        print("\n📊 msg.Tags 字典内容:")
+        if msg.Tags then
+            local tag_count = 0
+            for key, value in pairs(msg.Tags) do
+                print(string.format("  • %s = %s", tostring(key), tostring(value)))
+                tag_count = tag_count + 1
+            end
+            print(string.format("  [总共 %d 个标签]", tag_count))
+        else
+            print("  (msg.Tags 为 nil)")
+        end
+        
+        print("\n🔍 所有顶级属性:")
+        local attr_count = 0
+        for key in pairs(msg) do
+            if type(key) == "string" then
+                attr_count = attr_count + 1
+            end
+        end
+        print(string.format("  [总共 %d 个属性]", attr_count))
+        
+        print(string.rep("=", 80) .. "\n")
+        
         -- 检查接收到的标签
         local received_tags = {}
         
