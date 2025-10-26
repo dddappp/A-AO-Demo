@@ -149,18 +149,38 @@ echo "发送前 Inbox 长度: $INITIAL_LENGTH"
 echo ""
 
 # 在发送者进程中发送消息
-SEND_OUTPUT=$(ao-cli eval "$SENDER_ID" --data "
-Send({
-    Target = '$RECEIVER_ID',
-    Action = 'CheckTags',
-    ['X-SagaId'] = 'saga-test-123',
-    ['X-ResponseAction'] = 'ForwardToProxy',
-    ['X-NoResponseRequired'] = 'false',
-    Data = 'Testing custom tag preservation'
-})
-" --wait --json 2>/dev/null)
+# 使用 message 命令而不是 eval Send()，这样可以直接触发接收方的 Handler
+# message 命令会返回包含 Output.data（包含 print 输出）的完整结果
+SEND_OUTPUT=$(ao-cli message "$SENDER_ID" "CheckTags" \
+  --target "$RECEIVER_ID" \
+  --tag "X-SagaId=saga-test-123" \
+  --tag "X-ResponseAction=ForwardToProxy" \
+  --tag "X-NoResponseRequired=false" \
+  --data "Testing custom tag preservation" \
+  --wait --json 2>/dev/null)
 
 echo "✅ 消息已发送"
+echo ""
+
+# ==================== 步骤 4.5: 显示接收方 Handler 的处理输出 ====================
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔍 步骤 4.5: 接收方 Handler 的处理输出"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# 从 message 命令的返回结果中提取最后一个 JSON（完整结果）
+LAST_JSON=$(echo "$SEND_OUTPUT" | jq -s '.[-1]')
+
+# 从完整结果中提取 Handler 的 print 输出
+HANDLER_OUTPUT=$(echo "$LAST_JSON" | jq -r '.data.result.Output.data // "N/A"' 2>/dev/null)
+
+if [ "$HANDLER_OUTPUT" != "N/A" ] && [ -n "$HANDLER_OUTPUT" ]; then
+    echo "📤 接收方 Handler 的处理输出（包含 print 调试信息）："
+    echo ""
+    echo "$HANDLER_OUTPUT"
+    echo ""
+fi
+
 echo ""
 
 # ==================== 步骤 5: 从消息中提取并验证标签 ====================
