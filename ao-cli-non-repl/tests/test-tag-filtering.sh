@@ -88,7 +88,9 @@ cat > "$TEST_CODE" << 'LUAEOF'
 -- 处理消息，检查标签属性
 Handlers.add(
     "DebugTags",
-    Handlers.utils.byType("Message"),
+    function(msg)
+        return msg.Action == "DebugTags" or msg.Type == "Message"
+    end,
     function(msg)
         -- 输出消息的所有顶级属性
         local result = {}
@@ -97,6 +99,9 @@ Handlers.add(
             ["X-SagaId"] = msg["X-SagaId"],
             ["X-ResponseAction"] = msg["X-ResponseAction"],
             ["X-NoResponseRequired"] = msg["X-NoResponseRequired"],
+            ["X-Sagaid"] = msg["X-Sagaid"],           -- 大小写规范化版本
+            ["X-Responseaction"] = msg["X-Responseaction"],
+            ["X-Noresponserequired"] = msg["X-Noresponserequired"],
             ["Action"] = msg["Action"],
             ["From"] = msg["From"],
         }
@@ -110,25 +115,25 @@ Handlers.add(
         
         result.all_custom_tags = result.received_tags
         
-        msg.reply({
-            Data = json.encode(result)
-        })
+        if msg.reply then
+            msg.reply({
+                Data = json.encode(result)
+            })
+        end
     end
 )
 
 -- 支持eval查询消息历史
 Handlers.add(
     "QueryMessages",
-    Handlers.utils.byType("Message"),
+    Handlers.utils.hasMatchingTag("Action", "GetMessages"),
     function(msg)
-        if msg.Action == "GetMessages" then
-            msg.reply({
-                Data = json.encode({
-                    inbox_size = #Inbox,
-                    message = "Check Inbox for details"
-                })
+        msg.reply({
+            Data = json.encode({
+                inbox_size = #Inbox,
+                message = "Check Inbox for details"
             })
-        end
+        })
     end
 )
 LUAEOF
