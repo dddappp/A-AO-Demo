@@ -8,25 +8,10 @@
 #   验证 AO 网络是否会过滤自定义标签（X-SagaId, X-ResponseAction, X-NoResponseRequired）
 #   这对于 Saga 框架的实现至关重要。
 #
-# 背景：
-#   AO 平台对消息标签有过滤机制：
-#   - 标准标签（如 Action, From, Type 等）：通常保留
-#   - 自定义标签（如 X-* 开头的标签）：可能被过滤
-#
-# 测试流程：
-#   1. 创建发送者进程（Sender）
-#   2. 创建接收者进程（Receiver），加载消息调试代码
-#   3. 发送包含自定义标签的消息
-#   4. 接收者检查收到的消息中是否存在这些标签
-#   5. 通过 Inbox 查看结果
-#
-# 预期行为：
-#   - 如果标签被过滤：msg["X-SagaId"] 将为 nil
-#   - 如果标签保留：msg["X-SagaId"] 将包含发送时的值
-#
-# 关键发现（已知问题）：
-#   AO 网络会过滤自定义标签！解决方案是使用 Data 字段嵌入 Saga 信息。
-#   参考：src/messaging.lua 中的 embed_saga_info_in_data() 函数
+# 关键发现：
+#   1. Handler 处理的消息不会进入 Inbox
+#   2. 需要通过 Send() 回复来验证接收到的标签内容
+#   3. 标签完全保留，但会进行大小写规范化
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -34,19 +19,10 @@ export HTTPS_PROXY=http://127.0.0.1:1235
 export HTTP_PROXY=http://127.0.0.1:1235
 export ALL_PROXY=socks5://127.0.0.1:1235
 
-# 不使用 set -e，而是逐个检查错误
-# set -e
-
-# 帮助函数：检查命令是否成功
-check_error() {
-    if [ $? -ne 0 ]; then
-        echo "❌ 错误: $1"
-        exit 1
-    fi
-}
-
-echo "=== AO 标签过滤测试脚本 ==="
-echo "测试自定义标签 (X-SagaId, X-ResponseAction, X-NoResponseRequired) 是否被过滤"
+echo "╔════════════════════════════════════════════════════════════════════════╗"
+echo "║  🧪 AO 自定义标签过滤测试                                              ║"
+echo "║  验证标签传递是否被过滤或保留                                          ║"
+echo "╚════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
 # 检查 ao-cli 是否安装
@@ -66,72 +42,67 @@ echo "✅ 环境检查通过"
 echo ""
 
 # ==================== 步骤 1: 生成发送者进程 ====================
-echo "=== 步骤 1: 生成发送者进程 ==="
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📤 步骤 1: 生成发送者进程"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 SENDER_JSON=$(ao-cli spawn default --name "tag-test-sender-$(date +%s)" --json 2>/dev/null)
 SENDER_ID=$(echo "$SENDER_JSON" | jq -r '.data.processId')
-echo "发送者进程ID: $SENDER_ID"
+echo "✅ 发送者进程ID: $SENDER_ID"
 echo ""
 
 # ==================== 步骤 2: 生成接收者进程 ====================
-echo "=== 步骤 2: 生成接收者进程 ==="
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📥 步骤 2: 生成接收者进程"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 RECEIVER_JSON=$(ao-cli spawn default --name "tag-test-receiver-$(date +%s)" --json 2>/dev/null)
 RECEIVER_ID=$(echo "$RECEIVER_JSON" | jq -r '.data.processId')
-echo "接收者进程ID: $RECEIVER_ID"
+echo "✅ 接收者进程ID: $RECEIVER_ID"
 echo ""
 
-# ==================== 步骤 3: 为接收者加载测试代码 ====================
-echo "=== 步骤 3: 为接收者加载消息检查代码 ==="
+# ==================== 步骤 3: 为接收者加载标签检查代码 ====================
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "⚙️  步骤 3: 为接收者加载标签检查代码"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # 创建临时Lua代码，用于检查接收到的消息标签
 TEST_CODE=$(mktemp /tmp/tag-test-XXXX.lua)
 cat > "$TEST_CODE" << 'LUAEOF'
--- 处理消息，检查标签属性
+-- 标签检查处理器
+-- 注意：Handler 处理的消息不会进入 Inbox，需要通过 Send() 来回复
 Handlers.add(
-    "DebugTags",
+    "CheckTags",
     function(msg)
-        return msg.Action == "DebugTags" or msg.Type == "Message"
+        return msg.Action == "CheckTags"
     end,
     function(msg)
-        -- 输出消息的所有顶级属性
-        local result = {}
-        result.received_tags = {}
-        result.checked_fields = {
-            ["X-SagaId"] = msg["X-SagaId"],
-            ["X-ResponseAction"] = msg["X-ResponseAction"],
-            ["X-NoResponseRequired"] = msg["X-NoResponseRequired"],
-            ["X-Sagaid"] = msg["X-Sagaid"],           -- 大小写规范化版本
-            ["X-Responseaction"] = msg["X-Responseaction"],
-            ["X-Noresponserequired"] = msg["X-Noresponserequired"],
-            ["Action"] = msg["Action"],
-            ["From"] = msg["From"],
-        }
+        -- 检查接收到的标签
+        local received_tags = {}
         
-        -- 遍历所有顶级属性
+        -- 检查所有可能的标签格式（考虑大小写规范化）
         for key, value in pairs(msg) do
-            if type(key) == "string" and key:sub(1, 2) == "X-" then
-                table.insert(result.received_tags, key)
+            if type(key) == "string" then
+                -- 保存所有 X- 开头的自定义标签
+                if key:sub(1, 2) == "X-" or key:sub(1, 2) == "x-" then
+                    received_tags[key] = value
+                end
+                -- 也保存标准标签用于对比
+                if key == "Action" or key == "From" or key == "Type" then
+                    received_tags[key] = value
+                end
             end
         end
         
-        result.all_custom_tags = result.received_tags
-        
-        if msg.reply then
-            msg.reply({
-                Data = json.encode(result)
-            })
-        end
-    end
-)
-
--- 支持eval查询消息历史
-Handlers.add(
-    "QueryMessages",
-    Handlers.utils.hasMatchingTag("Action", "GetMessages"),
-    function(msg)
-        msg.reply({
+        -- 通过 Send() 回复发送方，这样数据会进入发送方的 Inbox
+        Send({
+            Target = msg.From,
+            Action = "TagCheckResult",
             Data = json.encode({
-                inbox_size = #Inbox,
-                message = "Check Inbox for details"
+                message_received = true,
+                handler_name = "CheckTags",
+                received_tags = received_tags,
+                tags_dict = msg.Tags,
+                original_action = msg.Action,
+                from_process = msg.From
             })
         })
     end
@@ -140,95 +111,134 @@ LUAEOF
 
 ao-cli load "$RECEIVER_ID" "$TEST_CODE" --json 2>/dev/null > /dev/null
 rm "$TEST_CODE"
-echo "✅ 接收者代码加载完成"
+echo "✅ 接收者代码加载完成（包含标签检查处理器）"
 echo ""
 
 # ==================== 步骤 4: 发送带自定义标签的消息 ====================
-echo "=== 步骤 4: 发送带自定义标签的消息 ==="
-echo "从 $SENDER_ID 向 $RECEIVER_ID 发送包含自定义标签的消息..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📨 步骤 4: 发送包含自定义标签的消息"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+echo "发送者: $SENDER_ID"
+echo "接收者: $RECEIVER_ID"
+echo ""
+echo "📋 发送的标签："
+echo "  • X-SagaId = saga-test-123"
+echo "  • X-ResponseAction = ForwardToProxy"
+echo "  • X-NoResponseRequired = false"
 echo ""
 
-# 使用 eval 在发送者进程内发送消息，包含自定义标签
+# 在发送者进程中执行 Send 命令
 SEND_OUTPUT=$(ao-cli eval "$SENDER_ID" --data "
 Send({
     Target = '$RECEIVER_ID',
-    Action = 'TestAction',
+    Action = 'CheckTags',
     Tags = {
-        Action = 'DebugTags',
-        ['X-SagaId'] = 'saga-123',
-        ['X-ResponseAction'] = 'TestResponse',
-        ['X-NoResponseRequired'] = 'true'
+        ['X-SagaId'] = 'saga-test-123',
+        ['X-ResponseAction'] = 'ForwardToProxy',
+        ['X-NoResponseRequired'] = 'false'
     },
-    Data = 'Test message with custom tags'
+    Data = 'Testing custom tag preservation'
 })
 " --wait --json 2>/dev/null)
 
 echo "✅ 消息已发送"
 echo ""
 
-# ==================== 步骤 5: 等待并查询接收者的Inbox ====================
-echo "=== 步骤 5: 检查接收者收到的消息 ==="
+# ==================== 步骤 5: 等待并检查发送者的 Inbox ====================
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📬 步骤 5: 检查发送者收到的响应"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "等待3秒让消息处理完成..."
 sleep 3
-
-# 查询接收者的Inbox
-INBOX_OUTPUT=$(ao-cli eval "$RECEIVER_ID" --data "return Inbox" --wait --json 2>/dev/null)
-echo ""
-echo "接收者的Inbox内容："
-echo "$INBOX_OUTPUT" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | head -100
 echo ""
 
-# ==================== 步骤 6: 发送并接收DebugTags响应 ====================
-echo "=== 步骤 6: 通过消息检查自定义标签 ==="
-echo "发送DebugTags消息来检查标签是否存在..."
+# 查询发送者的 Inbox 来获取接收者的响应
+INBOX_JSON=$(ao-cli eval "$SENDER_ID" --data "
+local result = {}
+for i, msg in ipairs(Inbox) do
+    if msg.Action == 'TagCheckResult' then
+        table.insert(result, {
+            index = i,
+            action = msg.Action,
+            data = msg.Data
+        })
+    end
+end
+return json.encode(result)
+" --wait --json 2>/dev/null)
 
-# 先获取初始Inbox长度（不使用 set -e，所以不会因为 jq 错误而退出）
-INITIAL_LENGTH_RAW=$(ao-cli eval "$RECEIVER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null || echo "unknown")
-echo "初始Inbox长度: $INITIAL_LENGTH"
-echo ""
+INBOX_RESULT=$(echo "$INBOX_JSON" | jq -s '.[-1] | .data.result.Output.data | fromjson?' 2>/dev/null || echo "[]")
 
-# 发送消息给接收者，会触发DebugTags handler
-echo "正在发送消息..."
-MESSAGE_RESULT=$(ao-cli message "$RECEIVER_ID" "DebugTags" \
-  --data "test" \
-  --tags "X-SagaId=saga-456" \
-  --tags "X-ResponseAction=MyResponse" \
-  --tags "X-NoResponseRequired=yes" \
-  --wait --json 2>/dev/null)
-
-echo "消息发送结果:"
-if [ -n "$MESSAGE_RESULT" ]; then
-    echo "$MESSAGE_RESULT" | jq '.' 2>/dev/null | head -100
+if [ "$INBOX_RESULT" != "[]" ] && [ -n "$INBOX_RESULT" ]; then
+    echo "✅ 收到来自接收者的响应"
+    echo ""
+    
+    # 解析响应数据
+    RESPONSE_DATA=$(echo "$INBOX_RESULT" | jq '.[0].data' 2>/dev/null)
+    
+    if [ -n "$RESPONSE_DATA" ] && [ "$RESPONSE_DATA" != "null" ]; then
+        PARSED_RESPONSE=$(echo "$RESPONSE_DATA" | base64 -d 2>/dev/null | jq '.' 2>/dev/null || echo "$RESPONSE_DATA")
+        
+        echo "📊 响应内容："
+        echo "$PARSED_RESPONSE" | jq '.' 2>/dev/null | head -50
+    else
+        echo "⚠️  无法解析响应数据"
+    fi
 else
-    echo "（无JSON输出）"
-fi
-echo ""
-
-# ==================== 步骤 7: 查看最后的Inbox消息 ====================
-echo "=== 步骤 7: 查看最后接收的消息 ==="
-FINAL_INBOX=$(ao-cli inbox "$RECEIVER_ID" --latest --json 2>/dev/null)
-
-echo "最后的Inbox消息 (完整JSON):"
-echo "$FINAL_INBOX" | jq -s '.[-1]' 2>/dev/null | head -150
-echo ""
-
-# 尝试提取data字段
-echo "尝试从Messages中提取标签检查结果:"
-MESSAGES=$(echo "$FINAL_INBOX" | jq -s '.[-1] | .data.inbox | fromjson? | .latest?.Data' 2>/dev/null)
-if [ -n "$MESSAGES" ] && [ "$MESSAGES" != "null" ]; then
-    echo "接收到的标签检查结果:"
-    echo "$MESSAGES"
-else
-    echo "无法解析消息数据"
+    echo "⚠️  未收到来自接收者的响应"
+    echo "    这可能是因为网络延迟或消息未被正确处理"
 fi
 
 echo ""
-echo "=== 测试完成 ==="
+
+# ==================== 步骤 6: 验证标签是否被保留 ====================
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ 步骤 6: 验证结果分析"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "📋 总结:"
-echo "  - 发送者ID: $SENDER_ID"
-echo "  - 接收者ID: $RECEIVER_ID"
-echo "  - 测试内容: X-SagaId, X-ResponseAction, X-NoResponseRequired"
-echo "  - 观察Inbox中的消息是否包含这些自定义标签"
+
+RECEIVED_TAGS=$(echo "$PARSED_RESPONSE" 2>/dev/null | jq '.received_tags' 2>/dev/null)
+
+if [ -n "$RECEIVED_TAGS" ] && [ "$RECEIVED_TAGS" != "null" ]; then
+    echo "接收者收到的自定义标签："
+    echo "$RECEIVED_TAGS" | jq 'to_entries | .[] | "  • \(.key) = \(.value)"' -r 2>/dev/null
+    echo ""
+    
+    # 检查每个标签
+    SAGA_ID=$(echo "$RECEIVED_TAGS" | jq -r '.["X-Sagaid"] // .["X-SagaId"] // "NOT FOUND"' 2>/dev/null)
+    RESPONSE_ACTION=$(echo "$RECEIVED_TAGS" | jq -r '.["X-Responseaction"] // .["X-ResponseAction"] // "NOT FOUND"' 2>/dev/null)
+    NO_RESPONSE=$(echo "$RECEIVED_TAGS" | jq -r '.["X-Noresponserequired"] // .["X-NoResponseRequired"] // "NOT FOUND"' 2>/dev/null)
+    
+    echo "📋 标签检查结果："
+    echo ""
+    echo "  发送时            →  接收时              →  结果"
+    echo "  ────────────────────────────────────────────────────"
+    
+    if [ "$SAGA_ID" != "NOT FOUND" ]; then
+        echo "  ✅ X-SagaId           X-Sagaid            ✓ 保留: $SAGA_ID"
+    else
+        echo "  ❌ X-SagaId           (未找到)           ✗ 被过滤"
+    fi
+    
+    if [ "$RESPONSE_ACTION" != "NOT FOUND" ]; then
+        echo "  ✅ X-ResponseAction   X-Responseaction    ✓ 保留: $RESPONSE_ACTION"
+    else
+        echo "  ❌ X-ResponseAction   (未找到)           ✗ 被过滤"
+    fi
+    
+    if [ "$NO_RESPONSE" != "NOT FOUND" ]; then
+        echo "  ✅ X-NoResponseRequired X-Noresponserequired ✓ 保留: $NO_RESPONSE"
+    else
+        echo "  ❌ X-NoResponseRequired (未找到)           ✗ 被过滤"
+    fi
+    
+else
+    echo "⚠️  无法提取标签信息"
+fi
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════════════════╗"
+echo "║  🎯 测试完成                                                           ║"
+echo "╚════════════════════════════════════════════════════════════════════════╝"
 echo ""
