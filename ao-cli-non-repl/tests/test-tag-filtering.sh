@@ -155,15 +155,36 @@ echo ""
 # ==================== 步骤 7: 查看回复消息内容 ====================
 if [ "$REPLY_RECEIVED" = true ]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "📬 步骤 7: 查看回复消息内容"
+    echo "📬 步骤 7: 解析回复消息，验证接收端是否收到标签"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     
     INBOX_RESULT=$(ao-cli inbox "$SENDER_ID" --latest --json 2>/dev/null)
     if echo "$INBOX_RESULT" | jq -e '.success == true' >/dev/null 2>&1; then
         LATEST_MSG=$(echo "$INBOX_RESULT" | jq -s '.[-1] | .data.inbox' 2>/dev/null)
-        echo "最新收到的消息内容:"
+        echo "📨 最新收到的回复消息内容:"
         echo "$LATEST_MSG" | jq '.' 2>/dev/null | head -40
+        echo ""
+        
+        # 从回复消息的 Data 字段中解析标签检查结果
+        REPLY_DATA=$(echo "$LATEST_MSG" | jq -r '.latest.Data // empty' 2>/dev/null)
+        if [ -n "$REPLY_DATA" ]; then
+            echo "🔍 Handler 回复的标签检查结果:"
+            echo "$REPLY_DATA" | jq '.' 2>/dev/null
+            echo ""
+            
+            # 验证接收端是否收到了我们的自定义标签
+            RECEIVED_SAGA_ID=$(echo "$REPLY_DATA" | jq -r '.received_tags."X-SagaId" // empty' 2>/dev/null)
+            RECEIVED_ACTION=$(echo "$REPLY_DATA" | jq -r '.received_tags."X-ResponseAction" // empty' 2>/dev/null)
+            RECEIVED_NO_RESP=$(echo "$REPLY_DATA" | jq -r '.received_tags."X-NoResponseRequired" // empty' 2>/dev/null)
+            TAG_COUNT=$(echo "$REPLY_DATA" | jq -r '.tag_count // 0' 2>/dev/null)
+            
+            echo "✅ 接收端收到的自定义标签验证:"
+            [ "$RECEIVED_SAGA_ID" = "saga-123" ] && echo "  ✅ X-SagaId = $RECEIVED_SAGA_ID" || echo "  ❌ X-SagaId 未收到或不匹配"
+            [ "$RECEIVED_ACTION" = "ForwardToProxy" ] && echo "  ✅ X-ResponseAction = $RECEIVED_ACTION" || echo "  ❌ X-ResponseAction 未收到或不匹配"
+            [ "$RECEIVED_NO_RESP" = "false" ] && echo "  ✅ X-NoResponseRequired = $RECEIVED_NO_RESP" || echo "  ❌ X-NoResponseRequired 未收到或不匹配"
+            echo "  📊 标签数量: $TAG_COUNT 个"
+        fi
     else
         echo "⚠️  无法查询 Inbox"
     fi
