@@ -107,7 +107,7 @@ rm -f "$TEST_CODE"
 echo "✅ 接收者代码加载完成（包含标签检查处理器和回复机制）"
 echo ""
 
-# ==================== 步骤 4: 发送带自定义标签的消息 ====================
+# ==================== 步骤 4: 发送包含自定义标签的消息 ====================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📨 步骤 4: 发送包含自定义标签的消息"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -119,6 +119,12 @@ echo "📋 发送的标签："
 echo "  • X-SagaId = saga-test-123"
 echo "  • X-ResponseAction = ForwardToProxy"
 echo "  • X-NoResponseRequired = false"
+echo ""
+
+# 在发送消息前记录发送者的初始 Inbox 长度
+INITIAL_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
+INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null || echo "0")
+echo "发送前 Inbox 长度: $INITIAL_LENGTH"
 echo ""
 
 # 在发送者进程中执行 Send 命令
@@ -188,11 +194,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "📬 步骤 6: 验证接收者的回复消息"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-
-# 首先获取发送者当前的 Inbox 长度
-INITIAL_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null || echo "0")
-echo "发送者初始 Inbox 长度: $INITIAL_LENGTH"
 echo "等待接收者的回复消息到达..."
 echo ""
 
