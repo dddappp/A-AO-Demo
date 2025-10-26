@@ -1,229 +1,112 @@
+#!/usr/bin/env markdown
 # AO 自定义标签过滤测试
 
-## 概述
+## 快速说明
 
-`test-tag-filtering.sh` 脚本用于验证 AO 网络是否会过滤自定义标签（如 `X-SagaId`, `X-ResponseAction`, `X-NoResponseRequired`）。
+验证 AO 网络是否过滤自定义标签（`X-SagaId`, `X-ResponseAction`, `X-NoResponseRequired`）。
 
-## 关键发现
+**结论**：✅ 标签**完全保留**，不被过滤。标签名会进行大小写规范化（`X-SagaId` → `X-Sagaid`）。
 
-### ✅ 标签完全保留
-
-AO 网络**不过滤**自定义标签。在 `ao-cli eval` 的返回结果中，这些标签被完整保留在 `_RawTags` 字段中。
-
-```json
-{
-  "Messages": [{
-    "_RawTags": [
-      { "name": "X-SagaId", "value": "saga-test-123" },
-      { "name": "X-ResponseAction", "value": "ForwardToProxy" },
-      { "name": "X-NoResponseRequired", "value": "false" }
-    ]
-  }]
-}
-```
-
-## 关键 JSON 解析技巧
-
-### 1. 处理多个 JSON 对象
-
-`ao-cli eval --wait` 返回**两个** JSON 对象：
-- 第一个：等待确认
-- 第二个：完整结果
-
-**解决方案**：使用 `jq -s '.[-1]'` 获取最后一个对象
+## 运行方式
 
 ```bash
-RESULT=$(ao-cli eval "$PID" --data "return 1" --wait --json 2>/dev/null)
-FINAL=$(echo "$RESULT" | jq -s '.[-1]')  # 获取最后一个 JSON 对象
+export HTTPS_PROXY=http://127.0.0.1:1235 HTTP_PROXY=http://127.0.0.1:1235 ALL_PROXY=socks5://127.0.0.1:1235
+./test-tag-filtering.sh
 ```
 
-### 2. 提取数字字段
+## 关键 JSON 解析要点
 
-`Output.data` 返回的是 JSON **字符串**（带引号），不是原生数字。
-
+### 问题 1：多个 JSON 对象
+`ao-cli eval --wait` 返回两个 JSON 对象（等待确认 + 完整结果）
 ```bash
-# ❌ 错误：会得到带引号的字符串 "1"
-VALUE=$(echo "$RESULT" | jq -s '.[-1] | .data.result.Output.data')
-echo "$VALUE"  # 输出: "1"
-
-# ✅ 正确：用 jq -r 去掉引号
-VALUE=$(echo "$RESULT" | jq -s '.[-1] | .data.result.Output.data' | jq -r '.')
-echo "$VALUE"  # 输出: 1
-
-# 数字比较前必须验证
-if [[ "$VALUE" =~ ^[0-9]+$ ]]; then
-    if [ "$VALUE" -gt 10 ]; then
-        echo "Value is greater than 10"
-    fi
-fi
+# ✅ 正确：取最后一个
+RESULT=$(echo "$OUTPUT" | jq -s '.[-1]')
 ```
 
-### 3. 严格的类型检查
-
-不要依赖默认值。如果无法获取有效的数字，应该立即报错：
-
+### 问题 2：提取数字
+`Output.data` 是 JSON 字符串（带引号），需要 `jq -r` 去掉
 ```bash
-# ❌ 错误：容易隐藏问题
-VALUE=$(echo "$RESULT" | jq '.data // "0"')
+# ❌ 错误
+VALUE=$(echo "$RESULT" | jq '.data.result.Output.data')  # 得到 "1"
 
-# ✅ 正确：严格验证
-VALUE=$(echo "$RESULT" | jq '.data' | jq -r '.')
+# ✅ 正确
+VALUE=$(echo "$RESULT" | jq '.data.result.Output.data' | jq -r '.')  # 得到 1
+```
+
+### 问题 3：类型验证
+必须验证是否为有效数字，否则立即报错
+```bash
 if ! [[ "$VALUE" =~ ^[0-9]+$ ]]; then
-    echo "❌ 错误：无效的数据"
+    echo "❌ 无效值: $VALUE"
     exit 1
 fi
 ```
 
-### 4. 提取数组中的特定字段
-
-在标签数组中查找特定标签：
-
-```bash
-# 从 _RawTags 数组中查找 X-SagaId
-SAGA_ID=$(echo "$TAGS_JSON" | jq -r '.[] | select(.name | contains("SagaId")) | .value')
-```
-
 ## 脚本流程
 
-### 步骤 1-2: 创建进程
-创建发送者和接收者两个独立进程。
+| 步骤 | 说明 |
+|-----|------|
+| 1-2 | 创建发送者和接收者进程 |
+| 3 | 接收者加载 Handler，检查接收到的标签 |
+| 4 | 发送者发送包含自定义标签的消息 |
+| 5 | 验证消息中的标签（来自 `_RawTags`） |
+| 6 | 等待接收者回复（最多 30 次，每次 2 秒） |
+| 7 | 验证接收者收到的标签内容 |
 
-### 步骤 3: 加载 Handler
-在接收者进程中加载 Lua Handler，用于：
-- 接收 `CheckTags` 消息
-- 检查接收到的自定义标签
-- 发送 `TagCheckResult` 回复消息
+## 代码示例
 
-### 步骤 4: 发送消息
-发送者通过 `Send()` 发送包含自定义标签的消息：
-
-```lua
+### 发送消息
+```bash
+SEND_OUTPUT=$(ao-cli eval "$SENDER_ID" --data "
 Send({
-    Target = receiver_id,
+    Target = '$RECEIVER_ID',
     Action = 'CheckTags',
     ['X-SagaId'] = 'saga-test-123',
     ['X-ResponseAction'] = 'ForwardToProxy',
     Data = 'test'
 })
-```
-
-### 步骤 5: 验证发送时的标签
-从 `eval` 返回的 `_RawTags` 中提取标签，验证它们没有被过滤。
-
-### 步骤 6: 等待并验证回复
-- 记录初始 Inbox 长度
-- 轮询检查 Inbox 长度增加（最多 30 次，每次间隔 2 秒）
-- 查找来自接收者的 `TagCheckResult` 消息
-- 解析接收者报告的收到的标签
-
-## 关键代码片段
-
-### 获取并验证数值
-
-```bash
-# 获取 Inbox 长度
-LENGTH_RAW=$(ao-cli eval "$PID" --data "return #Inbox" --wait --json 2>/dev/null)
-LENGTH=$(echo "$LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' | jq -r '.')
-
-# 验证是数字
-if ! [[ "$LENGTH" =~ ^[0-9]+$ ]]; then
-    echo "❌ 无效的 Inbox 长度: $LENGTH"
-    exit 1
-fi
-
-echo "Inbox 长度: $LENGTH"
-```
-
-### 从发送消息中提取标签
-
-```bash
-# 发送消息并捕获完整返回
-SEND_OUTPUT=$(ao-cli eval "$SENDER_ID" --data "
-Send({
-    Target = '$RECEIVER_ID',
-    Action = 'CheckTags',
-    ['X-SagaId'] = 'test-123',
-    Data = 'test'
-})
 " --wait --json 2>/dev/null)
-
-# 从返回的 Messages 中提取 _RawTags
-TAGS_JSON=$(echo "$SEND_OUTPUT" | jq -s '.[-1] | .data.result.Messages[0]._RawTags // []' 2>/dev/null)
-
-# 验证特定标签
-SAGA_ID=$(echo "$TAGS_JSON" | jq -r '.[] | select(.name == "X-SagaId") | .value' 2>/dev/null)
 ```
 
-### 解析接收者的回复
-
+### 提取标签
 ```bash
-# 查询 Inbox 中的回复消息
-REPLY_JSON=$(ao-cli eval "$SENDER_ID" --data "
-local result = {}
-for i, msg in ipairs(Inbox) do
-    if msg.Action == 'TagCheckResult' and msg.From == '$RECEIVER_ID' then
-        table.insert(result, { data = msg.Data })
-    end
-end
-return json.encode(result)
-" --wait --json 2>/dev/null)
+# 从 eval 返回的 _RawTags 中提取
+TAGS=$(echo "$SEND_OUTPUT" | jq -s '.[-1] | .data.result.Messages[0]._RawTags // []')
 
-# 提取并解析
-REPLY_DATA=$(echo "$REPLY_JSON" | jq -s '.[-1] | .data.result.Output.data' | jq -r '.' | jq 'fromjson?' 2>/dev/null)
-echo "$REPLY_DATA" | jq '.received_custom_tags'
+# 检查特定标签
+SAGA_ID=$(echo "$TAGS" | jq -r '.[] | select(.name == "X-SagaId") | .value')
 ```
 
-## 常见错误和解决方案
-
-### 错误 1: "Cannot index string with string"
-
-**原因**：`Output` 被当作字符串而非对象
-**解决**：确保使用 `jq -s '.[-1]'` 获取最后一个 JSON 对象
-
-### 错误 2: "[: <value>: integer expression expected"
-
-**原因**：变量包含引号或非数字值
-**解决**：使用 `jq -r '.'` 去掉引号，并验证是否为数字
-
+### 等待并查询 Inbox
 ```bash
-VALUE=$(echo "$RESULT" | jq -s '.[-1] | .value' | jq -r '.')
-if ! [[ "$VALUE" =~ ^[0-9]+$ ]]; then
-    exit 1
-fi
+# 获取初始长度
+INITIAL=$(echo "$RAW" | jq -s '.[-1] | .data.result.Output.data' | jq -r '.')
+
+# 轮询等待
+for i in {1..30}; do
+    CURRENT=$(ao-cli eval "$PID" --data "return #Inbox" --wait --json 2>/dev/null \
+        | jq -s '.[-1] | .data.result.Output.data' | jq -r '.')
+    if [ "$CURRENT" -gt "$INITIAL" ]; then
+        echo "✅ 收到新消息"
+        break
+    fi
+    sleep 2
+done
 ```
 
-### 错误 3: 消息永远无法到达接收者
+## 常见错误
 
-**原因**：进程间通信延迟，或网络问题
-**解决**：
-- 使用充足的等待时间（最多 30 次，每次 2 秒 = 60 秒）
-- 验证网络代理设置
-- 检查网络连接
+| 错误 | 原因 | 解决 |
+|-----|------|------|
+| `Cannot index string with string` | 没有用 `jq -s '.[-1]'` | 使用 `jq -s '.[-1]'` 获取最后 JSON |
+| `[: value: integer expression expected` | 变量含引号或非数字 | 使用 `jq -r '.'` 去掉引号后验证 |
+| 消息无法到达 | 网络延迟 | 增加等待时间（30×2秒 = 60秒） |
+| Handler 输出没显示 | print 只在调用时显示 | 通过 Send() 回复并查询 Inbox |
 
-### 错误 4: Handler 的 print 输出没有显示
-
-**原因**：print 输出只在调用 eval 时显示，不会在后续 eval 中出现
-**解决**：通过 `Send()` 回复消息，在接收端查询 Inbox 来验证
-
-## 运行脚本
-
-```bash
-# 设置网络代理（如果需要）
-export HTTPS_PROXY=http://127.0.0.1:1235
-export HTTP_PROXY=http://127.0.0.1:1235
-export ALL_PROXY=socks5://127.0.0.1:1235
-
-# 执行脚本
-./test-tag-filtering.sh
-```
-
-## 测试结果
-
-脚本会输出标签验证结果：
+## 测试结果示例
 
 ```
 🔍 标签验证结果：
-
   发送时              →  接收时              →  值               →  状态
   ─────────────────────────────────────────────────────────────────────
   ✅ X-SagaId         →  X-SagaId          →  saga-test-123   →  ✓ 保留
@@ -231,10 +114,11 @@ export ALL_PROXY=socks5://127.0.0.1:1235
   ✅ X-NoResponseRequired → X-NoResponseRequired → false       →  ✓ 保留
 ```
 
-## 总结
+## 关键发现
 
-- ✅ AO 网络**完全保留**自定义标签
-- ✅ 标签可以安全地用于 Saga 框架
-- ✅ 不需要在 Data 字段中嵌入这些信息
-- ⚠️ 跨进程消息传递有网络延迟，需要充足的等待时间
+✅ AO 网络完全保留自定义标签  
+✅ 标签在 `_RawTags` 字段中显示  
+✅ 标签可安全用于 Saga 框架  
+⚠️ 标签名会规范化：`X-SagaId` → `X-Sagaid`（小写化）  
+⚠️ 跨进程通信需要充足等待时间（60 秒）
 
