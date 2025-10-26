@@ -9,9 +9,9 @@
 #   这对于 Saga 框架的实现至关重要。
 #
 # 关键发现：
-#   1. Handler 处理的消息不会进入 Inbox
-#   2. 需要通过 Send() 回复来验证接收到的标签内容
-#   3. 标签完全保留，但会进行大小写规范化
+#   1. 标签在 eval 返回的 _RawTags 中完整显示
+#   2. Inbox 长度用 jq -r 去掉引号，然后数字比较
+#   3. Output.data 需要 jq -r 来正确去掉引号
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -64,7 +64,6 @@ echo "⚙️  步骤 3: 为接收者加载标签检查代码"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # 创建临时Lua代码，用于检查接收到的消息标签
-# 使用时间戳和随机数避免文件冲突
 TEST_CODE="/tmp/tag-test-$(date +%s%N)-$RANDOM.lua"
 cat > "$TEST_CODE" << 'LUAEOF'
 -- 标签检查处理器
@@ -139,7 +138,7 @@ echo ""
 
 # 在发送消息前记录发送者的初始 Inbox 长度
 INITIAL_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data // "0"' 2>/dev/null | tr -d '"')
+INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' | jq -r '.')
 
 # 验证 INITIAL_LENGTH 是数字，否则报错退出
 if ! [[ "$INITIAL_LENGTH" =~ ^[0-9]+$ ]]; then
@@ -151,16 +150,14 @@ fi
 echo "发送前 Inbox 长度: $INITIAL_LENGTH"
 echo ""
 
-# 在发送者进程中执行 Send 命令
+# 在发送者进程中发送消息
 SEND_OUTPUT=$(ao-cli eval "$SENDER_ID" --data "
 Send({
     Target = '$RECEIVER_ID',
     Action = 'CheckTags',
-    Tags = {
-        ['X-SagaId'] = 'saga-test-123',
-        ['X-ResponseAction'] = 'ForwardToProxy',
-        ['X-NoResponseRequired'] = 'false'
-    },
+    ['X-SagaId'] = 'saga-test-123',
+    ['X-ResponseAction'] = 'ForwardToProxy',
+    ['X-NoResponseRequired'] = 'false',
     Data = 'Testing custom tag preservation'
 })
 " --wait --json 2>/dev/null)
@@ -168,31 +165,15 @@ Send({
 echo "✅ 消息已发送"
 echo ""
 
-# ==================== 步骤 4.5: 检查消息处理输出（包含 print） ====================
+# ==================== 步骤 5: 从消息中提取并验证标签 ====================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔍 步骤 4.5: 检查消息处理输出"
+echo "✅ 步骤 5: 从消息中提取并验证标签"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-
-# 从 eval 结果中提取 Output.data（包含 Handler 的 print 输出）
-OUTPUT_DATA=$(echo "$SEND_OUTPUT" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | tr -d '"')
-
-if [ -n "$OUTPUT_DATA" ] && [ "$OUTPUT_DATA" != "null" ]; then
-    echo "📤 Handler 处理输出:"
-    echo "$OUTPUT_DATA" | sed 's/\\n/\n/g'
-    echo ""
-fi
-
 echo ""
 
 # eval 返回的结果包含消息的完整信息（包括标签）
 # 从 eval 结果中提取消息的标签
 TAGS_JSON=$(echo "$SEND_OUTPUT" | jq -s '.[-1] | .data.result.Messages[0]._RawTags // []' 2>/dev/null)
-
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ 步骤 5: 从消息中提取并验证标签"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
 
 echo "📋 发送的消息中的标签："
 echo "$TAGS_JSON" | jq '.' 2>/dev/null
@@ -238,12 +219,12 @@ echo ""
 echo "等待接收者的回复消息到达..."
 echo ""
 
-# 等待 Inbox 长度增加（最多检查 30 次）
+# 等待 Inbox 长度增加（最多检查 30 次，每次等待 2 秒）
 WAIT_COUNT=0
 MAX_ATTEMPTS=30
 while [ $WAIT_COUNT -lt $MAX_ATTEMPTS ]; do
     CURRENT_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-    CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data // "0"' 2>/dev/null | tr -d '"')
+    CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' | jq -r '.')
     
     # 验证 CURRENT_LENGTH 是数字
     if ! [[ "$CURRENT_LENGTH" =~ ^[0-9]+$ ]]; then
@@ -259,7 +240,7 @@ while [ $WAIT_COUNT -lt $MAX_ATTEMPTS ]; do
     
     WAIT_COUNT=$((WAIT_COUNT + 1))
     if [ $WAIT_COUNT -lt $MAX_ATTEMPTS ]; then
-        sleep 1
+        sleep 2
     fi
 done
 
@@ -286,7 +267,7 @@ end
 return json.encode(result)
 " --wait --json 2>/dev/null)
 
-REPLY_RESULT=$(echo "$REPLY_JSON" | jq -s '.[-1] | .data.result.Output.data | fromjson?' 2>/dev/null || echo "[]")
+REPLY_RESULT=$(echo "$REPLY_JSON" | jq -s '.[-1] | .data.result.Output.data' | jq -r '.' | jq 'fromjson?' 2>/dev/null || echo "[]")
 
 if [ "$REPLY_RESULT" != "[]" ] && [ -n "$REPLY_RESULT" ]; then
     echo "✅ 发送者 Inbox 中收到接收者的回复消息"
@@ -296,8 +277,8 @@ if [ "$REPLY_RESULT" != "[]" ] && [ -n "$REPLY_RESULT" ]; then
     REPLY_DATA=$(echo "$REPLY_RESULT" | jq '.[0].data' 2>/dev/null)
     
     if [ -n "$REPLY_DATA" ] && [ "$REPLY_DATA" != "null" ]; then
-        # 解码消息数据（可能是 base64 或直接的 JSON）
-        PARSED_REPLY=$(echo "$REPLY_DATA" | base64 -d 2>/dev/null | jq '.' 2>/dev/null || echo "$REPLY_DATA" | jq '.' 2>/dev/null)
+        # 解码消息数据
+        PARSED_REPLY=$(echo "$REPLY_DATA" | jq 'fromjson?' 2>/dev/null || echo "$REPLY_DATA")
         
         echo "📊 接收者回复的消息内容："
         echo "$PARSED_REPLY" | jq '.' 2>/dev/null
