@@ -18,11 +18,27 @@ Handlers.add(
             end
         end
         
-        -- 打印接收到的信息（调试用）
+        -- 打印接收到的信息（详细调试用）
         print("✅ Handler 接收到消息")
         print("   Action: " .. tostring(msg.Action))
         print("   From: " .. tostring(msg.From))
         print("   Data: " .. tostring(msg.Data))
+
+        -- 调试：检查 msg 对象的直接属性
+        print("   🔍 调试: 检查 msg 对象的直接属性")
+        print("   msg.X-SagaId = " .. tostring(msg["X-SagaId"]))
+        print("   msg.X-ResponseAction = " .. tostring(msg["X-ResponseAction"]))
+        print("   msg.X-NoResponseRequired = " .. tostring(msg["X-NoResponseRequired"]))
+
+        -- 调试：检查 msg.Tags 表
+        print("   🔍 调试: 检查 msg.Tags 表")
+        if msg.Tags then
+            for k, v in pairs(msg.Tags) do
+                print("   msg.Tags." .. k .. " = " .. tostring(v))
+            end
+        else
+            print("   msg.Tags 表不存在")
+        end
 
         -- 计算标签数量（修复计数问题）
         local tag_count = 0
@@ -30,11 +46,12 @@ Handlers.add(
             tag_count = tag_count + 1
         end
 
-        print("   收到的自定义标签数量: " .. tostring(tag_count))
+        print("   📊 收到的自定义 X- 标签数量: " .. tostring(tag_count))
 
         -- 逐个打印接收到的标签
+        print("   📍 接收到的 X- 标签详情:")
         for key, value in pairs(received_tags) do
-            print("   📍 " .. key .. " = " .. tostring(value))
+            print("     " .. key .. " = " .. tostring(value))
         end
         
         -- 回复给发送者（使用 Send 确保消息进入 Inbox）

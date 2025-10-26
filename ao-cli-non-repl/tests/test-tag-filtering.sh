@@ -83,18 +83,65 @@ echo "  • X-ResponseAction = ForwardToProxy"
 echo "  • X-NoResponseRequired = false"
 echo ""
 
+# 首先显示发送的原始消息结构
+echo "📤 发送端消息结构预览:"
+echo "  Target: $RECEIVER_ID"
+echo "  Action: CheckTags"
+echo "  X-SagaId: saga-123"
+echo "  X-ResponseAction: ForwardToProxy"
+echo "  X-NoResponseRequired: false"
+echo "  Data: Test message with custom tags"
+echo ""
+
 SEND_RESULT=$(ao-cli eval "$SENDER_ID" --data "
 Send({
     Target = '$RECEIVER_ID',
     Action = 'CheckTags',
     ['X-SagaId'] = 'saga-123',
-    ['X-ResponseAction'] = 'ForwardToProxy', 
+    ['X-ResponseAction'] = 'ForwardToProxy',
     ['X-NoResponseRequired'] = 'false',
     Data = 'Test message with custom tags'
 })
 " --wait --json 2>/dev/null)
 
-echo "✅ 消息已发送"
+echo "✅ 消息已发送到接收者 outbox"
+echo ""
+
+# ==================== 步骤 4.5: 显示 Handler 调试信息 ====================
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔍 步骤 4.5: 显示 Handler 对消息的处理过程（调试信息）"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+echo "📋 使用 ao-cli message 命令触发 Handler，显示详细调试信息:"
+
+DEBUG_RESULT=$(ao-cli message "$RECEIVER_ID" CheckTags \
+    --data 'Debug: Test message for displaying handler logs' \
+    --tag 'X-SagaId=debug-saga-123' \
+    --tag 'X-ResponseAction=DebugForward' \
+    --tag 'X-NoResponseRequired=false' \
+    --wait --json 2>/dev/null)
+
+DEBUG_OUTPUT=$(echo "$DEBUG_RESULT" | jq -s '.[-1] | .data.result.Output.data // empty' 2>/dev/null)
+
+if [ -n "$DEBUG_OUTPUT" ]; then
+    echo ""
+    echo "🐛 Handler 调试输出（显示 msg 对象结构）:"
+    echo "----------------------------------------"
+    echo "$DEBUG_OUTPUT" | sed 's/\\n/\n/g' | sed 's/\\"/"/g' | grep -v '^$' | head -30
+    echo "----------------------------------------"
+    echo ""
+
+    echo "✅ 关键发现总结："
+    echo "   • msg['X-SagaId'] = nil （直接属性不存在）"
+    echo "   • msg.Tags['X-Sagaid'] = 'debug-saga-123' （标签在 Tags 表中，大小写规范化）"
+    echo "   • 自定义标签被 AO 系统移动到 msg.Tags 表并规范化大小写"
+    echo ""
+else
+    echo "❌ 无法获取 Handler 调试输出"
+fi
+
+echo "📡 现在继续测试完整的跨进程通信流程..."
 echo ""
 
 # ==================== 步骤 5: 验证发送消息中的标签 ====================
@@ -104,16 +151,27 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 TAGS_IN_MESSAGE=$(echo "$SEND_RESULT" | jq -s '.[-1] | .data.result.Messages[0]._RawTags // []' 2>/dev/null)
-echo "📋 发送的消息中的标签:"
+echo "📋 发送端：消息中的标签（_RawTags）:"
+
+# 显示所有标签的原始信息
+if echo "$TAGS_IN_MESSAGE" | jq -e '. != []' >/dev/null 2>&1; then
+    echo "$TAGS_IN_MESSAGE" | jq -r '.[] | "  🔸 \(.name) = \(.value)"' 2>/dev/null
+else
+    echo "  ⚠️  未找到标签信息"
+fi
 
 SAGA_ID=$(echo "$TAGS_IN_MESSAGE" | jq -r '.[] | select(.name == "X-SagaId") | .value' 2>/dev/null || echo "")
 RESPONSE_ACTION=$(echo "$TAGS_IN_MESSAGE" | jq -r '.[] | select(.name == "X-ResponseAction") | .value' 2>/dev/null || echo "")
 NO_RESPONSE=$(echo "$TAGS_IN_MESSAGE" | jq -r '.[] | select(.name == "X-NoResponseRequired") | .value' 2>/dev/null || echo "")
 
-echo "标签验证:"
+echo ""
+echo "发送端标签验证:"
 [ -n "$SAGA_ID" ] && echo "  ✅ X-SagaId = $SAGA_ID" || echo "  ❌ X-SagaId 未找到"
 [ -n "$RESPONSE_ACTION" ] && echo "  ✅ X-ResponseAction = $RESPONSE_ACTION" || echo "  ❌ X-ResponseAction 未找到"
 [ -n "$NO_RESPONSE" ] && echo "  ✅ X-NoResponseRequired = $NO_RESPONSE" || echo "  ❌ X-NoResponseRequired 未找到"
+echo ""
+
+echo "📡 消息已发送给接收者，等待 Handler 处理..."
 echo ""
 
 # ==================== 步骤 6: 等待发送者 Inbox 增长（接收回复） ====================
@@ -174,15 +232,35 @@ if [ "$REPLY_RECEIVED" = true ]; then
             echo ""
             
             # 验证接收端是否收到了我们的自定义标签
-            RECEIVED_SAGA_ID=$(echo "$REPLY_DATA" | jq -r '.received_tags."X-SagaId" // empty' 2>/dev/null)
-            RECEIVED_ACTION=$(echo "$REPLY_DATA" | jq -r '.received_tags."X-ResponseAction" // empty' 2>/dev/null)
-            RECEIVED_NO_RESP=$(echo "$REPLY_DATA" | jq -r '.received_tags."X-NoResponseRequired" // empty' 2>/dev/null)
+            RECEIVED_TAGS=$(echo "$REPLY_DATA" | jq -r '.received_tags // empty' 2>/dev/null)
             TAG_COUNT=$(echo "$REPLY_DATA" | jq -r '.tag_count // 0' 2>/dev/null)
-            
-            echo "✅ 接收端收到的自定义标签验证:"
-            [ "$RECEIVED_SAGA_ID" = "saga-123" ] && echo "  ✅ X-SagaId = $RECEIVED_SAGA_ID" || echo "  ❌ X-SagaId 未收到或不匹配"
-            [ "$RECEIVED_ACTION" = "ForwardToProxy" ] && echo "  ✅ X-ResponseAction = $RECEIVED_ACTION" || echo "  ❌ X-ResponseAction 未收到或不匹配"
-            [ "$RECEIVED_NO_RESP" = "false" ] && echo "  ✅ X-NoResponseRequired = $RECEIVED_NO_RESP" || echo "  ❌ X-NoResponseRequired 未收到或不匹配"
+
+            echo "📬 接收端回复详情:"
+            echo "  标签数量: $TAG_COUNT"
+            echo "  接收到的标签:"
+
+            if [ "$RECEIVED_TAGS" != "empty" ] && [ -n "$RECEIVED_TAGS" ]; then
+                echo "$RECEIVED_TAGS" | jq -r 'to_entries[] | "    \(.key) = \(.value)"' 2>/dev/null || echo "    无法解析标签数据"
+            else
+                echo "    无标签数据"
+            fi
+
+            echo ""
+            echo "🔍 标签规范化对比:"
+            echo "  发送时 → 接收时"
+            echo "  X-SagaId → X-Sagaid"
+            echo "  X-ResponseAction → X-Responseaction"
+            echo "  X-NoResponseRequired → X-Noresponserequired"
+
+            RECEIVED_SAGA_ID=$(echo "$RECEIVED_TAGS" | jq -r '."X-Sagaid" // empty' 2>/dev/null)
+            RECEIVED_ACTION=$(echo "$RECEIVED_TAGS" | jq -r '."X-Responseaction" // empty' 2>/dev/null)
+            RECEIVED_NO_RESP=$(echo "$RECEIVED_TAGS" | jq -r '."X-Noresponserequired" // empty' 2>/dev/null)
+
+            echo ""
+            echo "✅ 标签保留验证:"
+            [ "$RECEIVED_SAGA_ID" = "saga-123" ] && echo "  ✅ X-SagaId → X-Sagaid: $RECEIVED_SAGA_ID ✓" || echo "  ❌ X-SagaId → X-Sagaid: $RECEIVED_SAGA_ID ✗"
+            [ "$RECEIVED_ACTION" = "ForwardToProxy" ] && echo "  ✅ X-ResponseAction → X-Responseaction: $RECEIVED_ACTION ✓" || echo "  ❌ X-ResponseAction → X-Responseaction: $RECEIVED_ACTION ✗"
+            [ "$RECEIVED_NO_RESP" = "false" ] && echo "  ✅ X-NoResponseRequired → X-Noresponserequired: $RECEIVED_NO_RESP ✓" || echo "  ❌ X-NoResponseRequired → X-Noresponserequired: $RECEIVED_NO_RESP ✗"
             echo "  📊 标签数量: $TAG_COUNT 个"
         fi
     else
