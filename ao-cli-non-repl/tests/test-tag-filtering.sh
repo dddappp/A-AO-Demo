@@ -46,47 +46,19 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "⚙️  步骤 2: 为接收者加载 Handler"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-HANDLER_FILE="/tmp/tag-handler-$RANDOM.lua"
-cat > "$HANDLER_FILE" << 'LUAEOF'
-Handlers.add(
-    "CheckTags",
-    Handlers.utils.hasMatchingTag("Action", "CheckTags"),
-    function(msg)
-        local received_tags = {}
-        for key, value in pairs(msg) do
-            if type(key) == "string" and string.sub(key, 1, 2) == "X-" then
-                received_tags[key] = value
-            end
-        end
-        
-        if msg.reply then
-            msg.reply({
-                result = "OK",
-                tags = received_tags
-            })
-        else
-            Send({
-                Target = msg.From,
-                Action = "TagCheckReply",
-                Data = json.encode({
-                    result = "OK",
-                    tags = received_tags
-                })
-            })
-        end
-    end
-)
-LUAEOF
+HANDLER_FILE="$(dirname "$0")/tag-check-handler.lua"
+if [ ! -f "$HANDLER_FILE" ]; then
+    echo "❌ Handler 文件未找到: $HANDLER_FILE"
+    exit 1
+fi
 
 LOAD_RESULT=$(ao-cli load "$RECEIVER_ID" "$HANDLER_FILE" --json 2>/dev/null)
 if echo "$LOAD_RESULT" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ Handler 加载成功"
 else
     echo "❌ Handler 加载失败"
-    rm -f "$HANDLER_FILE"
     exit 1
 fi
-rm -f "$HANDLER_FILE"
 echo ""
 
 # ==================== 步骤 3: 发送者记录初始 Inbox 长度 ====================
