@@ -122,23 +122,26 @@ DEBUG_RESULT=$(ao-cli message "$RECEIVER_ID" CheckTags \
     --tag 'X-NoResponseRequired=false' \
     --wait --json 2>/dev/null)
 
-DEBUG_OUTPUT=$(echo "$DEBUG_RESULT" | jq -s '.[-1] | .data.result.Output.data // empty' 2>/dev/null)
+# 直接格式化整个调试结果
+echo ""
+echo "🐛 Handler 调试输出（完整 JSON 响应）:"
+echo "$DEBUG_RESULT" | jq '.' 2>/dev/null || echo "JSON 解析失败，原始输出: $DEBUG_RESULT"
 
-if [ -n "$DEBUG_OUTPUT" ]; then
-    echo ""
-    echo "🐛 Handler 调试输出（显示 msg 对象结构）:"
-    echo "----------------------------------------"
-    echo "$DEBUG_OUTPUT" | sed 's/\\n/\n/g' | sed 's/\\"/"/g' | grep -v '^$' | head -30
-    echo "----------------------------------------"
-    echo ""
+# 提取并格式化 Handler 的输出数据
+DEBUG_OUTPUT=$(echo "$DEBUG_RESULT" | jq -r '.data.result.Output.data // empty' 2>/dev/null)
 
-    echo "✅ 关键发现总结："
-    echo "   • msg['X-SagaId'] = nil （直接属性不存在）"
-    echo "   • msg.Tags['X-Sagaid'] = 'debug-saga-123' （标签在 Tags 表中，大小写规范化）"
-    echo "   • 自定义标签被 AO 系统移动到 msg.Tags 表并规范化大小写"
+if [ -n "$DEBUG_OUTPUT" ] && [ "$DEBUG_OUTPUT" != "empty" ]; then
     echo ""
-else
-    echo "❌ 无法获取 Handler 调试输出"
+    echo "📄 Handler print 输出（格式化解析）:"
+    # 如果输出是 JSON 格式的回复数据，格式化显示
+    echo "$DEBUG_OUTPUT" | jq '.' 2>/dev/null || echo "原始输出: $DEBUG_OUTPUT"
+
+    echo ""
+    echo "🎯 关键发现总结："
+    echo "   ❌ msg['X-SagaId'] = nil          (直接属性不存在)"
+    echo "   ✅ msg.Tags['X-Sagaid'] 存在      (标签在 Tags 表中，大小写规范化)"
+    echo "   🔄 自定义标签被 AO 系统移动到 msg.Tags 并规范化大小写"
+    echo ""
 fi
 
 echo "📡 现在继续测试完整的跨进程通信流程..."
