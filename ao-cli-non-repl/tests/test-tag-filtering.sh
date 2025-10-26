@@ -65,7 +65,8 @@ echo "⚙️  步骤 3: 为接收者加载标签检查代码"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # 创建临时Lua代码，用于检查接收到的消息标签
-TEST_CODE=$(mktemp /tmp/tag-test-XXXX.lua)
+# 使用时间戳和随机数避免文件冲突
+TEST_CODE="/tmp/tag-test-$(date +%s%N)-$RANDOM.lua"
 cat > "$TEST_CODE" << 'LUAEOF'
 -- 标签检查处理器
 -- 注意：Handler 处理的消息不会进入 Inbox，需要通过 Send() 来回复
@@ -75,51 +76,54 @@ Handlers.add(
         return msg.Action == "CheckTags"
     end,
     function(msg)
-        -- 调试输出：打印接收到的消息完整信息
-        print("\n" .. string.rep("=", 80))
-        print("📨 接收者 Handler 中收到消息")
-        print(string.rep("=", 80))
+        -- 调试输出：打印接收到的消息完整信息到 stdout
+        io.stdout:write("\n" .. string.rep("=", 80) .. "\n")
+        io.stdout:write("📨 接收者 Handler 中收到消息\n")
+        io.stdout:write(string.rep("=", 80) .. "\n\n")
         
-        print("\n✅ 消息基本信息:")
-        print("  Action: " .. tostring(msg.Action))
-        print("  From: " .. tostring(msg.From))
-        print("  Type: " .. tostring(msg.Type))
-        print("  Data: " .. tostring(msg.Data))
+        io.stdout:write("✅ 消息基本信息:\n")
+        io.stdout:write("  Action: " .. tostring(msg.Action) .. "\n")
+        io.stdout:write("  From: " .. tostring(msg.From) .. "\n")
+        io.stdout:write("  Type: " .. tostring(msg.Type) .. "\n")
+        io.stdout:write("  Data: " .. tostring(msg.Data) .. "\n")
         
-        print("\n📋 消息中的自定义标签 (X-* 开头):")
+        io.stdout:write("\n📋 消息中的自定义标签 (X-* 开头):\n")
         local custom_tag_count = 0
         for key, value in pairs(msg) do
             if type(key) == "string" and (key:sub(1, 2) == "X-" or key:sub(1, 2) == "x-") then
-                print(string.format("  • %s = %s", key, tostring(value)))
+                io.stdout:write(string.format("  • %s = %s\n", key, tostring(value)))
                 custom_tag_count = custom_tag_count + 1
             end
         end
         if custom_tag_count == 0 then
-            print("  (没有找到自定义标签)")
+            io.stdout:write("  (没有找到自定义标签)\n")
+        else
+            io.stdout:write(string.format("  [共 %d 个自定义标签]\n", custom_tag_count))
         end
         
-        print("\n📊 msg.Tags 字典内容:")
+        io.stdout:write("\n📊 msg.Tags 字典内容:\n")
         if msg.Tags then
             local tag_count = 0
             for key, value in pairs(msg.Tags) do
-                print(string.format("  • %s = %s", tostring(key), tostring(value)))
+                io.stdout:write(string.format("  • %s = %s\n", tostring(key), tostring(value)))
                 tag_count = tag_count + 1
             end
-            print(string.format("  [总共 %d 个标签]", tag_count))
+            io.stdout:write(string.format("  [总共 %d 个标签]\n", tag_count))
         else
-            print("  (msg.Tags 为 nil)")
+            io.stdout:write("  (msg.Tags 为 nil)\n")
         end
         
-        print("\n🔍 所有顶级属性:")
+        io.stdout:write("\n🔍 所有顶级属性:\n")
         local attr_count = 0
         for key in pairs(msg) do
             if type(key) == "string" then
                 attr_count = attr_count + 1
             end
         end
-        print(string.format("  [总共 %d 个属性]", attr_count))
+        io.stdout:write(string.format("  [总共 %d 个属性]\n", attr_count))
         
-        print(string.rep("=", 80) .. "\n")
+        io.stdout:write(string.rep("=", 80) .. "\n\n")
+        io.stdout:flush()
         
         -- 检查接收到的标签
         local received_tags = {}
@@ -156,7 +160,7 @@ Handlers.add(
 LUAEOF
 
 ao-cli load "$RECEIVER_ID" "$TEST_CODE" --json 2>/dev/null > /dev/null
-rm "$TEST_CODE"
+rm -f "$TEST_CODE"
 echo "✅ 接收者代码加载完成（包含标签检查处理器）"
 echo ""
 
