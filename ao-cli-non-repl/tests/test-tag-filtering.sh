@@ -123,7 +123,7 @@ echo ""
 
 # 在发送消息前记录发送者的初始 Inbox 长度
 INITIAL_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null || echo "0")
+INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | tr -d '"' || echo "0")
 echo "发送前 Inbox 长度: $INITIAL_LENGTH"
 echo ""
 
@@ -202,7 +202,7 @@ WAIT_TIME=0
 MAX_WAIT=30
 while [ $WAIT_TIME -lt $MAX_WAIT ]; do
     CURRENT_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-    CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null || echo "0")
+    CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | tr -d '"' || echo "0")
     
     # 检查是否有新消息到达
     if [ "$CURRENT_LENGTH" -gt "$INITIAL_LENGTH" ]; then
