@@ -188,8 +188,39 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "📬 步骤 6: 验证接收者的回复消息"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "等待接收者处理消息并回复..."
+
+# 首先获取发送者当前的 Inbox 长度
+INITIAL_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
+INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null || echo "0")
+echo "发送者初始 Inbox 长度: $INITIAL_LENGTH"
+echo "等待接收者的回复消息到达..."
 echo ""
+
+# 等待 Inbox 长度增加（最多等待 30 秒）
+WAIT_TIME=0
+MAX_WAIT=30
+while [ $WAIT_TIME -lt $MAX_WAIT ]; do
+    CURRENT_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
+    CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null || echo "0")
+    
+    # 检查是否有新消息到达
+    if [ "$CURRENT_LENGTH" -gt "$INITIAL_LENGTH" ]; then
+        echo "✅ Inbox 长度从 $INITIAL_LENGTH 增加到 $CURRENT_LENGTH，有新消息到达"
+        break
+    fi
+    
+    WAIT_TIME=$((WAIT_TIME + 1))
+    if [ $WAIT_TIME -lt $MAX_WAIT ]; then
+        sleep 1
+    fi
+done
+
+if [ "$CURRENT_LENGTH" -le "$INITIAL_LENGTH" ]; then
+    echo "⏱️  等待超时，未收到新消息"
+    echo ""
+else
+    echo ""
+fi
 
 # 查询发送者的 Inbox，查找来自接收者的 TagCheckResult 消息
 REPLY_JSON=$(ao-cli eval "$SENDER_ID" --data "
