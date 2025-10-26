@@ -15,9 +15,8 @@
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
-export HTTPS_PROXY=http://127.0.0.1:1235
-export HTTP_PROXY=http://127.0.0.1:1235
-export ALL_PROXY=socks5://127.0.0.1:1235
+# 视网络环境不同，可能需要设置代理
+# export HTTPS_PROXY=http://127.0.0.1:1235 HTTP_PROXY=http://127.0.0.1:1235 ALL_PROXY=socks5://127.0.0.1:1235
 
 echo "╔════════════════════════════════════════════════════════════════════════╗"
 echo "║  🧪 AO 自定义标签过滤测试                                              ║"
@@ -140,7 +139,13 @@ echo ""
 
 # 在发送消息前记录发送者的初始 Inbox 长度
 INITIAL_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | tr -d '"' || echo "0")
+INITIAL_LENGTH=$(echo "$INITIAL_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data // "0"' 2>/dev/null | tr -d '"' || echo "0")
+
+# 确保 INITIAL_LENGTH 是数字，如果不是则设为 0
+if ! [[ "$INITIAL_LENGTH" =~ ^[0-9]+$ ]]; then
+    INITIAL_LENGTH="0"
+fi
+
 echo "发送前 Inbox 长度: $INITIAL_LENGTH"
 echo ""
 
@@ -236,7 +241,12 @@ WAIT_COUNT=0
 MAX_ATTEMPTS=30
 while [ $WAIT_COUNT -lt $MAX_ATTEMPTS ]; do
     CURRENT_LENGTH_RAW=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-    CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | tr -d '"' || echo "0")
+    CURRENT_LENGTH=$(echo "$CURRENT_LENGTH_RAW" | jq -s '.[-1] | .data.result.Output.data // "0"' 2>/dev/null | tr -d '"' || echo "0")
+    
+    # 确保 CURRENT_LENGTH 是数字
+    if ! [[ "$CURRENT_LENGTH" =~ ^[0-9]+$ ]]; then
+        CURRENT_LENGTH="0"
+    fi
     
     # 检查是否有新消息到达
     if [ "$CURRENT_LENGTH" -gt "$INITIAL_LENGTH" ]; then
