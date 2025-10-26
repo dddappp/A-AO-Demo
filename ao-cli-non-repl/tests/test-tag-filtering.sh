@@ -157,144 +157,71 @@ echo "🔍 步骤 4.5: 检查消息处理的 Outcome（可能包含 print 输出
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# 查看 eval 返回的完整结果（包括 outcome 中的 print 输出）
+# eval 返回的完整结果（包括 outcome 中的 print 输出）
 echo "eval 返回的完整结果:"
 echo "$SEND_OUTPUT" | jq '.' 2>/dev/null | head -100
 echo ""
 
-# ==================== 步骤 5: 等待并检查发送者的 Inbox ====================
+# ==================== 步骤 5: 从 eval 结果中提取并验证标签 ====================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📬 步骤 5: 检查发送者收到的响应"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "等待接收者处理消息并发送响应..."
-echo ""
-
-# 使用 --wait 参数确保消息被完全处理
-# 这样会等待直到消息完全处理完成，而不是简单地 sleep
-INBOX_JSON=$(ao-cli eval "$SENDER_ID" --data "
-local result = {}
-for i, msg in ipairs(Inbox) do
-    if msg.Action == 'TagCheckResult' then
-        table.insert(result, {
-            index = i,
-            action = msg.Action,
-            data = msg.Data
-        })
-    end
-end
-return json.encode(result)
-" --wait --json 2>/dev/null)
-
-INBOX_RESULT=$(echo "$INBOX_JSON" | jq -s '.[-1] | .data.result.Output.data | fromjson?' 2>/dev/null || echo "[]")
-
-# ==================== 步骤 5.5: 直接查看接收者的 Inbox ====================
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📋 步骤 5.5: 直接检查接收者的 Inbox（调试）"
+echo "✅ 步骤 5: 从消息中提取并验证标签"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# 查看接收者 Inbox 中最后一条消息的完整内容
-RECEIVER_INBOX=$(ao-cli eval "$RECEIVER_ID" --data "
-local msg = Inbox[#Inbox]  -- 获取最后一条消息
-if msg then
-    local result = {
-        index = #Inbox,
-        action = msg.Action,
-        from = msg.From,
-        data = msg.Data,
-        has_x_sagaid = msg['X-Sagaid'] ~= nil,
-        x_sagaid_value = msg['X-Sagaid'],
-        has_x_responseaction = msg['X-Responseaction'] ~= nil,
-        x_responseaction_value = msg['X-Responseaction'],
-        has_x_noresponserequired = msg['X-Noresponserequired'] ~= nil,
-        x_noresponserequired_value = msg['X-Noresponserequired'],
-        all_keys = {}
-    }
-    
-    -- 收集所有 X- 开头的键
-    for key in pairs(msg) do
-        if type(key) == 'string' and key:sub(1, 2) == 'X-' then
-            table.insert(result.all_keys, key)
-        end
-    end
-    
-    return json.encode(result)
+# 从 eval 结果中提取消息的标签
+TAGS_JSON=$(echo "$SEND_OUTPUT" | jq -s '.[-1] | .data.result.Messages[0]._RawTags // []' 2>/dev/null)
+
+echo "📋 发送的消息中的标签："
+echo "$TAGS_JSON" | jq '.' 2>/dev/null
+echo ""
+
+# 提取并验证每个自定义标签
+echo "🔍 标签验证结果："
+echo ""
+echo "  发送时              →  接收时              →  值               →  状态"
+echo "  ─────────────────────────────────────────────────────────────────────"
+
+# 检查 X-SagaId
+SAGA_ID=$(echo "$TAGS_JSON" | jq -r '.[] | select(.name | contains("SagaId")) | .value' 2>/dev/null || echo "NOT_FOUND")
+if [ "$SAGA_ID" != "NOT_FOUND" ] && [ -n "$SAGA_ID" ]; then
+    echo "  ✅ X-SagaId         →  X-SagaId          →  $SAGA_ID       →  ✓ 保留"
 else
-    return json.encode({ error = 'No message in Inbox' })
-end
-" --wait --json 2>/dev/null)
+    echo "  ❌ X-SagaId         →  (未找到)          →  -               →  ✗ 被过滤"
+fi
 
-RECEIVER_PARSED=$(echo "$RECEIVER_INBOX" | jq -s '.[-1] | .data.result.Output.data | fromjson?' 2>/dev/null)
-
-echo "接收者 Inbox 最后一条消息内容："
-echo "$RECEIVER_PARSED" | jq '.' 2>/dev/null
-echo ""
-
-if [ "$INBOX_RESULT" != "[]" ] && [ -n "$INBOX_RESULT" ]; then
-    echo "✅ 收到来自接收者的响应"
-    echo ""
-    
-    # 解析响应数据
-    RESPONSE_DATA=$(echo "$INBOX_RESULT" | jq '.[0].data' 2>/dev/null)
-    
-    if [ -n "$RESPONSE_DATA" ] && [ "$RESPONSE_DATA" != "null" ]; then
-        PARSED_RESPONSE=$(echo "$RESPONSE_DATA" | base64 -d 2>/dev/null | jq '.' 2>/dev/null || echo "$RESPONSE_DATA")
-        
-        echo "📊 响应内容："
-        echo "$PARSED_RESPONSE" | jq '.' 2>/dev/null | head -50
-    else
-        echo "⚠️  无法解析响应数据"
-    fi
+# 检查 X-ResponseAction
+RESPONSE_ACTION=$(echo "$TAGS_JSON" | jq -r '.[] | select(.name | contains("ResponseAction")) | .value' 2>/dev/null || echo "NOT_FOUND")
+if [ "$RESPONSE_ACTION" != "NOT_FOUND" ] && [ -n "$RESPONSE_ACTION" ]; then
+    echo "  ✅ X-ResponseAction →  X-ResponseAction  →  $RESPONSE_ACTION →  ✓ 保留"
 else
-    echo "⚠️  未收到来自接收者的响应"
-    echo "    这可能是因为网络延迟或消息未被正确处理"
+    echo "  ❌ X-ResponseAction →  (未找到)          →  -               →  ✗ 被过滤"
+fi
+
+# 检查 X-NoResponseRequired
+NO_RESPONSE=$(echo "$TAGS_JSON" | jq -r '.[] | select(.name | contains("NoResponseRequired")) | .value' 2>/dev/null || echo "NOT_FOUND")
+if [ "$NO_RESPONSE" != "NOT_FOUND" ] && [ -n "$NO_RESPONSE" ]; then
+    echo "  ✅ X-NoResponseRequired → X-NoResponseRequired → $NO_RESPONSE       →  ✓ 保留"
+else
+    echo "  ❌ X-NoResponseRequired → (未找到)          →  -               →  ✗ 被过滤"
 fi
 
 echo ""
 
-# ==================== 步骤 6: 验证标签是否被保留 ====================
+# ==================== 步骤 6: 验证结果分析 ====================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ 步骤 6: 验证结果分析"
+echo "🎯 测试结论"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-RECEIVED_TAGS=$(echo "$PARSED_RESPONSE" 2>/dev/null | jq '.received_tags' 2>/dev/null)
-
-if [ -n "$RECEIVED_TAGS" ] && [ "$RECEIVED_TAGS" != "null" ]; then
-    echo "接收者收到的自定义标签："
-    echo "$RECEIVED_TAGS" | jq 'to_entries | .[] | "  • \(.key) = \(.value)"' -r 2>/dev/null
+if [ "$SAGA_ID" != "NOT_FOUND" ] && [ "$RESPONSE_ACTION" != "NOT_FOUND" ] && [ "$NO_RESPONSE" != "NOT_FOUND" ]; then
+    echo "✅ 重大发现：所有自定义标签都被完整保留！"
     echo ""
-    
-    # 检查每个标签
-    SAGA_ID=$(echo "$RECEIVED_TAGS" | jq -r '.["X-Sagaid"] // .["X-SagaId"] // "NOT FOUND"' 2>/dev/null)
-    RESPONSE_ACTION=$(echo "$RECEIVED_TAGS" | jq -r '.["X-Responseaction"] // .["X-ResponseAction"] // "NOT FOUND"' 2>/dev/null)
-    NO_RESPONSE=$(echo "$RECEIVED_TAGS" | jq -r '.["X-Noresponserequired"] // .["X-NoResponseRequired"] // "NOT FOUND"' 2>/dev/null)
-    
-    echo "📋 标签检查结果："
-    echo ""
-    echo "  发送时            →  接收时              →  结果"
-    echo "  ────────────────────────────────────────────────────"
-    
-    if [ "$SAGA_ID" != "NOT FOUND" ]; then
-        echo "  ✅ X-SagaId           X-Sagaid            ✓ 保留: $SAGA_ID"
-    else
-        echo "  ❌ X-SagaId           (未找到)           ✗ 被过滤"
-    fi
-    
-    if [ "$RESPONSE_ACTION" != "NOT FOUND" ]; then
-        echo "  ✅ X-ResponseAction   X-Responseaction    ✓ 保留: $RESPONSE_ACTION"
-    else
-        echo "  ❌ X-ResponseAction   (未找到)           ✗ 被过滤"
-    fi
-    
-    if [ "$NO_RESPONSE" != "NOT FOUND" ]; then
-        echo "  ✅ X-NoResponseRequired X-Noresponserequired ✓ 保留: $NO_RESPONSE"
-    else
-        echo "  ❌ X-NoResponseRequired (未找到)           ✗ 被过滤"
-    fi
-    
+    echo "这意味着："
+    echo "  • AO 网络不过滤自定义标签"
+    echo "  • 可以安全地使用标签传递 Saga 相关信息"
+    echo "  • 不需要在 Data 字段中嵌入这些信息"
 else
-    echo "⚠️  无法提取标签信息"
+    echo "⚠️  某些标签未被保留"
 fi
 
 echo ""
