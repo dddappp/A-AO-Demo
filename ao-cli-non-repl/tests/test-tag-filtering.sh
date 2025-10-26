@@ -163,24 +163,6 @@ Send({
 echo "✅ 消息已发送"
 echo ""
 
-# ==================== 步骤 4.5: 显示接收方 Handler 的处理输出 ====================
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔍 步骤 4.5: 接收方 Handler 的处理输出"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-
-# 从 SEND_OUTPUT 的 Output.data 中提取 Handler 的 print 输出
-HANDLER_OUTPUT=$(echo "$SEND_OUTPUT" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | jq -r '.')
-
-if [ -n "$HANDLER_OUTPUT" ] && [ "$HANDLER_OUTPUT" != "null" ] && [ "$HANDLER_OUTPUT" != "null" ]; then
-    echo "📤 Handler 处理输出（包含 print 调试信息）："
-    echo ""
-    echo "$HANDLER_OUTPUT"
-    echo ""
-fi
-
-echo ""
-
 # ==================== 步骤 5: 从消息中提取并验证标签 ====================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ 步骤 5: 从消息中提取并验证标签"
