@@ -1,6 +1,8 @@
 -- 标签检查处理器
 -- 接收消息，收集其中的 X- 前缀标签，然后回复给发送者
 
+local json = require('json')
+
 Handlers.add(
     "CheckTags",
     Handlers.utils.hasMatchingTag("Action", "CheckTags"),
