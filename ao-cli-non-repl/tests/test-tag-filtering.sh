@@ -43,6 +43,19 @@ if ! command -v ao-cli &> /dev/null; then
     exit 1
 fi
 
+# 统一的 ao-cli 调用函数，确保正确的 JSON 输出
+run_ao_cli() {
+    local command="$1"
+    local process_id="$2"
+    shift 2  # 移除前两个参数
+
+    if [[ "$process_id" == -* ]]; then
+        ao-cli "$command" -- "$process_id" --json "$@" 2>/dev/null
+    else
+        ao-cli "$command" "$process_id" --json "$@" 2>/dev/null
+    fi
+}
+
 # ==================== 步骤 1: 创建两个进程 ====================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📤 步骤 1: 创建接收者进程"
@@ -83,8 +96,35 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "📊 步骤 3: 记录发送者初始 Inbox 长度"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-INITIAL_RESULT=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-INITIAL_LENGTH=$(echo "$INITIAL_RESULT" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | tr -d '"')
+# 健壮的Inbox长度获取函数
+get_inbox_length() {
+    local process_id="$1"
+    local raw_output=$(run_ao_cli eval "$process_id" --data "return #Inbox" --wait)
+
+    # 获取最后一个JSON对象（eval可能返回多个JSON对象）
+    local json_output=$(echo "$raw_output" | jq -s '.[-1]' 2>/dev/null)
+
+    # 检查命令是否成功
+    if ! echo "$json_output" | jq -e '.success == true' >/dev/null 2>&1; then
+        local error_msg=$(echo "$json_output" | jq -r '.error // "JSON parse failed"' 2>/dev/null || echo "Command failed")
+        echo "⚠️  Inbox查询失败: $error_msg，使用默认值0" >&2
+        echo "0"
+        return
+    fi
+
+    # 提取Inbox长度，提供默认值
+    local inbox_length=$(echo "$json_output" | jq -r '.data.result.Output.data // "0"' 2>/dev/null)
+
+    # 验证是否为有效数字
+    if ! [[ "$inbox_length" =~ ^[0-9]+$ ]]; then
+        echo "⚠️  解析到的Inbox长度不是有效数字: '$inbox_length'，使用默认值0" >&2
+        inbox_length="0"
+    fi
+
+    echo "$inbox_length"
+}
+
+INITIAL_LENGTH=$(get_inbox_length "$SENDER_ID")
 echo "初始 Inbox 长度: $INITIAL_LENGTH"
 echo ""
 
@@ -215,11 +255,14 @@ while true; do
         break
     fi
     
-    CURRENT_RESULT=$(ao-cli eval "$SENDER_ID" --data "return #Inbox" --wait --json 2>/dev/null)
-    CURRENT_LENGTH=$(echo "$CURRENT_RESULT" | jq -s '.[-1] | .data.result.Output.data' 2>/dev/null | tr -d '"')
-    
+    CURRENT_LENGTH=$(get_inbox_length "$SENDER_ID")
+
+    # 确保都是有效数字，避免bash比较错误
+    if ! [[ "$INITIAL_LENGTH" =~ ^[0-9]+$ ]]; then INITIAL_LENGTH=0; fi
+    if ! [[ "$CURRENT_LENGTH" =~ ^[0-9]+$ ]]; then CURRENT_LENGTH=0; fi
+
     echo "   ⏱️  已等待 ${waited}s: Inbox 从 $INITIAL_LENGTH -> $CURRENT_LENGTH"
-    
+
     if [ "$CURRENT_LENGTH" -gt "$INITIAL_LENGTH" ]; then
         echo "✅ 收到回复！Inbox 长度增加到 $CURRENT_LENGTH"
         REPLY_RECEIVED=true
