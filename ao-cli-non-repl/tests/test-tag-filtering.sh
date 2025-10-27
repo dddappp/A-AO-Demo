@@ -303,12 +303,11 @@ else
 fi
 
 # 🎯 测试结论总结
-# ✅ 自定义扩展标签在 AO 跨进程通信中被完全保留（直接属性方式可行）
-# 🔄 发送时的直接属性 → 接收时规范化到 msg.Tags 表
-# ⚠️ 重要：接收方访问方式变化
-#   发送：msg['X-SagaId'] = 'saga-123' （直接属性）
-#   接收：msg.Tags['X-Sagaid'] = 'saga-123' （Tags表，大小写规范化）
-# ❌ msg['X-SagaId'] 直接属性不存在（nil）
-# ✅ msg.Tags['X-Sagaid'] 标签在 Tags 表中可访问
-# 📝 开发建议：接收方始终使用 msg.Tags 表访问自定义扩展标签
+# ✅ AO 系统自动将消息 Tags 转换为直接属性（跨进程通信时）
+# 🔄 标签名称会被大小写规范化（如 X-SagaId → X-Sagaid）
+# ⚠️ 重要：接收方必须使用规范化后的属性名访问
+#   发送：--tag 'X-SagaId=saga-123'
+#   接收：msg['X-Sagaid'] = 'saga-123' （直接属性，规范化后）
+#   也可用：msg.Tags['X-Sagaid'] = 'saga-123' （Tags表）
+# 📝 开发建议：接收方应检查 msg.Tags 表获取标签的规范化名称
 

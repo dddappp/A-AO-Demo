@@ -30,6 +30,12 @@ Handlers.add(
         print("   msg.X-ResponseAction = " .. tostring(msg["X-ResponseAction"]))
         print("   msg.X-NoResponseRequired = " .. tostring(msg["X-NoResponseRequired"]))
 
+        -- NOTE 增加了大小写规范化后的标签检查
+        print("   🔍 调试: 检查 msg 对象的直接属性")
+        print("   msg.X-Sagaid = " .. tostring(msg["X-Sagaid"]))
+        print("   msg.X-Responseaction = " .. tostring(msg["X-Responseaction"]))
+        print("   msg.X-Noresponserequired = " .. tostring(msg["X-Noresponserequired"]))
+
         -- 调试：检查 msg.Tags 表
         print("   🔍 调试: 检查 msg.Tags 表")
         if msg.Tags then
