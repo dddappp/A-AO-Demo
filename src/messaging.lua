@@ -8,8 +8,7 @@ local X_CONTEXT = {
     SAGA_ID = "X-SagaId",
 }
 
--- 扩展上下文的规范化属性名（Title-Kebab-Case格式）
--- 用于从消息的直接属性中提取扩展上下文
+-- Normalized property names for extension context. Used to extract extension context from message direct properties
 local X_CONTEXT_NORMALIZED_NAMES = {
     NO_RESPONSE_REQUIRED = "X-No-Response-Required",
     RESPONSE_ACTION = "X-Response-Action",
@@ -22,14 +21,14 @@ local MESSAGE_PASS_THROUGH_PROPERTIES = {
     X_CONTEXT_NORMALIZED_NAMES.SAGA_ID,
 }
 
--- 扩展上下文来源常量
+-- Extension context source constants
 local X_CONTEXT_SOURCE = {
-    DIRECT_PROPERTIES = 1,  -- 来自消息的直接属性
-    DATA_EMBEDDED = 2, -- 嵌入在msg.Data中的扩展上下文信息
+    DIRECT_PROPERTIES = 1,  -- From message direct properties
+    DATA_EMBEDDED = 2, -- Embedded in msg.Data as extension context information
 }
 
 local X_CONTEXT_KEY = "X-Context"
-local X_CONTEXT_SOURCE_KEY = "X-Context-Source"  -- 存储扩展上下文来源的key
+local X_CONTEXT_SOURCE_KEY = "X-Context-Source"  -- Key for storing extension context source
 
 messaging.X_CONTEXT = X_CONTEXT
 messaging.MESSAGE_PASS_THROUGH_PROPERTIES = MESSAGE_PASS_THROUGH_PROPERTIES
@@ -37,10 +36,12 @@ messaging.MESSAGE_PASS_THROUGH_PROPERTIES = MESSAGE_PASS_THROUGH_PROPERTIES
 -- Embed saga information in data to avoid tag loss during forwarding
 function messaging.embed_saga_info_in_data(data, saga_id, response_action)
 
-    -- todo 查找所有使用 embed_saga_info_in_data 的地方，应该根据远端“参与者”的设置来决定是否在 Data 中嵌入扩展上下文信息。
-    --   如果没有，那么考虑（默认）在发送的消息的直接属性中嵌入扩展上下文信息？
-    --   我们可以看到，embed_saga_info_in_data 之后，紧接着就是 commit_send_or_error。
-    --   此时，将要嵌入的扩展上下文信息通过 commit_send_or_error 的 tags 参数传递？
+    -- TODO: Find all places using embed_saga_info_in_data, should decide whether to embed extension context
+    --   in Data based on remote "participant" settings. If not, consider (by default) embedding extension
+    --   context information in the direct properties of the message being sent?
+    --   We can see that embed_saga_info_in_data is followed immediately by commit_send_or_error.
+    --   At this point, should the extension context information to be embedded be passed through
+    --   the tags parameter of commit_send_or_error?
 
     -- CRITICAL FIX: Create a copy instead of modifying the original object to avoid polluting context references
     local enhanced_data = {}
@@ -65,8 +66,10 @@ local function extract_cached_x_context_from_message(msg)
 
     local x_context_source = nil
 
-    -- 优先遍历 X_CONTEXT_NORMALIZED_NAMES 指定的属性名称，尝试从消息的直接属性中提取扩展上下文。
-    --   并且一旦在消息的直接属性中找到了扩展上下文，就不要再尝试提取“嵌入在 msg.Data 中的扩展上下文信息”
+    -- Prioritize iterating through property names specified by X_CONTEXT_NORMALIZED_NAMES,
+    --   attempt to extract extension context from message direct properties.
+    --   And once extension context is found in direct properties, do not attempt to extract
+    --   "extension context information embedded in msg.Data"
     for _, v in pairs(X_CONTEXT_NORMALIZED_NAMES) do
         if type(v) == "string" and msg[v] ~= nil then
             x_context[v] = msg[v]
@@ -77,7 +80,7 @@ local function extract_cached_x_context_from_message(msg)
         return x_context, x_context_source
     end
 
-    -- 默认情况下，可以认为扩展上下文来自消息的直接属性
+    -- By default, extension context can be considered to come from message direct properties
     x_context_source = X_CONTEXT_SOURCE.DIRECT_PROPERTIES
 
     -- Safely handle msg.Data
@@ -141,7 +144,7 @@ end
 function messaging.get_saga_id(msg)
     -- Extract saga information only from data (cross-process safe)
     local x_context = extract_cached_x_context_from_message(msg)
-    -- 优先使用规范化后的属性名称来提取扩展上下文中的 saga id
+    -- Prioritize using normalized property names to extract saga id from extension context
     return x_context[X_CONTEXT_NORMALIZED_NAMES.SAGA_ID] or x_context[messaging.X_CONTEXT.SAGA_ID]
 end
 
@@ -193,7 +196,8 @@ function messaging.respond(status, result_or_error, request_msg)
     -- Use request_msg.From as response target
     -- local target = request_msg.From
 
-    -- 如果 “扩展上下文” 来自请求消息的直接属性，则**不要**在回复的 data 中嵌入扩展上下文信息
+    -- If "extension context" comes from request message direct properties, do **NOT** embed
+    -- extension context information in reply data
     if (x_context_source ~= X_CONTEXT_SOURCE.DIRECT_PROPERTIES and type(data) == "table") then
         for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_PROPERTIES) do
             if x_context[x_tag] then
@@ -207,7 +211,8 @@ function messaging.respond(status, result_or_error, request_msg)
         Data = json.encode(data)
     }
 
-    -- 如果 “扩展上下文” 来自请求消息的直接属性，则在回复消息的“直接属性”中直接嵌入扩展上下文信息！
+    -- If "extension context" comes from request message direct properties, embed extension
+    -- context information directly in reply message "direct properties"!
     if x_context_source == X_CONTEXT_SOURCE.DIRECT_PROPERTIES then
         for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_PROPERTIES) do
             if x_context[x_tag] then
@@ -246,10 +251,11 @@ end
 -- commit_send_or_error: specifically for sending messages to external parties (saga mode)
 -- commit_respond_or_error: specifically for responding to messages (when request message exists)
 function messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
-    -- 在 tags 参数中如果包含特定的属性名，则从 tags 中移除它们，直接在 message 的“直接属性”中设置它们。
-    --   比如 `Action`，直接在 message 的“直接属性”中设置它似乎更合适。
-    --   还有，我们的扩展上下文属性，比如 `X-Saga-Id`，`X-Response-Action`，`X-No-Response-Required`，
-    --   如果通过 tags 参数传入，也应该从 tags 中移除，然后在 message 的“直接属性”中设置它们。
+    -- If tags parameter contains specific property names, remove them from tags and set them
+    --   directly in message "direct properties".
+    --   For example, `Action` seems more appropriate to set directly in message "direct properties".
+    --   Also, our extension context properties like `X-Saga-Id`, `X-Response-Action`, `X-No-Response-Required`,
+    --   if passed through tags parameter, should also be removed from tags and set in message "direct properties".
     if (status) then
         commit()
 
@@ -258,17 +264,17 @@ function messaging.commit_send_or_error(status, request_or_error, commit, target
             Data = json.encode(request_or_error)
         }
 
-        -- 如果tags存在，处理其中的特殊属性
+        -- If tags exist, process special properties within them
         if tags then
             local filtered_tags = {}
             for k, v in pairs(tags) do
                 if k == "Action" then
-                    -- Action 直接设置为消息的直接属性
+                    -- Set Action directly in message direct properties
                     message.Action = v
                 elseif k == X_CONTEXT_NORMALIZED_NAMES.SAGA_ID or k == X_CONTEXT_NORMALIZED_NAMES.RESPONSE_ACTION or k == X_CONTEXT_NORMALIZED_NAMES.NO_RESPONSE_REQUIRED then
                     message[k] = v
                 else
-                    -- 其他属性保留在tags中
+                    -- Keep other properties in tags
                     filtered_tags[k] = v
                 end
             end
