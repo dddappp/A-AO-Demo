@@ -2,19 +2,19 @@ local json = require("json")
 
 local messaging = {}
 
-local X_TAGS = {
+local X_CONTEXT = {
     NO_RESPONSE_REQUIRED = "X-NoResponseRequired",
     RESPONSE_ACTION = "X-ResponseAction",
     SAGA_ID = "X-SagaId",
 }
 
-local MESSAGE_PASS_THROUGH_TAGS = {
-    X_TAGS.SAGA_ID,
+local MESSAGE_PASS_THROUGH_PROPERTIES = {
+    X_CONTEXT.SAGA_ID,
 }
 
-messaging.X_TAGS = X_TAGS
-messaging.MESSAGE_PASS_THROUGH_TAGS = MESSAGE_PASS_THROUGH_TAGS
-messaging.X_TAGS_KEY = "XTags"
+messaging.X_CONTEXT = X_CONTEXT
+messaging.MESSAGE_PASS_THROUGH_PROPERTIES = MESSAGE_PASS_THROUGH_PROPERTIES
+messaging.X_CONTEXT_KEY = "XTags"
 
 -- Embed saga information in data to avoid tag loss during forwarding
 function messaging.embed_saga_info_in_data(data, saga_id, response_action)
@@ -25,18 +25,18 @@ function messaging.embed_saga_info_in_data(data, saga_id, response_action)
             enhanced_data[k] = v
         end
     end
-    enhanced_data[messaging.X_TAGS.SAGA_ID] = saga_id
-    enhanced_data[messaging.X_TAGS.RESPONSE_ACTION] = response_action
+    enhanced_data[messaging.X_CONTEXT.SAGA_ID] = saga_id
+    enhanced_data[messaging.X_CONTEXT.RESPONSE_ACTION] = response_action
     return enhanced_data
 end
 
-function messaging.extract_cached_x_tags_from_message(msg)
-    local x_tags = msg[messaging.X_TAGS_KEY] -- Cache result in msg["XTags"] to avoid repeated computation
+function messaging.extract_cached_x_context_from_message(msg)
+    local x_context = msg[messaging.X_CONTEXT_KEY] -- Cache result in msg["XTags"] to avoid repeated computation
     -- Only nil and false are considered false, other values (including empty table {}) are true
-    if (x_tags) then
-        return x_tags
+    if (x_context) then
+        return x_context
     end
-    x_tags = {}
+    x_context = {}
 
     -- Safely handle msg.Data
     local data = msg.Data
@@ -47,52 +47,52 @@ function messaging.extract_cached_x_tags_from_message(msg)
                 data = decoded
             else
                 -- JSON parsing failed, return empty result
-                msg[messaging.X_TAGS_KEY] = x_tags
-                return x_tags
+                msg[messaging.X_CONTEXT_KEY] = x_context
+                return x_context
             end
         elseif (type(data) ~= "table") then
             -- data is neither string nor table, return empty result
-            msg[messaging.X_TAGS_KEY] = x_tags
-            return x_tags
+            msg[messaging.X_CONTEXT_KEY] = x_context
+            return x_context
         end
     else
         -- No Data field, return empty result
-        msg[messaging.X_TAGS_KEY] = x_tags
-        return x_tags
+        msg[messaging.X_CONTEXT_KEY] = x_context
+        return x_context
     end
 
     -- Ensure data is a table
     if (type(data) ~= "table") then
-        msg[messaging.X_TAGS_KEY] = x_tags
-        return x_tags
+        msg[messaging.X_CONTEXT_KEY] = x_context
+        return x_context
     end
 
-    -- Safely extract X_TAGS
-    for _, v in pairs(X_TAGS) do
+    -- Safely extract X_CONTEXT
+    for _, v in pairs(X_CONTEXT) do
         if type(v) == "string" and data[v] ~= nil then
-            x_tags[v] = data[v]
+            x_context[v] = data[v]
         end
     end
 
-    msg[messaging.X_TAGS_KEY] = x_tags
-    return x_tags
+    msg[messaging.X_CONTEXT_KEY] = x_context
+    return x_context
 end
 
 function messaging.get_saga_id(msg)
     -- Extract saga information only from data (cross-process safe)
-    local x_tags = messaging.extract_cached_x_tags_from_message(msg)
-    return x_tags[messaging.X_TAGS.SAGA_ID]
+    local x_context = messaging.extract_cached_x_context_from_message(msg)
+    return x_context[messaging.X_CONTEXT.SAGA_ID]
 end
 
 function messaging.get_response_action(msg)
     -- Extract response action only from data (cross-process safe)
-    local x_tags = messaging.extract_cached_x_tags_from_message(msg)
-    return x_tags[messaging.X_TAGS.RESPONSE_ACTION]
+    local x_context = messaging.extract_cached_x_context_from_message(msg)
+    return x_context[messaging.X_CONTEXT.RESPONSE_ACTION]
 end
 
 function messaging.get_no_response_required(msg)
-    local x_tags = messaging.extract_cached_x_tags_from_message(msg)
-    return x_tags[messaging.X_TAGS.NO_RESPONSE_REQUIRED]
+    local x_context = messaging.extract_cached_x_context_from_message(msg)
+    return x_context[messaging.X_CONTEXT.NO_RESPONSE_REQUIRED]
 end
 
 local string_to_boolean_mappings = {
@@ -126,16 +126,16 @@ function messaging.respond(status, result_or_error, request_msg)
     local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
 
     -- Extract saga information from data
-    local x_tags = messaging.extract_cached_x_tags_from_message(request_msg)
-    local response_action = x_tags[messaging.X_TAGS.RESPONSE_ACTION]
+    local x_context = messaging.extract_cached_x_context_from_message(request_msg)
+    local response_action = x_context[messaging.X_CONTEXT.RESPONSE_ACTION]
 
     -- Use request_msg.From as response target
     -- local target = request_msg.From
 
     if (type(data) == "table") then
-        for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_TAGS) do
-            if x_tags[x_tag] then
-                data[x_tag] = x_tags[x_tag]
+        for _, x_tag in ipairs(MESSAGE_PASS_THROUGH_PROPERTIES) do
+            if x_context[x_tag] then
+                data[x_tag] = x_context[x_tag]
             end
         end
     end

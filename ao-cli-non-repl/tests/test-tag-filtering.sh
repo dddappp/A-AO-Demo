@@ -1,39 +1,40 @@
 #!/bin/bash
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 测试脚本：AO 自定义扩展标签传输机制验证
+# 测试脚本：AO 扩展上下文传输机制验证
 # ═══════════════════════════════════════════════════════════════════════════
 #
 # 【重要概念澄清】
-# 本脚本中的"标签"特指我们自定义的扩展标签（如 X-SagaId），不是 AO 消息的 Tags 属性！
+# 本脚本中的"扩展上下文"特指我们自定义的扩展上下文属性（如 X-SagaId），不是 AO 消息的 Tags 属性！
+# 注意：原XTags概念已重命名为XContext（扩展上下文）
 #
 # 【历史背景】
-# 早期我们使用 AO 消息的 Tags 属性来传输自定义扩展标签：
+# 早期我们使用 AO 消息的 Tags 属性来传输扩展上下文：
 #   msg.Tags["X-SagaId"] = "saga-123"
 #   msg.Tags["X-ResponseAction"] = "ForwardToProxy"
 #
 # 【网络升级影响】
-# 随着 AO 网络升级，自定义扩展标签在 Tags 中传输已被废弃，会被网络过滤丢弃！
-# 因此我们改用在 msg.Data 字段中嵌入 JSON 来传输扩展标签。
+# 随着 AO 网络升级，扩展上下文在 Tags 中传输已被废弃，会被网络过滤丢弃！
+# 因此我们改用在 msg.Data 字段中嵌入 JSON 来传输扩展上下文。
 #
 # 【测试目的】
-# 本脚本测试：直接作为 msg 的"直接属性"传输扩展标签是否可行？
+# 本脚本测试：直接作为 msg 的"直接属性"传输扩展上下文是否可行？
 #   msg["X-SagaId"] = "saga-123"  ← 直接属性方式
 #   vs
 #   msg.Data = '{"X-SagaId": "saga-123", ...}'  ← Data 嵌入方式
 #
 # 测试流程：
 #   1. 创建接收者进程，加载 Handler
-#   2. 从发送者通过 eval Send() 发送包含直接属性扩展标签的消息
-#   3. 接收者 Handler 接收消息并验证标签是否被保留
+#   2. 从发送者通过 eval Send() 发送包含直接属性扩展上下文的消息
+#   3. 接收者 Handler 接收消息并验证扩展上下文是否被保留
 #   4. 接收者回复给发送者
 #   5. 验证发送者 Inbox 中收到回复
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
 echo "╔════════════════════════════════════════════════════════════════════════╗"
-echo "║  🧪 AO 自定义标签过滤测试                                              ║"
-echo "║  验证跨进程通信中标签的保留情况                                        ║"
+echo "║  🧪 AO 扩展上下文传输测试                                              ║"
+echo "║  验证跨进程通信中扩展上下文的保留情况                                        ║"
 echo "╚════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -128,14 +129,14 @@ INITIAL_LENGTH=$(get_inbox_length "$SENDER_ID")
 echo "初始 Inbox 长度: $INITIAL_LENGTH"
 echo ""
 
-# ==================== 步骤 4: 发送包含自定义 `X-` 前缀标签的消息 ====================
+# ==================== 步骤 4: 发送包含扩展上下文属性的消息 ====================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📨 步骤 4: 从发送者发送包含自定义 `X-` 前缀标签的消息"
+echo "📨 步骤 4: 从发送者发送包含扩展上下文属性的消息"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "发送者: $SENDER_ID"
 echo "接收者: $RECEIVER_ID"
-echo "自定义 `X-` 前缀标签:"
+echo "扩展上下文属性:"
 echo "  • X-SagaId = saga-123"
 echo "  • X-ResponseAction = ForwardToProxy"
 echo "  • X-NoResponseRequired = false"
@@ -197,7 +198,7 @@ if [ -n "$DEBUG_OUTPUT" ] && [ "$DEBUG_OUTPUT" != "empty" ]; then
     echo ""
     echo "🎯 测试结果总结："
 
-    # 动态解析Handler输出，判断标签访问情况
+    # 动态解析Handler输出，判断扩展上下文访问情况
     if echo "$DEBUG_OUTPUT" | grep -q "msg.X-Sagaid = debug-saga-123"; then
         echo "   ✅ msg['X-Sagaid'] 可访问         (直接属性，规范化后名称)"
     else
@@ -222,20 +223,20 @@ fi
 echo "📡 现在继续测试完整的跨进程通信流程..."
 echo ""
 
-# ==================== 步骤 5: 验证发送消息中的标签 ====================
+# ==================== 步骤 5: 验证发送消息中的扩展上下文 ====================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔍 步骤 5: 验证发送消息中的标签（发送端验证）"
+echo "🔍 步骤 5: 验证发送消息中的扩展上下文（发送端验证）"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 TAGS_IN_MESSAGE=$(echo "$SEND_RESULT" | jq -s '.[-1] | .data.result.Messages[0]._RawTags // []' 2>/dev/null)
-echo "📋 发送端：消息中的标签（_RawTags）:"
+echo "📋 发送端：消息中的AO Tags（_RawTags）:"
 
 # 显示所有标签的原始信息
 if echo "$TAGS_IN_MESSAGE" | jq -e '. != []' >/dev/null 2>&1; then
     echo "$TAGS_IN_MESSAGE" | jq -r '.[] | "  🔸 \(.name) = \(.value)"' 2>/dev/null
 else
-    echo "  ⚠️  未找到标签信息"
+    echo "  ⚠️  未找到AO Tags信息"
 fi
 
 SAGA_ID=$(echo "$TAGS_IN_MESSAGE" | jq -r '.[] | select(.name == "X-SagaId") | .value' 2>/dev/null || echo "")
@@ -243,7 +244,7 @@ RESPONSE_ACTION=$(echo "$TAGS_IN_MESSAGE" | jq -r '.[] | select(.name == "X-Resp
 NO_RESPONSE=$(echo "$TAGS_IN_MESSAGE" | jq -r '.[] | select(.name == "X-NoResponseRequired") | .value' 2>/dev/null || echo "")
 
 echo ""
-echo "发送端标签验证:"
+echo "发送端扩展上下文验证:"
 [ -n "$SAGA_ID" ] && echo "  ✅ X-SagaId = $SAGA_ID" || echo "  ❌ X-SagaId 未找到"
 [ -n "$RESPONSE_ACTION" ] && echo "  ✅ X-ResponseAction = $RESPONSE_ACTION" || echo "  ❌ X-ResponseAction 未找到"
 [ -n "$NO_RESPONSE" ] && echo "  ✅ X-NoResponseRequired = $NO_RESPONSE" || echo "  ❌ X-NoResponseRequired 未找到"
@@ -294,7 +295,7 @@ echo ""
 # ==================== 步骤 7: 查看回复消息内容 ====================
 if [ "$REPLY_RECEIVED" = true ]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "📬 步骤 7: 解析回复消息，验证接收端是否收到标签"
+    echo "📬 步骤 7: 解析回复消息，验证接收端是否收到扩展上下文"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     
@@ -305,29 +306,29 @@ if [ "$REPLY_RECEIVED" = true ]; then
         echo "$LATEST_MSG" | jq '.' 2>/dev/null | head -40
         echo ""
         
-        # 从回复消息的 Data 字段中解析标签检查结果
+        # 从回复消息的 Data 字段中解析扩展上下文检查结果
         REPLY_DATA=$(echo "$LATEST_MSG" | jq -r '.latest.Data // empty' 2>/dev/null)
         if [ -n "$REPLY_DATA" ]; then
-            echo "🔍 Handler 回复的标签检查结果:"
+            echo "🔍 Handler 回复的扩展上下文检查结果:"
             echo "$REPLY_DATA" | jq '.' 2>/dev/null
             echo ""
             
-            # 验证接收端是否收到了我们的自定义标签
+            # 验证接收端是否收到了我们的扩展上下文
             RECEIVED_TAGS=$(echo "$REPLY_DATA" | jq -r '.received_tags // empty' 2>/dev/null)
             TAG_COUNT=$(echo "$REPLY_DATA" | jq -r '.tag_count // 0' 2>/dev/null)
 
             echo "📬 接收端回复详情:"
-            echo "  标签数量: $TAG_COUNT"
-            echo "  接收到的标签:"
+            echo "  扩展上下文数量: $TAG_COUNT"
+            echo "  接收到的扩展上下文:"
 
             if [ "$RECEIVED_TAGS" != "empty" ] && [ -n "$RECEIVED_TAGS" ]; then
-                echo "$RECEIVED_TAGS" | jq -r 'to_entries[] | "    \(.key) = \(.value)"' 2>/dev/null || echo "    无法解析标签数据"
+                echo "$RECEIVED_TAGS" | jq -r 'to_entries[] | "    \(.key) = \(.value)"' 2>/dev/null || echo "    无法解析扩展上下文数据"
             else
-                echo "    无标签数据"
+                echo "    无扩展上下文数据"
             fi
 
             echo ""
-            echo "🔍 标签规范化对比:"
+            echo "🔍 扩展上下文规范化对比:"
             echo "  发送时 → 接收时"
             echo "  X-SagaId → X-Sagaid"
             echo "  X-ResponseAction → X-Responseaction"
@@ -338,11 +339,11 @@ if [ "$REPLY_RECEIVED" = true ]; then
             RECEIVED_NO_RESP=$(echo "$RECEIVED_TAGS" | jq -r '."X-Noresponserequired" // empty' 2>/dev/null)
 
             echo ""
-            echo "✅ 标签保留验证:"
+            echo "✅ 扩展上下文保留验证:"
             [ "$RECEIVED_SAGA_ID" = "saga-123" ] && echo "  ✅ X-SagaId → X-Sagaid: $RECEIVED_SAGA_ID ✓" || echo "  ❌ X-SagaId → X-Sagaid: $RECEIVED_SAGA_ID ✗"
             [ "$RECEIVED_ACTION" = "ForwardToProxy" ] && echo "  ✅ X-ResponseAction → X-Responseaction: $RECEIVED_ACTION ✓" || echo "  ❌ X-ResponseAction → X-Responseaction: $RECEIVED_ACTION ✗"
             [ "$RECEIVED_NO_RESP" = "false" ] && echo "  ✅ X-NoResponseRequired → X-Noresponserequired: $RECEIVED_NO_RESP ✓" || echo "  ❌ X-NoResponseRequired → X-Noresponserequired: $RECEIVED_NO_RESP ✗"
-            echo "  📊 标签数量: $TAG_COUNT 个"
+            echo "  📊 扩展上下文数量: $TAG_COUNT 个"
         fi
     else
         echo "⚠️  无法查询 Inbox"
@@ -357,17 +358,17 @@ echo "╚═══════════════════════�
 echo ""
 
 if [ "$REPLY_RECEIVED" = true ]; then
-    echo "✅ 测试成功！自定义标签被正确保留和传递"
+    echo "✅ 测试成功！扩展上下文被正确保留和传递"
 else
     echo "❌ 测试失败！未能在 Inbox 中收到回复消息"
 fi
 
 # 🎯 测试结论总结
-# ✅ AO 系统自动将消息 Tags 转换为直接属性（跨进程通信时）
-# 🔄 标签名称会被大小写规范化（如 X-SagaId → X-Sagaid）
+# ✅ AO 系统自动将扩展上下文转换为直接属性（跨进程通信时）
+# 🔄 扩展上下文名称会被大小写规范化（如 X-SagaId → X-Sagaid）
 # ⚠️ 重要：接收方必须使用规范化后的属性名访问
 #   发送：--tag 'X-SagaId=saga-123'
 #   接收：msg['X-Sagaid'] = 'saga-123' （直接属性，规范化后）
 #   也可用：msg.Tags['X-Sagaid'] = 'saga-123' （Tags表）
-# 📝 开发建议：接收方应检查 msg.Tags 表获取标签的规范化名称
+# 📝 开发建议：接收方应检查 msg.Tags 表获取扩展上下文的规范化名称
 

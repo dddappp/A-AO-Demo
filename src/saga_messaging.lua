@@ -9,7 +9,7 @@ function saga_messaging.extract_reply_context(msg)
         reply = msg.reply,
         From = msg.From,  -- Reply target address
         Data = {},        -- Reply data (always empty object)
-        [messaging.X_TAGS_KEY] = messaging.extract_cached_x_tags_from_message(msg)  -- Pre-extracted X-Tags
+        [messaging.X_CONTEXT_KEY] = messaging.extract_cached_x_context_from_message(msg)  -- Pre-extracted X-Tags
     }
 end
 
