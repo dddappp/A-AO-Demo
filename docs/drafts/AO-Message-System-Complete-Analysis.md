@@ -3,23 +3,45 @@
 **日期**: 2025-10-19
 **发现者**: AI Assistant
 **验证**: 通过 AO/AOS 代码库源码深度分析
-**涵盖内容**: 消息构造等价性、同步机制、属性命名规范、实际使用示例
+**涵盖内容**: 消息构造方式差异分析、标签传递机制、规范化行为、测试结果验证
 
 ## 🎯 核心发现
 
-### 消息构造等价性
+### 消息构造方式差异分析
 
-在 AO 系统中，以下两种消息构造方式是**完全等价**的：
+在 AO 系统中，不同的消息构造方式对标签传递有**显著差异**：
 
-```lua
--- 方式1: 直接属性
-Send({Target = ao.id, Action = "GetArticleIdSequence"})
+#### ✅ **验证通过的构造方式**
 
--- 方式2: Tags 对象
-Send({Target = ao.id, Tags = {Action = "GetArticleIdSequence"}})
+**方式1: 命令行 --tag 参数**
+```bash
+ao-cli message <process-id> <action> --tag 'X-SagaId=saga-123'
 ```
+- ✅ 自定义标签能够被正确传递和访问
 
-两种方式最终都产生相同的消息结构，对 Handler 匹配行为完全一致。
+**方式2: 直接属性方式**
+```lua
+Send({
+    Target = ao.id,
+    Action = "CheckTags",
+    ['X-SagaId'] = 'saga-123'  -- 直接属性
+})
+```
+- ✅ 自定义标签能够被正确传递和访问
+
+#### ❌ **未验证/可能被过滤的构造方式**
+
+**方式3: Tags对象方式** ⚠️
+```lua
+Send({
+    Target = ao.id,
+    Tags = {
+        ['X-SagaId'] = 'saga-123'  -- 在Tags对象中
+    }
+})
+```
+- ❓ **未测试**: 自定义标签可能被过滤掉
+- 📝 **实际采用方案**: 因此项目使用Data字段嵌入自定义标签
 
 ### 消息根部属性命名规范
 
@@ -80,6 +102,42 @@ nonExtractableTags = {
 - 使用语义化的业务属性名：`Balance`, `Ticker`, `Account`, `name`, `ticker` 等
 - 可以重用 `Data`, `Action` 等系统属性
 - 避免使用排除列表中的属性名作为业务属性名
+
+### 🔬 实际测试发现
+
+#### 标签名称规范化验证
+通过实际测试，我们确认了标签名称的Title-Kebab-Case规范化行为：
+
+**测试案例**:
+- 发送: `X-SagaId`, `X-ResponseAction`, `X-NoResponseRequired`
+- 接收: `X-Sagaid`, `X-Responseaction`, `X-Noresponserequired`
+
+**规范化规则确认**:
+```lua
+-- Title-Kebab-Case转换
+"X-SagaId" → "X-Sagaid"
+"X-ResponseAction" → "X-Responseaction"
+"X-NoResponseRequired" → "X-Noresponserequired"
+```
+
+#### ao.normalize() 执行状态
+**关键发现**: 在我们的测试环境中，`ao.normalize()`函数**已被执行**！
+
+**表现**:
+- ✅ 标签存在于 `msg.Tags` 表中（规范化后名称）
+- ✅ 标签**已被提取**到消息根部属性（使用规范化后名称）
+- 📝 结果: `msg["X-SagaId"] = nil`，但 `msg["X-Sagaid"]` 可访问
+
+#### 系统环境差异
+**AO vs AOS 系统对比**:
+
+| 特性 | AO系统 | AOS系统 | 我们的测试结果 |
+|------|--------|---------|----------------|
+| 标签规范化 | ❌ 无 | ✅ 有(utils.normalize) | ✅ 观察到规范化 |
+| 消息规范化 | ❌ 无 | ✅ 有(normalizeMsg) | ✅ 已执行 |
+| 标签提取 | ❌ 未执行 | ✅ 有(ao.normalize) | ✅ 已执行 |
+
+**结论**: 测试环境表现出与AOS系统一致的行为 - 有规范化也有提取，可能使用了包含AOS逻辑的AO系统。
 
 ## 🔍 技术机制分析
 
@@ -248,18 +306,74 @@ AO 实现了从发送到接收的完整消息标准化流程：
 
 ## 💡 实践意义
 
-1. **代码灵活性**: 开发者可以使用任一种构造方式
-2. **向后兼容**: 现有代码无需修改
-3. **一致性保证**: AO 系统确保所有方式行为一致
-4. **调试便利**: 多种访问方式 (`msg.Action` 或 `msg.Tags.Action`)
+1. **构造方式选择**: 开发者应选择能正确传递自定义标签的构造方式
+2. **向后兼容**: 现有代码无需修改，但需注意标签传递方式
+3. **系统标签一致性**: AO 系统确保系统标签(Action等)的构造方式行为一致
+4. **自定义标签传递**: 不同构造方式对自定义标签传递有显著差异
 
 ## ⚠️ 注意事项
 
-- 该等价性仅适用于不在 `nonExtractableTags` 列表中的 Tag 名称
-- `Action` Tag 会被自动提取到消息根部属性
-- Handler 应使用 `Handlers.utils.hasMatchingTag()` 进行匹配
-- Tags 数组是权威格式，对象格式是派生格式
+- **构造方式差异**: 不同消息构造方式对自定义标签传递有显著差异
+- **命令行标签**: `--tag` 参数发送的标签能正确传递
+- **直接属性标签**: `['X-SagaId'] = value` 方式的标签能正确传递
+- **Tags对象过滤**: `Tags = {['X-SagaId'] = value}` 方式的自定义标签**可能被过滤**
+- **名称规范化**: 成功传递的标签名称会被转换为Title-Kebab-Case格式
+- **双重访问**: 成功传递的自定义标签既可通过 `msg["X-Sagaid"]` 也可通过 `msg.Tags["X-Sagaid"]` 访问
+- **Handler匹配**: `Handlers.utils.hasMatchingTag()` 对验证通过的构造方式都有效
 
-## 📝 结论
+## 📝 结论与建议
 
-通过深入源码分析，完全证实了经验判断：两种消息构造方式在 AO 系统中确实完全等价。这个双向同步机制是 AO 消息系统设计的核心特性之一，确保了开发体验的一致性和灵活性。
+### 核心发现总结
+
+1. **标签传递差异**: ✅ **已确认** - 不同构造方式对自定义标签传递有显著差异
+2. **命令行标签传递**: ✅ **验证通过** - `--tag` 参数发送的自定义标签能正确传递
+3. **直接属性传递**: ✅ **验证通过** - 直接属性方式的自定义标签能正确传递
+4. **Tags对象传递**: ❓ **未验证** - Tags对象中的自定义标签可能被过滤
+5. **标签规范化**: ✅ **已确认存在** - 标签名称在传输过程中被转换为Title-Kebab-Case格式
+6. **系统环境**: 测试环境表现出与AOS系统一致的行为
+
+### 开发者建议
+
+**当前环境下的最佳实践**:
+```lua
+-- ✅ 推荐：直接属性方式发送自定义标签
+Send({
+    Target = ao.id,
+    Action = "MyAction",
+    ['X-SagaId'] = 'saga-123',        -- 直接属性
+    ['X-ResponseAction'] = 'Forward'
+})
+
+-- ✅ 接收时：规范化后名称直接访问
+local sagaId = msg["X-Sagaid"]  -- 使用规范化后的名称
+local action = msg["X-Responseaction"]
+
+-- ✅ 也可用：通过 msg.Tags 访问
+local sagaId = msg.Tags["X-Sagaid"]
+local action = msg.Tags["X-Responseaction"]
+
+-- ❌ 避免：Tags对象方式（可能被过滤）
+Send({
+    Target = ao.id,
+    Tags = {['X-SagaId'] = 'saga-123'}  -- ⚠️ 可能不工作
+})
+
+-- ⚠️ 注意：原始名称访问会失败
+-- local sagaId = msg["X-SagaId"]  -- nil（名称未规范化）
+```
+
+**标签传递建议**:
+- ✅ **使用直接属性方式**: `['X-SagaId'] = 'value'`（已验证可行）
+- ❌ **避免Tags对象方式**: `Tags = {['X-SagaId'] = 'value'}`（可能被过滤）
+- 📝 **实际采用方案**: 项目使用Data字段嵌入自定义标签
+
+**测试策略**:
+- 可以使用 `msg["X-Sagaid"]` 或 `msg.Tags["X-Sagaid"]` 访问自定义标签
+- 在多个环境中测试标签访问方式
+- 注意标签名称的规范化行为（驼峰 → Title-Kebab-Case）
+
+### 未来兼容性注意事项
+
+- AO系统规范可能随时间演变
+- 标签规范化行为在不同环境可能不一致
+- 建议代码优先使用规范化名称访问，并支持多种访问方式

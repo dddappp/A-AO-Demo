@@ -195,10 +195,27 @@ if [ -n "$DEBUG_OUTPUT" ] && [ "$DEBUG_OUTPUT" != "empty" ]; then
     echo "$DEBUG_OUTPUT" | jq '.' 2>/dev/null || echo "原始输出: $DEBUG_OUTPUT"
 
     echo ""
-    echo "🎯 关键发现总结："
-    echo "   ❌ msg['X-SagaId'] = nil          (直接属性不存在)"
-    echo "   ✅ msg.Tags['X-Sagaid'] 存在      (标签在 Tags 表中，大小写规范化)"
-    echo "   🔄 自定义标签被 AO 系统移动到 msg.Tags 并规范化大小写"
+    echo "🎯 测试结果总结："
+
+    # 动态解析Handler输出，判断标签访问情况
+    if echo "$DEBUG_OUTPUT" | grep -q "msg.X-Sagaid = debug-saga-123"; then
+        echo "   ✅ msg['X-Sagaid'] 可访问         (直接属性，规范化后名称)"
+    else
+        echo "   ❌ msg['X-Sagaid'] 不可访问       (直接属性访问失败)"
+    fi
+
+    if echo "$DEBUG_OUTPUT" | grep -q "msg.Tags.X-Sagaid = debug-saga-123"; then
+        echo "   ✅ msg.Tags['X-Sagaid'] 可访问    (Tags表访问)"
+    else
+        echo "   ❌ msg.Tags['X-Sagaid'] 不可访问  (Tags表访问失败)"
+    fi
+
+    if echo "$DEBUG_OUTPUT" | grep -q "msg.X-SagaId = nil"; then
+        echo "   ❌ msg['X-SagaId'] = nil          (原始名称访问返回nil)"
+    fi
+
+    echo "   📝 测试方式: 命令行 --tag 参数 + 直接属性方式"
+    echo "   ⚠️ 未测试: Tags对象方式 (Send({...Tags={['X-SagaId']=...}}))"
     echo ""
 fi
 
