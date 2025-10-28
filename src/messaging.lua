@@ -36,12 +36,12 @@ messaging.MESSAGE_PASS_THROUGH_PROPERTIES = MESSAGE_PASS_THROUGH_PROPERTIES
 -- Embed saga information in data to avoid tag loss during forwarding
 function messaging.embed_saga_info_in_data(data, saga_id, response_action)
 
-    -- TODO: Find all places using embed_saga_info_in_data, should decide whether to embed extension context
-    --   in Data based on remote "participant" settings. If not, consider (by default) embedding extension
+    -- TODO: Find all places using `embed_saga_info_in_data`, should decide whether to embed extension context
+    --   in message `Data` property based on remote "participant" settings. If not, consider (by default) including extension
     --   context information in the direct properties of the message being sent?
-    --   We can see that embed_saga_info_in_data is followed immediately by commit_send_or_error.
+    --   We can see that `embed_saga_info_in_data` is followed immediately by `commit_send_or_error`.
     --   At this point, should the extension context information to be embedded be passed through
-    --   the tags parameter of commit_send_or_error?
+    --   the tags parameter of `commit_send_or_error`?
 
     -- CRITICAL FIX: Create a copy instead of modifying the original object to avoid polluting context references
     local enhanced_data = {}
