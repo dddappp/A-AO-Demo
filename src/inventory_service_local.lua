@@ -50,7 +50,7 @@ function inventory_service_local.process_inventory_surplus_or_shortage_prepare_g
         location = context.location,
     }
     context.inventory_item_id = _inventory_item_id
-    -- 现在GetInventoryItem需要JSON对象格式：{"inventory_item_id": {...}}
+    -- Now GetInventoryItem requires JSON object format: {"inventory_item_id": {...}}
     local request = {
         inventory_item_id = _inventory_item_id
     }
