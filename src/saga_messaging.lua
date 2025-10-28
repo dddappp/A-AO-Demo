@@ -3,16 +3,6 @@ local messaging = require("messaging")
 
 local saga_messaging = {}
 
--- Extract complete reply context from message
-function saga_messaging.extract_reply_context(msg)
-    return {
-        reply = msg.reply,
-        From = msg.From,  -- Reply target address
-        Data = {},        -- Reply data (always empty object)
-        [messaging.X_CONTEXT_KEY] = messaging.extract_cached_x_context_from_message(msg)  -- Pre-extracted X-Tags
-    }
-end
-
 local function respond_original_requester(saga_instance, result_or_error, is_error)
     local reply_context = saga_instance.original_message
 

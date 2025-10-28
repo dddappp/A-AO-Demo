@@ -73,7 +73,7 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
 
     local status, request_or_error, commit = pcall((function()
     -- Extract reply context with pre-computed X-Tags
-    local original_message = saga_messaging.extract_reply_context(msg)
+    local original_message = messaging.extract_reply_context(msg)
 
         local saga_instance, commit = saga.create_saga_instance(ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE, target,
             tags,

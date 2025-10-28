@@ -30,7 +30,7 @@ function messaging.embed_saga_info_in_data(data, saga_id, response_action)
     return enhanced_data
 end
 
-function messaging.extract_cached_x_context_from_message(msg)
+local function extract_cached_x_context_from_message(msg)
     local x_context = msg[messaging.X_CONTEXT_KEY] -- Cache result in msg["XTags"] to avoid repeated computation
     -- Only nil and false are considered false, other values (including empty table {}) are true
     if (x_context) then
@@ -78,20 +78,30 @@ function messaging.extract_cached_x_context_from_message(msg)
     return x_context
 end
 
+-- Extract complete reply context from message
+function messaging.extract_reply_context(msg)
+    return {
+        reply = msg.reply,
+        From = msg.From,  -- Reply target address
+        Data = {},        -- Reply data (always empty object)
+        [messaging.X_CONTEXT_KEY] = extract_cached_x_context_from_message(msg)  -- Pre-extracted X-Tags
+    }
+end
+
 function messaging.get_saga_id(msg)
     -- Extract saga information only from data (cross-process safe)
-    local x_context = messaging.extract_cached_x_context_from_message(msg)
+    local x_context = extract_cached_x_context_from_message(msg)
     return x_context[messaging.X_CONTEXT.SAGA_ID]
 end
 
 function messaging.get_response_action(msg)
     -- Extract response action only from data (cross-process safe)
-    local x_context = messaging.extract_cached_x_context_from_message(msg)
+    local x_context = extract_cached_x_context_from_message(msg)
     return x_context[messaging.X_CONTEXT.RESPONSE_ACTION]
 end
 
 function messaging.get_no_response_required(msg)
-    local x_context = messaging.extract_cached_x_context_from_message(msg)
+    local x_context = extract_cached_x_context_from_message(msg)
     return x_context[messaging.X_CONTEXT.NO_RESPONSE_REQUIRED]
 end
 
@@ -126,7 +136,7 @@ function messaging.respond(status, result_or_error, request_msg)
     local data = status and { result = result_or_error } or { error = messaging.extract_error_code(result_or_error) };
 
     -- Extract saga information from data
-    local x_context = messaging.extract_cached_x_context_from_message(request_msg)
+    local x_context = extract_cached_x_context_from_message(request_msg)
     local response_action = x_context[messaging.X_CONTEXT.RESPONSE_ACTION]
 
     -- Use request_msg.From as response target
