@@ -2,6 +2,7 @@ local json = require("json")
 
 local messaging = {}
 
+-- Extension context property names embedded in message Data property
 local X_CONTEXT = {
     NO_RESPONSE_REQUIRED = "X-NoResponseRequired",
     RESPONSE_ACTION = "X-ResponseAction",
@@ -17,8 +18,8 @@ local X_CONTEXT_NORMALIZED_NAMES = {
 
 
 local MESSAGE_PASS_THROUGH_PROPERTIES = {
-    X_CONTEXT.SAGA_ID,
     X_CONTEXT_NORMALIZED_NAMES.SAGA_ID,
+    X_CONTEXT.SAGA_ID,
 }
 
 -- Extension context source constants
