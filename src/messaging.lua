@@ -25,7 +25,7 @@ local MESSAGE_PASS_THROUGH_PROPERTIES = {
 -- Extension context source constants
 local X_CONTEXT_SOURCE = {
     DIRECT_PROPERTIES = 1,  -- From message direct properties
-    DATA_EMBEDDED = 2, -- Embedded in msg.Data as extension context information
+    DATA_EMBEDDED = 2, -- Embedded in msg.Data
 }
 
 local X_CONTEXT_KEY = "X-Context"
