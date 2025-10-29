@@ -83,8 +83,9 @@ function inventory_service.process_inventory_surplus_or_shortage(msg, env, respo
         )
         local saga_id = saga_instance.saga_id
         local request = process_inventory_surplus_or_shortage_prepare_get_inventory_item_request(context)
-        -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
+        -- Use configurable X-context embedding strategy
+        local embedding_strategy = inventory_item_config.get_x_context_embedding()
+        request, tags = messaging.embed_saga_info(request, tags, embedding_strategy, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_GET_INVENTORY_ITEM_CALLBACK)
         return request, commit
     end))
 
@@ -128,8 +129,9 @@ function inventory_service.process_inventory_surplus_or_shortage_get_inventory_i
             movement_quantity = context.movement_quantity,
         }
         local commit = saga.move_saga_instance_forward(saga_id, 1, target, tags, context)
-        -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK)
+        -- Use configurable X-context embedding strategy
+        local embedding_strategy = in_out_config.get_x_context_embedding()
+        request, tags = messaging.embed_saga_info(request, tags, embedding_strategy, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_CALLBACK)
         return request, commit
     end))
 
@@ -168,8 +170,9 @@ local function process_inventory_surplus_or_shortage_compensate_create_single_li
         }
 
         local commit = saga.rollback_saga_instance(saga_id, pre_local_step_count + 1, target, tags, context, _err)
-        -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK)
+        -- Use configurable X-context embedding strategy
+        local embedding_strategy = in_out_config.get_x_context_embedding()
+        request, tags = messaging.embed_saga_info(request, tags, embedding_strategy, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_CREATE_SINGLE_LINE_IN_OUT_COMPENSATION_CALLBACK)
         return request, commit
     end))
     local total_commit = function()
@@ -234,8 +237,9 @@ function inventory_service.process_inventory_surplus_or_shortage_create_single_l
             version = context.item_version,
         }
         local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, target, tags, context)
-        -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK)
+        -- Use configurable X-context embedding strategy
+        local embedding_strategy = inventory_item_config.get_x_context_embedding()
+        request, tags = messaging.embed_saga_info(request, tags, embedding_strategy, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_ADD_INVENTORY_ITEM_ENTRY_CALLBACK)
         return request, commit
     end))
 
@@ -301,8 +305,9 @@ function inventory_service.process_inventory_surplus_or_shortage_add_inventory_i
             version = context.in_out_version,
         }
         local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, target, tags, context)
-        -- Embed saga information in request data instead of tags
-        request = messaging.embed_saga_info_in_data(request, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK)
+        -- Use configurable X-context embedding strategy
+        local embedding_strategy = in_out_config.get_x_context_embedding()
+        request, tags = messaging.embed_saga_info(request, tags, embedding_strategy, saga_id, ACTIONS.PROCESS_INVENTORY_SURPLUS_OR_SHORTAGE_COMPLETE_IN_OUT_CALLBACK)
         return request, commit
     end))
 

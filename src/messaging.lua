@@ -28,14 +28,20 @@ local X_CONTEXT_SOURCE = {
     DATA_EMBEDDED = 2, -- Embedded in msg.Data
 }
 
+-- X-context embedding strategy constants (aligned with X_CONTEXT_SOURCE)
+local EMBEDDING_STRATEGY = {
+    DIRECT_PROPERTIES = 1,  -- Embed in message direct properties (delivered via tags)
+    DATA_EMBEDDED = 2,      -- Embed in message Data property
+}
+
 local X_CONTEXT_KEY = "X-Context"
 local X_CONTEXT_SOURCE_KEY = "X-Context-Source"  -- Key for storing extension context source
 
 messaging.X_CONTEXT = X_CONTEXT
 messaging.MESSAGE_PASS_THROUGH_PROPERTIES = MESSAGE_PASS_THROUGH_PROPERTIES
 
--- Embed saga information in data to avoid tag loss during forwarding
-function messaging.embed_saga_info_in_data(data, saga_id, response_action)
+-- Internal function: Embed saga information in data to avoid tag loss during forwarding
+local function embed_saga_info_in_data(data, saga_id, response_action)
 
     -- TODO: Find all places using `embed_saga_info_in_data`, should decide whether to embed extension context
     --   in message `Data` property based on remote "participant" settings. If not, consider (by default) including extension
@@ -54,6 +60,32 @@ function messaging.embed_saga_info_in_data(data, saga_id, response_action)
     enhanced_data[messaging.X_CONTEXT.SAGA_ID] = saga_id
     enhanced_data[messaging.X_CONTEXT.RESPONSE_ACTION] = response_action
     return enhanced_data
+end
+
+-- Public API: Unified saga info embedding with configurable strategy
+function messaging.embed_saga_info(request, tags, embedding_strategy, saga_id, response_action)
+    -- 参数顺序：request, tags, embedding_strategy, saga_id, response_action
+
+    -- 初始化参数
+    request = request or {}
+    tags = tags or {}
+
+    -- 简化策略：只有EMBEDDING_STRATEGY.DATA_EMBEDDED使用Data嵌入，其他都使用直接属性嵌入
+    if embedding_strategy == EMBEDDING_STRATEGY.DATA_EMBEDDED then
+        -- 嵌入到Data属性（兼容现有方式）
+        request = embed_saga_info_in_data(request, saga_id, response_action)
+    else
+        -- 默认使用直接属性嵌入（通过tags传递，最终在接收端变成规范化名称）
+        tags[X_CONTEXT_NORMALIZED_NAMES.SAGA_ID] = saga_id
+        tags[X_CONTEXT_NORMALIZED_NAMES.RESPONSE_ACTION] = response_action
+    end
+
+    return request, tags
+end
+
+-- Backward compatibility: Keep original public function
+function messaging.embed_saga_info_in_data(data, saga_id, response_action)
+    return embed_saga_info_in_data(data, saga_id, response_action)
 end
 
 local function extract_cached_x_context_from_message(msg)
