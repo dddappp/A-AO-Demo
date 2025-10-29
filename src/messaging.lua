@@ -42,14 +42,6 @@ messaging.MESSAGE_PASS_THROUGH_PROPERTIES = MESSAGE_PASS_THROUGH_PROPERTIES
 
 -- Internal function: Embed saga information in data to avoid tag loss during forwarding
 local function embed_saga_info_in_data(data, saga_id, response_action)
-
-    -- TODO: Find all places using `embed_saga_info_in_data`, should decide whether to embed extension context
-    --   in message `Data` property based on remote "participant" settings. If not, consider (by default) including extension
-    --   context information in the direct properties of the message being sent?
-    --   We can see that `embed_saga_info_in_data` is followed immediately by `commit_send_or_error`.
-    --   At this point, should the extension context information to be embedded be passed through
-    --   the tags parameter of `commit_send_or_error`?
-
     -- CRITICAL FIX: Create a copy instead of modifying the original object to avoid polluting context references
     local enhanced_data = {}
     if data then
@@ -64,18 +56,15 @@ end
 
 -- Public API: Unified saga info embedding with configurable strategy
 function messaging.embed_saga_info(request, tags, embedding_strategy, saga_id, response_action)
-    -- 参数顺序：request, tags, embedding_strategy, saga_id, response_action
-
-    -- 初始化参数
     request = request or {}
     tags = tags or {}
 
-    -- 简化策略：只有EMBEDDING_STRATEGY.DATA_EMBEDDED使用Data嵌入，其他都使用直接属性嵌入
+    -- Simplified strategy: Only EMBEDDING_STRATEGY.DATA_EMBEDDED uses Data embedding, others use direct properties
     if embedding_strategy == EMBEDDING_STRATEGY.DATA_EMBEDDED then
-        -- 嵌入到Data属性（兼容现有方式）
+        -- Embed in Data property (backward compatible)
         request = embed_saga_info_in_data(request, saga_id, response_action)
     else
-        -- 默认使用直接属性嵌入（通过tags传递，最终在接收端变成规范化名称）
+        -- Default to direct properties embedding (via tags, normalized at receiver)
         tags[X_CONTEXT_NORMALIZED_NAMES.SAGA_ID] = saga_id
         tags[X_CONTEXT_NORMALIZED_NAMES.RESPONSE_ACTION] = response_action
     end
