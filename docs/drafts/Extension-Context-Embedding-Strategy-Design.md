@@ -24,12 +24,21 @@ get_extension_context_embedding() → embedding_strategy
 
 ### 配置实现
 
+**嵌入策略常量定义**：
+```lua
+-- Extension context embedding strategy constants
+local EMBEDDING_STRATEGY = {
+    DIRECT_PROPERTIES = 1,  -- Embed in message direct properties
+    TAGS = 2,              -- Embed in tags table
+}
+```
+
 **全局变量支持动态配置**：
 ```lua
 -- 支持运行时通过Eval消息修改
-INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING or "direct_properties"
-INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING or "direct_properties"
-INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING or "direct_properties"
+INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
+INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
+INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
 ```
 
 **配置函数**：
@@ -93,8 +102,8 @@ function messaging.embed_saga_info(request, tags, embedding_strategy, saga_id, r
     request = request or {}
     tags = tags or {}
 
-    -- 简化策略：只有"tags"使用tags嵌入，其他都使用直接属性嵌入
-    if embedding_strategy == "tags" then
+    -- 简化策略：只有EMBEDDING_STRATEGY.TAGS使用tags嵌入，其他都使用直接属性嵌入
+    if embedding_strategy == EMBEDDING_STRATEGY.TAGS then
         -- 添加到tags表
         tags[X_CONTEXT.SAGA_ID] = saga_id
         tags[X_CONTEXT.RESPONSE_ACTION] = response_action
@@ -119,7 +128,7 @@ local embedding_strategy = inventory_item_config.get_extension_context_embedding
 local request, tags = messaging.embed_saga_info(
     request,
     tags,
-    embedding_strategy,
+    embedding_strategy,  -- EMBEDDING_STRATEGY.DIRECT_PROPERTIES 或 EMBEDDING_STRATEGY.TAGS
     saga_id,
     callback_action
 )
@@ -132,16 +141,16 @@ messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 
 ### 支持的嵌入策略
 
-| 策略 | 说明 | 使用场景 |
-|------|------|----------|
-| `"direct_properties"` | 嵌入到消息直接属性 | 默认策略，规范化名称访问 |
-| `"tags"` | 添加到tags表 | 通过commit_send_or_error处理 |
-| 其他值 | 自动降级为直接属性 | 容错设计 |
+| 策略常量 | 值 | 说明 | 使用场景 |
+|----------|----|------|----------|
+| `EMBEDDING_STRATEGY.DIRECT_PROPERTIES` | 1 | 嵌入到消息直接属性 | 默认策略，规范化名称访问 |
+| `EMBEDDING_STRATEGY.TAGS` | 2 | 添加到tags表 | 通过commit_send_or_error处理 |
+| 其他值 | - | 自动降级为直接属性 | 容错设计 |
 
 ### 策略选择逻辑
 
 1. **简化设计**: 只支持两种策略
-2. **默认行为**: 任何非"tags"的值都使用直接属性嵌入
+2. **默认行为**: 任何非`EMBEDDING_STRATEGY.TAGS`的值都使用直接属性嵌入
 3. **容错性**: 无效策略自动降级为直接属性
 
 ## 🔄 向后兼容性
@@ -169,7 +178,7 @@ end
 ### 参数顺序设计
 `request, tags, embedding_strategy, saga_id, response_action` 的顺序考虑：
 - **输入优先**: request和tags是主要输入
-- **配置其次**: embedding_strategy是控制参数
+- **配置其次**: embedding_strategy是控制参数（EMBEDDING_STRATEGY常量）
 - **数据最后**: saga_id和response_action是业务数据
 
 ## 📝 待实现任务
