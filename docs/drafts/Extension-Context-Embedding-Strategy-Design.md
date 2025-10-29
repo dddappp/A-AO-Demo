@@ -12,9 +12,8 @@
 
 ### 方案评估
 
-经过讨论，我们决定采用**方案C**：
+经过讨论，我们决定采用的**方案: 保持原函数，新增单独的配置函数**。即：
 
-**方案C: 保持原函数，新增单独的配置函数**
 ```lua
 -- 保持原有API不变
 get_target() → target_process_id
@@ -28,9 +27,9 @@ get_extension_context_embedding() → embedding_strategy
 **全局变量支持动态配置**：
 ```lua
 -- 支持运行时通过Eval消息修改
-INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING or "data"
-INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING or "data"
-INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING or "data"
+INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING or "direct_properties"
+INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING or "direct_properties"
+INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING or "direct_properties"
 ```
 
 **配置函数**：
@@ -88,37 +87,19 @@ end
 ```lua
 -- Public API
 function messaging.embed_saga_info(request, tags, embedding_strategy, saga_id, response_action)
-    -- 参数顺序调整：request, tags, embedding_strategy, saga_id, response_action
-
-    -- 策略验证和默认值处理
-    if not embedding_strategy or embedding_strategy == "" then
-        embedding_strategy = "direct_properties"  -- 默认策略
-    end
+    -- 参数顺序：request, tags, embedding_strategy, saga_id, response_action
 
     -- 初始化参数
     request = request or {}
     tags = tags or {}
 
-    if embedding_strategy == "data" then
-        -- 嵌入到Data属性
-        request = embed_saga_info_in_data(request, saga_id, response_action)
-
-    elseif embedding_strategy == "direct_properties" then
-        -- 嵌入到消息直接属性
-        request[X_CONTEXT_NORMALIZED_NAMES.SAGA_ID] = saga_id
-        request[X_CONTEXT_NORMALIZED_NAMES.RESPONSE_ACTION] = response_action
-
-    elseif embedding_strategy == "tags" then
+    -- 简化策略：只有"tags"使用tags嵌入，其他都使用直接属性嵌入
+    if embedding_strategy == "tags" then
         -- 添加到tags表
         tags[X_CONTEXT.SAGA_ID] = saga_id
         tags[X_CONTEXT.RESPONSE_ACTION] = response_action
-
-    elseif embedding_strategy == "none" then
-        -- 不嵌入任何信息
-        -- 直接返回，不做任何修改
-
     else
-        -- 无效策略，默认使用直接属性嵌入
+        -- 默认使用直接属性嵌入（包括无效策略）
         request[X_CONTEXT_NORMALIZED_NAMES.SAGA_ID] = saga_id
         request[X_CONTEXT_NORMALIZED_NAMES.RESPONSE_ACTION] = response_action
     end
@@ -153,16 +134,15 @@ messaging.commit_send_or_error(status, request_or_error, commit, target, tags)
 
 | 策略 | 说明 | 使用场景 |
 |------|------|----------|
-| `"data"` | 嵌入到消息Data属性 | 当前默认，兼容现有代码 |
-| `"direct_properties"` | 嵌入到消息直接属性 | 新推荐方式，规范化名称访问 |
+| `"direct_properties"` | 嵌入到消息直接属性 | 默认策略，规范化名称访问 |
 | `"tags"` | 添加到tags表 | 通过commit_send_or_error处理 |
-| `"none"` | 不嵌入 | 调试或特殊情况 |
+| 其他值 | 自动降级为直接属性 | 容错设计 |
 
 ### 策略选择逻辑
 
-1. **优先级**: `direct_properties` > `data` > `tags` > `none`
-2. **默认值**: 无效策略自动降级为 `direct_properties`
-3. **兼容性**: 现有代码默认使用 `data` 策略
+1. **简化设计**: 只支持两种策略
+2. **默认行为**: 任何非"tags"的值都使用直接属性嵌入
+3. **容错性**: 无效策略自动降级为直接属性
 
 ## 🔄 向后兼容性
 
