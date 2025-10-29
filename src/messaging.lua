@@ -49,8 +49,8 @@ local function embed_saga_info_in_data(data, saga_id, response_action)
             enhanced_data[k] = v
         end
     end
-    enhanced_data[messaging.X_CONTEXT.SAGA_ID] = saga_id
-    enhanced_data[messaging.X_CONTEXT.RESPONSE_ACTION] = response_action
+    enhanced_data[X_CONTEXT.SAGA_ID] = saga_id
+    enhanced_data[X_CONTEXT.RESPONSE_ACTION] = response_action
     return enhanced_data
 end
 
