@@ -1,4 +1,4 @@
-# Extension Context Embedding Strategy Design
+# X-Context Embedding Strategy Design
 
 **日期**: 2025-10-29
 **状态**: 设计讨论阶段
@@ -6,7 +6,7 @@
 
 ## 🎯 问题背景
 
-在AO消息系统中，扩展上下文（Saga ID, Response Action等）需要在进程间传递。目前的实现将这些信息嵌入到消息的`Data`属性中，但这可能不是最优的传递方式。
+在AO消息系统中，X-Context（Saga ID, Response Action等）需要在进程间传递。目前的实现将这些信息嵌入到消息的`Data`属性中，但这可能不是最优的传递方式。
 
 ## 📋 配置设计方案
 
@@ -19,14 +19,14 @@
 get_target() → target_process_id
 
 -- 新增配置函数
-get_extension_context_embedding() → embedding_strategy
+get_x_context_embedding() → embedding_strategy
 ```
 
 ### 配置实现
 
 **嵌入策略常量定义**：
 ```lua
--- Extension context embedding strategy constants (aligned with messaging.lua X_CONTEXT_SOURCE)
+-- X-context embedding strategy constants (aligned with messaging.lua X_CONTEXT_SOURCE)
 local EMBEDDING_STRATEGY = {
     DIRECT_PROPERTIES = 1,  -- Embed in message direct properties (delivered via tags)
     DATA_EMBEDDED = 2,      -- Embed in message Data property
@@ -35,40 +35,49 @@ local EMBEDDING_STRATEGY = {
 
 **全局变量支持动态配置**：
 ```lua
+-- Configuration storage (supports state persistence across reloads)
+INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID = INVENTORY_SERVICE_INVENTORY_ITEM_TARGET_PROCESS_ID or ""
+INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID = INVENTORY_SERVICE_IN_OUT_TARGET_PROCESS_ID or ""
+
+-- X-context embedding strategy configuration
+INVENTORY_SERVICE_DEFAULT_X_CONTEXT_EMBEDDING = INVENTORY_SERVICE_DEFAULT_X_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
+INVENTORY_SERVICE_INVENTORY_ITEM_X_CONTEXT_EMBEDDING = INVENTORY_SERVICE_INVENTORY_ITEM_X_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
+INVENTORY_SERVICE_IN_OUT_X_CONTEXT_EMBEDDING = INVENTORY_SERVICE_IN_OUT_X_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
+
 -- 支持运行时通过Eval消息修改
-INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
-INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING = INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
+INVENTORY_SERVICE_INVENTORY_ITEM_X_CONTEXT_EMBEDDING = INVENTORY_SERVICE_INVENTORY_ITEM_X_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
+INVENTORY_SERVICE_IN_OUT_X_CONTEXT_EMBEDDING = INVENTORY_SERVICE_IN_OUT_X_CONTEXT_EMBEDDING or EMBEDDING_STRATEGY.DIRECT_PROPERTIES
 ```
 
 **配置函数**：
 ```lua
 local config = {
     -- 全局配置
-    get_extension_context_embedding = function()
-        return INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING
+    get_x_context_embedding = function()
+        return INVENTORY_SERVICE_DEFAULT_X_CONTEXT_EMBEDDING
     end,
-    set_extension_context_embedding = function(strategy)
-        INVENTORY_SERVICE_DEFAULT_EXTENSION_CONTEXT_EMBEDDING = strategy
+    set_x_context_embedding = function(strategy)
+        INVENTORY_SERVICE_DEFAULT_X_CONTEXT_EMBEDDING = strategy
     end,
 
     inventory_item = {
         -- 服务特定配置
-        get_extension_context_embedding = function()
-            return INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING
+        get_x_context_embedding = function()
+            return INVENTORY_SERVICE_INVENTORY_ITEM_X_CONTEXT_EMBEDDING
         end,
-        set_extension_context_embedding = function(strategy)
-            INVENTORY_SERVICE_INVENTORY_ITEM_EXTENSION_CONTEXT_EMBEDDING = strategy
+        set_x_context_embedding = function(strategy)
+            INVENTORY_SERVICE_INVENTORY_ITEM_X_CONTEXT_EMBEDDING = strategy
         end,
         -- ... 其他现有配置
     },
 
     in_out = {
         -- 服务特定配置
-        get_extension_context_embedding = function()
-            return INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING
+        get_x_context_embedding = function()
+            return INVENTORY_SERVICE_IN_OUT_X_CONTEXT_EMBEDDING
         end,
-        set_extension_context_embedding = function(strategy)
-            INVENTORY_SERVICE_IN_OUT_EXTENSION_CONTEXT_EMBEDDING = strategy
+        set_x_context_embedding = function(strategy)
+            INVENTORY_SERVICE_IN_OUT_X_CONTEXT_EMBEDDING = strategy
         end,
         -- ... 其他现有配置
     }
@@ -120,7 +129,7 @@ end
 **inventory_service.lua 中的使用**：
 ```lua
 -- 获取配置
-local embedding_strategy = inventory_item_config.get_extension_context_embedding()
+local embedding_strategy = inventory_item_config.get_x_context_embedding()
 
 -- 使用新API
 local request, tags = messaging.embed_saga_info(
@@ -181,7 +190,7 @@ end
 
 ## 📝 待实现任务
 
-- [ ] 在 `inventory_service_config.lua` 中添加配置函数
+- [ ] 在 `inventory_service_config.lua` 中添加X-context配置函数
 - [ ] 在 `messaging.lua` 中实现新API
 - [ ] 在 `inventory_service.lua` 中迁移调用
 - [ ] 更新相关文档
@@ -189,4 +198,4 @@ end
 
 ## 🎉 总结
 
-这个设计提供了灵活的扩展上下文嵌入策略，同时保持了向后兼容性。通过全局变量配置支持运行时动态调整，为不同的外部服务提供个性化的嵌入策略。统一的 `embed_saga_info` API 让代码更加清晰和可维护。
+这个设计提供了灵活的X-context嵌入策略，同时保持了向后兼容性。通过全局变量配置支持运行时动态调整，为不同的外部服务提供个性化的嵌入策略。统一的 `embed_saga_info` API 让代码更加清晰和可维护。
