@@ -19,8 +19,7 @@ echo "  • Testing methodology: eval + Inbox verification is closest to real co
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Constants for output display
-RESPONSE_DISPLAY_LINES=15  # Number of lines to display from ao-cli responses (showing the most valuable tail part)
-INBOX_DISPLAY_LINES=50     # Number of lines to display from inbox output (showing the most valuable beginning part)
+INBOX_DISPLAY_LINES=500     # Number of lines to display from inbox output (showing the most valuable beginning part)
 
 # Constants for Inbox waiting
 INBOX_CHECK_INTERVAL=2     # Check Inbox every 2 seconds

@@ -2335,40 +2335,12 @@ msg.reply({
 
 #### 11.3.1 参数获取的健壮性处理
 ```lua
--- 推荐的参数获取方式
-local function getParam(msg, paramName)
-  -- 检查多种可能的大小写组合
-  return msg.Tags[paramName] or 
-         msg.Tags[paramName:lower()] or 
-         msg.Tags[paramName:gsub("(%u)", function(c) return c:lower() end)] or
-         msg[paramName]
-end
-
--- 使用示例
-local tokenId = getParam(msg, "TokenId")
-local recipient = getParam(msg, "Recipient")
-local transferable = getParam(msg, "Transferable")
+local tokenId = msg.TokenId or msg.Tokenid
 ```
 
 #### 11.3.2 消息格式验证
 ```lua
--- 验证参数存在性
-local function validateParams(msg, requiredParams)
-  for _, param in ipairs(requiredParams) do
-    local value = getParam(msg, param)
-    if not value or type(value) ~= 'string' then
-      return false, param .. " is required and must be a string"
-    end
-  end
-  return true, nil
-end
-
--- 使用示例
-local valid, errorMsg = validateParams(msg, {"TokenId", "Recipient"})
-if not valid then
-  -- 返回错误消息
-  return
-end
+-- TBD
 ```
 
 #### 11.3.3 回复格式的一致性
