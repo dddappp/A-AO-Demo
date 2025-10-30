@@ -26,6 +26,28 @@ local utils = {
   end
 }
 
+-- Unified response sender function
+local function sendResponse(msg, response)
+  if msg.reply then
+    msg.reply(response)
+  else
+    response.Target = msg.From
+    Send(response)
+  end
+end
+
+-- Unified error sender function
+local function sendError(msg, action, error, data)
+  local errorMsg = {
+    Action = action,
+    Error = error
+  }
+  if data then
+    errorMsg.Data = data
+  end
+  sendResponse(msg, errorMsg)
+end
+
 
 -- Balance handler - Exact match with Wander wallet expectations
 Handlers.add('nft_balance', Handlers.utils.hasMatchingTag("Action", "Balance"), function(msg)
@@ -85,22 +107,19 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
   local description = msg.Description
   local image = msg.Image
 
-  -- Validate required parameters (following research report approach but with better error handling)
+  -- Validate required parameters
   if not name or type(name) ~= 'string' or name == '' then
-    local errorMsg = { Action = 'Mint-Error', Error = 'Name is required and must be a non-empty string' }
-    if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'Mint-Error', Error = 'Name is required'}) end
+    sendError(msg, 'Mint-Error', 'Name is required and must be a non-empty string')
     return
   end
 
   if not description or type(description) ~= 'string' or description == '' then
-    local errorMsg = { Action = 'Mint-Error', Error = 'Description is required and must be a non-empty string' }
-    if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'Mint-Error', Error = 'Description is required'}) end
+    sendError(msg, 'Mint-Error', 'Description is required and must be a non-empty string')
     return
   end
 
   if not image or type(image) ~= 'string' or image == '' then
-    local errorMsg = { Action = 'Mint-Error', Error = 'Image is required and must be a non-empty string' }
-    if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'Mint-Error', Error = 'Image is required'}) end
+    sendError(msg, 'Mint-Error', 'Image is required and must be a non-empty string')
     return
   end
 
@@ -164,29 +183,25 @@ Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Trans
 
     -- Validate NFT transfer parameters (matching Wander wallet expectations)
     if not recipient or type(recipient) ~= 'string' or recipient == '' then
-      local errorMsg = { Action = 'Transfer-Error', Error = 'Recipient is required for NFT transfer' }
-      if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'Transfer-Error', Error = 'Recipient is required'}) end
+      sendError(msg, 'Transfer-Error', 'Recipient is required for NFT transfer')
       return
     end
 
     -- Validate NFT exists
     if not NFTs[tokenId] then
-      local errorMsg = { Action = 'Transfer-Error', TokenId = tokenId, Error = 'NFT not found' }
-      if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'Transfer-Error', TokenId = tokenId, Error = 'NFT not found'}) end
+      sendError(msg, 'Transfer-Error', 'NFT not found', 'TokenId: ' .. tokenId)
       return
     end
 
     -- Validate ownership
     if Owners[tokenId] ~= msg.From then
-      local errorMsg = { Action = 'Transfer-Error', TokenId = tokenId, Error = 'You do not own this NFT' }
-      if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'Transfer-Error', TokenId = tokenId, Error = 'You do not own this NFT'}) end
+      sendError(msg, 'Transfer-Error', 'You do not own this NFT', 'TokenId: ' .. tokenId)
       return
     end
 
     -- Validate transferable
     if not NFTs[tokenId].transferable then
-      local errorMsg = { Action = 'Transfer-Error', TokenId = tokenId, Error = 'This NFT is not transferable' }
-      if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'Transfer-Error', TokenId = tokenId, Error = 'This NFT is not transferable'}) end
+      sendError(msg, 'Transfer-Error', 'This NFT is not transferable', 'TokenId: ' .. tokenId)
       return
     end
 
@@ -219,77 +234,35 @@ Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Trans
       if msg.reply then
         msg.reply(debitNotice)
       else
+        -- NOTE 调用 Send 之前注意设置 Target
+        debitNotice.Target = msg.From
         Send(debitNotice)
       end
       Send(creditNotice)
     end
   else
     -- Regular token transfer - not supported by this NFT contract
-    local errorMsg = { Action = 'Transfer-Error', Error = 'This NFT contract only supports NFT transfers with TokenId parameter' }
-    if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'Transfer-Error', Error = 'NFT transfers require TokenId parameter'}) end
+    sendError(msg, 'Transfer-Error', 'This NFT contract only supports NFT transfers with TokenId parameter')
   end
 end)
 
 -- Get NFT information handler - Compatible with research report format
 Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), function(msg)
-  -- Debug logging
-  print("=== Get-NFT Handler Called ===")
-  print("msg.From: " .. tostring(msg.From))
-  print("msg.Action: " .. tostring(msg.Action))
-
   -- Direct parameter access - AO converts TokenId to Tokenid
   local tokenId = msg.TokenId or msg.Tokenid or msg.Tags.TokenId or msg.Tags.Tokenid
-  print("tokenId extracted: " .. tostring(tokenId))
 
   -- Validate parameter
   if not tokenId or type(tokenId) ~= 'string' or tokenId == '' then
-    print("ERROR: TokenId validation failed")
-    local errorMsg = {
-      Action = 'NFT-Error',
-      Error = 'TokenId is required and must be a string',
-      Data = 'TokenId parameter missing or invalid'
-    }
-    if msg.reply then
-      msg.reply(errorMsg)
-    else
-      Send({
-        Target = msg.From,
-        Action = 'NFT-Error',
-        Error = 'TokenId is required and must be a string',
-        ['Data-Protocol'] = 'ao',
-        Type = 'NFT-Error'
-      })
-    end
+    sendError(msg, 'NFT-Error', 'TokenId is required and must be a string')
     return
   end
 
   -- Check if NFT exists
   local nft = NFTs[tokenId]
-  print("NFT lookup for tokenId '" .. tokenId .. "': " .. tostring(nft ~= nil))
   if not nft then
-    print("ERROR: NFT not found")
-    local errorMsg = {
-      Action = 'NFT-Error',
-      TokenId = tokenId,
-      Error = 'NFT not found',
-      Data = 'The requested NFT does not exist'
-    }
-    if msg.reply then
-      msg.reply(errorMsg)
-    else
-      Send({
-        Target = msg.From,
-        Action = 'NFT-Error',
-        TokenId = tokenId,
-        Error = 'NFT not found',
-        ['Data-Protocol'] = 'ao',
-        Type = 'NFT-Error'
-      })
-    end
+    sendError(msg, 'NFT-Error', 'NFT not found', 'TokenId: ' .. tokenId)
     return
   end
-
-  print("SUCCESS: NFT found, sending response")
 
   -- Return NFT information
   local response = {
@@ -316,38 +289,7 @@ Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), func
     })
   }
 
-  if msg.reply then
-    print("Using msg.reply()")
-    msg.reply(response)
-  else
-    print("Using Send()")
-    Send({
-      Target = msg.From,
-      Action = 'NFT-Info',
-      TokenId = tokenId,
-      Name = nft.name,
-      Description = nft.description,
-      Image = nft.image,
-      Owner = Owners[tokenId],
-      Creator = nft.creator,
-      CreatedAt = nft.createdAt,
-      Transferable = tostring(nft.transferable),
-      ['Data-Protocol'] = 'ao',
-      Type = 'NFT-Info',
-      Data = json.encode({
-        tokenId = tokenId,
-        name = nft.name,
-        description = nft.description,
-        image = nft.image,
-        attributes = nft.attributes,
-        owner = Owners[tokenId],
-        creator = nft.creator,
-        createdAt = nft.createdAt,
-        transferable = nft.transferable
-      })
-    })
-  end
-  print("Response sent successfully")
+  sendResponse(msg, response)
 end)
 
 -- Get user NFTs handler - Compatible with research report format
@@ -382,26 +324,7 @@ Handlers.add('get_user_nfts', Handlers.utils.hasMatchingTag("Action", "Get-User-
     })
   }
 
-  if msg.reply then
-    print("Using msg.reply() for User-NFTs")
-    msg.reply(response)
-  else
-    print("Using Send() for User-NFTs")
-    Send({
-      Target = msg.From,
-      Action = 'User-NFTs',
-      Address = userAddress,
-      Count = tostring(count),
-      ['Data-Protocol'] = 'ao',
-      Type = 'User-NFTs',
-      Data = json.encode({
-        address = userAddress,
-        nfts = userNFTs,
-        count = count
-      })
-    })
-  end
-  print("User-NFTs response sent successfully")
+  sendResponse(msg, response)
 end)
 
 -- Set NFT transferable status handler - Compatible with research report format
@@ -410,30 +333,26 @@ Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Se
   local tokenId = msg.TokenId or msg.Tokenid
   local transferable = msg.Transferable
 
-  -- Validate parameters (following research report approach but with better error handling)
+  -- Validate parameters
   if not tokenId or type(tokenId) ~= 'string' or tokenId == '' then
-    local errorMsg = { Action = 'NFT-Transferable-Error', Error = 'TokenId is required' }
-    if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'NFT-Transferable-Error', Error = 'TokenId is required'}) end
+    sendError(msg, 'NFT-Transferable-Error', 'TokenId is required')
     return
   end
 
   if not transferable or type(transferable) ~= 'string' then
-    local errorMsg = { Action = 'NFT-Transferable-Error', Error = 'Transferable is required and must be a string' }
-    if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'NFT-Transferable-Error', Error = 'Transferable is required'}) end
+    sendError(msg, 'NFT-Transferable-Error', 'Transferable is required and must be a string')
     return
   end
 
   -- Check if NFT exists
   if not NFTs[tokenId] then
-    local errorMsg = { Action = 'NFT-Transferable-Error', TokenId = tokenId, Error = 'NFT not found' }
-    if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'NFT-Transferable-Error', TokenId = tokenId, Error = 'NFT not found'}) end
+    sendError(msg, 'NFT-Transferable-Error', 'NFT not found', 'TokenId: ' .. tokenId)
     return
   end
 
   -- Check ownership
   if Owners[tokenId] ~= msg.From then
-    local errorMsg = { Action = 'NFT-Transferable-Error', TokenId = tokenId, Error = 'You do not own this NFT' }
-    if msg.reply then msg.reply(errorMsg) else Send({Target = msg.From, Action = 'NFT-Transferable-Error', TokenId = tokenId, Error = 'You do not own this NFT'}) end
+    sendError(msg, 'NFT-Transferable-Error', 'You do not own this NFT', 'TokenId: ' .. tokenId)
     return
   end
 
