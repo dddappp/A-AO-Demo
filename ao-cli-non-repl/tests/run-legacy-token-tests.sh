@@ -331,6 +331,15 @@ echo "📝 Note: According to contract logic, initial 10000 tokens are allocated
 inbox_before_operation=$(get_current_inbox_length "$TOKEN_PROCESS_ID")
 echo "📊 Inbox length (before operation): $inbox_before_operation"
 
+
+# ------------------------------------------------------------------------------------------------
+# Note: Test Balance function using message direct send command
+# export TOKEN_PROCESS_ID=ALDjeZZ37j3qbdbBWcTQXoAdWlqskLfuG3IrBf0Oj5w
+# export RECIPIENT_ADDRESS=Xz8Ay6CWu-Ykzi2e0-vG4g5rTnDHNzl2wELyHXQwg54
+# ao-cli message $TOKEN_PROCESS_ID Balance --prop Recipient=$RECIPIENT_ADDRESS --wait --json
+# If not Recipient is provided, then return the Senders balance
+# ------------------------------------------------------------------------------------------------
+
 echo "📤 Sending Balance request via eval command (internal send → Send() → Inbox)"
 echo "Executing: ao-cli eval $TOKEN_PROCESS_ID --data 'Send({Target=\"$TOKEN_PROCESS_ID\", Action=\"Balance\", Target=\"$TOKEN_PROCESS_ID\"})' --wait"
 
