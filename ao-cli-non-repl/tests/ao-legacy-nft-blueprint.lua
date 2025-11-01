@@ -579,10 +579,8 @@ end, function(msg)
   }
 
   print("SET-NFT-TRANSFERABLE: Operation completed successfully")
-  -- Force using Send() for eval+Send context
-  response.Target = msg.From
-  print("SET-NFT-TRANSFERABLE: About to call Send() with Target=" .. tostring(response.Target))
-  Send(response)
+  -- Use sendResponse for consistent response sending (same as other handlers)
+  sendResponse(msg, response)
   print("SET-NFT-TRANSFERABLE: Confirmation sent")
 end)
 
