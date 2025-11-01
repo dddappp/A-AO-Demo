@@ -49,38 +49,40 @@ local function sendError(msg, action, error, data)
 end
 
 
+-- TEMPORARILY DISABLED ALL HANDLERS EXCEPT DEBUG
+
 -- Balance handler - Exact match with Wander wallet expectations
-Handlers.add('nft_balance', Handlers.utils.hasMatchingTag("Action", "Balance"), function(msg)
+-- Handlers.add('nft_balance', Handlers.utils.hasMatchingTag("Action", "Balance"), function(msg)
   -- Wander wallet sends: data: JSON.stringify({ Target: address })
   -- And expects: balance as string in Data field
-  local targetAddress = nil
+  -- local targetAddress = nil
 
   -- Parse data field (Wander wallet approach)
-  if msg.Data and msg.Data ~= '' then
-    local success, decoded = pcall(function() return json.decode(msg.Data) end)
-    if success and decoded and decoded.Target then
-      targetAddress = decoded.Target
-    end
-  end
+  -- if msg.Data and msg.Data ~= '' then
+  --   local success, decoded = pcall(function() return json.decode(msg.Data) end)
+  --   if success and decoded and decoded.Target then
+  --     targetAddress = decoded.Target
+  --   end
+  -- end
 
   -- Count NFTs owned by this address (exact match with Wander wallet logic)
-  local nftCount = 0
-  for tokenId, owner in pairs(Owners) do
-    if owner == targetAddress then
-      nftCount = nftCount + 1
-    end
-  end
+  -- local nftCount = 0
+  -- for tokenId, owner in pairs(Owners) do
+  --   if owner == targetAddress then
+  --     nftCount = nftCount + 1
+  --   end
+  -- end
 
   -- Return pure number as string in Data field (matching Wander wallet expectation)
-  if msg.reply then
-    msg.reply({ Data = tostring(nftCount) })
-  else
-    Send({
-      Target = msg.From,
-      Data = tostring(nftCount)  -- Pure number string, no extra fields
-    })
-  end
-end)
+  -- if msg.reply then
+  --   msg.reply({ Data = tostring(nftCount) })
+  -- else
+  --   Send({
+  --     Target = msg.From,
+  --     Data = tostring(nftCount)  -- Pure number string, no extra fields
+  --   })
+  -- end
+-- end)
 
 -- Info handler - makes this contract recognizable as NFT by Wander wallet
 Handlers.add('nft_info', Handlers.utils.hasMatchingTag("Action", "Info"), function(msg)
@@ -102,46 +104,149 @@ end)
 
 -- Mint NFT handler - Fully compatible with research report format
 Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), function(msg)
-  -- Direct parameter access
-  local name = msg.Name
-  local description = msg.Description
-  local image = msg.Image
+  print("MINT-NFT: ===== STARTING MINT OPERATION =====")
+  print("MINT-NFT: Processing mint request from:", msg.From)
 
-  -- Validate required parameters
-  if not name or type(name) ~= 'string' or name == '' then
-    sendError(msg, 'Mint-Error', 'Name is required and must be a non-empty string')
-    return
+  -- STEP 1: Comprehensive parameter extraction with detailed logging
+  print("MINT-NFT: ===== STEP 1: PARAMETER EXTRACTION =====")
+
+  -- Check all possible parameter sources with detailed logging
+  print("MINT-NFT: Checking direct message properties:")
+  print("  msg.Name =", msg.Name, type(msg.Name))
+  print("  msg.Description =", msg.Description, type(msg.Description))
+  print("  msg.Image =", msg.Image, type(msg.Image))
+  print("  msg.Transferable =", msg.Transferable, type(msg.Transferable))
+
+  print("MINT-NFT: Checking lowercase message properties:")
+  print("  msg.name =", msg.name, type(msg.name))
+  print("  msg.description =", msg.description, type(msg.description))
+  print("  msg.image =", msg.image, type(msg.image))
+  print("  msg.transferable =", msg.transferable, type(msg.transferable))
+
+  print("MINT-NFT: Checking Tags:")
+  if msg.Tags then
+    print("  msg.Tags present, contents:")
+    for k, v in pairs(msg.Tags) do
+      print("    " .. k .. " = " .. tostring(v))
+    end
+  else
+    print("  msg.Tags is nil or empty")
   end
 
-  if not description or type(description) ~= 'string' or description == '' then
-    sendError(msg, 'Mint-Error', 'Description is required and must be a non-empty string')
-    return
+  -- Extract parameters with multiple fallback strategies
+  local name = msg.Name or msg.name or (msg.Tags and msg.Tags.Name) or (msg.Tags and msg.Tags.name)
+  local description = msg.Description or msg.description or (msg.Tags and msg.Tags.Description) or (msg.Tags and msg.Tags.description)
+  local image = msg.Image or msg.image or (msg.Tags and msg.Tags.Image) or (msg.Tags and msg.Tags.image)
+  local transferable = msg.Transferable or msg.transferable or (msg.Tags and msg.Tags.Transferable) or (msg.Tags and msg.Tags.transferable)
+
+  print("MINT-NFT: ===== STEP 2: PARAMETER VALIDATION =====")
+  print("MINT-NFT: Extracted parameters:")
+  print("  name =", name, type(name))
+  print("  description =", description, type(description))
+  print("  image =", image, type(image))
+  print("  transferable =", transferable, type(transferable))
+
+  -- STEP 2: Ultra-strict parameter validation with detailed error reporting
+  local validation_errors = {}
+
+  -- Name validation
+  if not name then
+    table.insert(validation_errors, "Name parameter is missing (tried: msg.Name, msg.name, msg.Tags.Name, msg.Tags.name)")
+  elseif type(name) ~= "string" then
+    table.insert(validation_errors, "Name must be a string, got: " .. type(name))
+  elseif name == "" then
+    table.insert(validation_errors, "Name cannot be empty string")
+  elseif #name > 100 then
+    table.insert(validation_errors, "Name too long (max 100 chars), got: " .. #name .. " chars")
   end
 
-  if not image or type(image) ~= 'string' or image == '' then
-    sendError(msg, 'Mint-Error', 'Image is required and must be a non-empty string')
-    return
+  -- Description validation
+  if not description then
+    table.insert(validation_errors, "Description parameter is missing (tried: msg.Description, msg.description, msg.Tags.Description, msg.Tags.description)")
+  elseif type(description) ~= "string" then
+    table.insert(validation_errors, "Description must be a string, got: " .. type(description))
+  elseif description == "" then
+    table.insert(validation_errors, "Description cannot be empty string")
+  elseif #description > 500 then
+    table.insert(validation_errors, "Description too long (max 500 chars), got: " .. #description .. " chars")
   end
 
-  -- Increment token counter and create NFT
-  TokenIdCounter = TokenIdCounter + 1
-  local tokenId = tostring(TokenIdCounter)
+  -- Image validation
+  if not image then
+    table.insert(validation_errors, "Image parameter is missing (tried: msg.Image, msg.image, msg.Tags.Image, msg.Tags.image)")
+  elseif type(image) ~= "string" then
+    table.insert(validation_errors, "Image must be a string, got: " .. type(image))
+  elseif image == "" then
+    table.insert(validation_errors, "Image cannot be empty string")
+  elseif not string.match(image, "^ar://") and not string.match(image, "^https?://") then
+    table.insert(validation_errors, "Image URL must start with ar:// or http(s)://, got: " .. image)
+  end
 
-  -- Parse attributes from Data field if provided (matching research report)
-  local attributes = {}
-  if msg.Data and msg.Data ~= '' then
-    local success, decoded = pcall(function() return json.decode(msg.Data) end)
-    if success and decoded and decoded.attributes then
-      attributes = decoded.attributes
+  -- Transferable validation (optional, defaults to true)
+  local isTransferable = true  -- default
+  if transferable ~= nil then
+    if type(transferable) == "string" then
+      isTransferable = transferable == "true"
+    elseif type(transferable) == "boolean" then
+      isTransferable = transferable
+    else
+      table.insert(validation_errors, "Transferable must be string 'true'/'false' or boolean, got: " .. type(transferable))
     end
   end
 
-  -- Get transferable flag (matching research report: msg.Transferable == 'true')
-  local transferable = msg.Transferable  -- Direct access, no AO conversion for this parameter
-  local isTransferable = transferable == 'true'  -- Exact match with research report
+  -- If any validation errors, fail immediately with detailed error report
+  if #validation_errors > 0 then
+    print("MINT-NFT: ❌ VALIDATION FAILED - " .. #validation_errors .. " errors found")
+    for i, err in ipairs(validation_errors) do
+      print("  " .. i .. ". " .. err)
+    end
 
-  -- Create NFT data (matching research report structure)
-  NFTs[tokenId] = {
+    local error_summary = "Mint validation failed: " .. #validation_errors .. " errors. Details in console logs."
+    sendError(msg, 'Mint-Error', 'Parameter validation failed', error_summary)
+    print("MINT-NFT: ===== MINT OPERATION FAILED =====")
+    return
+  end
+
+  print("MINT-NFT: ✅ All parameters validated successfully")
+
+  -- STEP 3: NFT Creation with comprehensive error handling
+  print("MINT-NFT: ===== STEP 3: NFT CREATION =====")
+
+  -- Increment token counter with safety checks
+  if not TokenIdCounter then
+    print("MINT-NFT: ❌ CRITICAL ERROR - TokenIdCounter not initialized")
+    sendError(msg, 'Mint-Error', 'Internal error: TokenIdCounter not initialized')
+    print("MINT-NFT: ===== MINT OPERATION FAILED =====")
+    return
+  end
+
+  TokenIdCounter = TokenIdCounter + 1
+  local tokenId = tostring(TokenIdCounter)
+
+  print("MINT-NFT: Generated TokenId:", tokenId, "(Counter:", TokenIdCounter, ")")
+
+  -- Parse attributes from Data field with robust error handling
+  local attributes = {}
+  if msg.Data and msg.Data ~= '' then
+    print("MINT-NFT: Parsing attributes from msg.Data:", msg.Data)
+    local success, decoded = pcall(function() return json.decode(msg.Data) end)
+    if success then
+      if decoded and type(decoded) == "table" and decoded.attributes then
+        attributes = decoded.attributes
+        print("MINT-NFT: Successfully parsed attributes, count:", #attributes)
+      else
+        print("MINT-NFT: Warning - msg.Data doesn't contain valid attributes object")
+      end
+    else
+      print("MINT-NFT: Warning - Failed to parse msg.Data as JSON:", decoded)
+    end
+  else
+    print("MINT-NFT: No Data field provided, using empty attributes")
+  end
+
+  -- Create NFT data structure with comprehensive validation
+  print("MINT-NFT: Creating NFT data structure...")
+  local nftData = {
     name = name,
     description = description,
     image = image,
@@ -151,10 +256,56 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
     creator = msg.From
   }
 
-  -- Set ownership
+  -- Validate NFT data structure
+  local nft_validation_errors = {}
+  if not nftData.name or nftData.name == "" then table.insert(nft_validation_errors, "NFT name is empty") end
+  if not nftData.description or nftData.description == "" then table.insert(nft_validation_errors, "NFT description is empty") end
+  if not nftData.image or nftData.image == "" then table.insert(nft_validation_errors, "NFT image is empty") end
+  if not nftData.creator or nftData.creator == "" then table.insert(nft_validation_errors, "NFT creator is empty") end
+
+  if #nft_validation_errors > 0 then
+    print("MINT-NFT: ❌ NFT DATA VALIDATION FAILED")
+    for i, err in ipairs(nft_validation_errors) do
+      print("  " .. i .. ". " .. err)
+    end
+    sendError(msg, 'Mint-Error', 'NFT data validation failed')
+    print("MINT-NFT: ===== MINT OPERATION FAILED =====")
+    return
+  end
+
+  -- Store NFT with error checking
+  print("MINT-NFT: Storing NFT in NFTs table...")
+  NFTs[tokenId] = nftData
+
+  -- Verify NFT was stored correctly
+  if not NFTs[tokenId] then
+    print("MINT-NFT: ❌ CRITICAL ERROR - Failed to store NFT in NFTs table")
+    sendError(msg, 'Mint-Error', 'Failed to store NFT data')
+    print("MINT-NFT: ===== MINT OPERATION FAILED =====")
+    return
+  end
+
+  -- Set ownership with error checking
+  print("MINT-NFT: Setting ownership...")
   Owners[tokenId] = msg.From
 
-  -- Send Mint-Confirmation (exactly matching research report format)
+  -- Verify ownership was set correctly
+  if not Owners[tokenId] or Owners[tokenId] ~= msg.From then
+    print("MINT-NFT: ❌ CRITICAL ERROR - Failed to set NFT ownership")
+    -- Note: NFT is already stored, so we don't delete it, but report the error
+    sendError(msg, 'Mint-Error', 'Failed to set NFT ownership')
+    print("MINT-NFT: ===== MINT OPERATION PARTIALLY FAILED =====")
+    return
+  end
+
+  print("MINT-NFT: ===== STEP 4: RESPONSE GENERATION =====")
+  print("MINT-NFT: ✅ NFT created successfully!")
+  print("  TokenId:", tokenId)
+  print("  Name:", name)
+  print("  Creator:", msg.From)
+  print("  Transferable:", isTransferable)
+
+  -- Generate response with comprehensive error handling
   local response = {
     Action = 'Mint-Confirmation',
     TokenId = tokenId,
@@ -162,12 +313,40 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
     Data = "NFT '" .. name .. "' minted successfully with ID: " .. tokenId
   }
 
+  -- Send response with error handling
+  print("MINT-NFT: Sending Mint-Confirmation response...")
+  local send_success = false
   if msg.reply then
-    msg.reply(response)
-  else
-    response.Target = msg.From
-    Send(response)
+    print("MINT-NFT: Using msg.reply() for response")
+    local reply_success, reply_error = pcall(function() msg.reply(response) end)
+    if reply_success then
+      send_success = true
+      print("MINT-NFT: ✅ Response sent via msg.reply()")
+    else
+      print("MINT-NFT: ❌ Failed to send via msg.reply():", reply_error)
+    end
   end
+
+  if not send_success then
+    print("MINT-NFT: Using Send() for response")
+    response.Target = msg.From
+    local send_call_success, send_error = pcall(function() Send(response) end)
+    if send_call_success then
+      send_success = true
+      print("MINT-NFT: ✅ Response sent via Send()")
+    else
+      print("MINT-NFT: ❌ Failed to send via Send():", send_error)
+    end
+  end
+
+  if not send_success then
+    print("MINT-NFT: ❌ CRITICAL ERROR - Failed to send any response")
+    print("MINT-NFT: ===== MINT OPERATION PARTIALLY SUCCEEDED =====")
+    return
+  end
+
+  print("MINT-NFT: ===== MINT OPERATION COMPLETED SUCCESSFULLY =====")
+  print("MINT-NFT: 🎉 NFT '" .. name .. "' (ID: " .. tokenId .. ") minted and confirmed!")
 end)
 
 
@@ -247,49 +426,58 @@ Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Trans
 end)
 
 -- Get NFT information handler - Compatible with research report format
+print("Registering get_nft handler...")
 Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), function(msg)
-  -- Direct parameter access - AO converts TokenId to Tokenid
-  local tokenId = msg.TokenId or msg.Tokenid or msg.Tags.TokenId or msg.Tags.Tokenid
+  print("GET-NFT HANDLER: Processing request")
 
-  -- Validate parameter
-  if not tokenId or type(tokenId) ~= 'string' or tokenId == '' then
-    sendError(msg, 'NFT-Error', 'TokenId is required and must be a string')
-    return
+  -- Get TokenId - try multiple sources (based on working Mint pattern)
+  local tokenId = msg.Tokenid or msg.TokenId
+  if msg.Tags then
+    tokenId = tokenId or msg.Tags.Tokenid or msg.Tags.TokenId
   end
 
-  -- Check if NFT exists
-  local nft = NFTs[tokenId]
-  if not nft then
-    sendError(msg, 'NFT-Error', 'NFT not found', 'TokenId: ' .. tokenId)
-    return
-  end
+  -- For eval+Send compatibility, also check direct message properties
 
-  -- Return NFT information
-  local response = {
-    Action = 'NFT-Info',
-    TokenId = tokenId,
-    Name = nft.name,
-    Description = nft.description,
-    Image = nft.image,
-    Attributes = json.encode(nft.attributes),
-    Owner = Owners[tokenId],
-    Creator = nft.creator,
-    CreatedAt = nft.createdAt,
-    Transferable = tostring(nft.transferable),
-    Data = json.encode({
-      tokenId = tokenId,
-      name = nft.name,
-      description = nft.description,
-      image = nft.image,
-      attributes = nft.attributes,
-      owner = Owners[tokenId],
-      creator = nft.creator,
-      createdAt = nft.createdAt,
-      transferable = nft.transferable
+  if not tokenId then
+    print("GET-NFT ERROR: No TokenId provided in message")
+    Send({
+      Target = msg.From,
+      Action = "Get-NFT-Error",
+      Error = "TokenId is required but not provided"
     })
-  }
+    return
+  end
 
-  sendResponse(msg, response)
+  print("GET-NFT: Using TokenId =", tokenId)
+
+  -- Look up NFT
+  local nft = NFTs[tokenId]
+  if nft and nft.name then
+    print("GET-NFT: Found NFT with name:", nft.name)
+    Send({
+      Target = msg.From,
+      Action = 'NFT-Info',
+      TokenId = tokenId,
+      Name = nft.name,
+      Description = nft.description or "",
+      Image = nft.image or "",
+      Owner = Owners[tokenId] or "",
+      Data = json.encode({
+        tokenId = tokenId,
+        name = nft.name,
+        description = nft.description,
+        image = nft.image,
+        owner = Owners[tokenId]
+      })
+    })
+  else
+    print("GET-NFT: NFT not found or incomplete data")
+    Send({
+      Target = msg.From,
+      Action = 'NFT-Error',
+      Data = 'NFT not found for TokenId: ' .. tokenId
+    })
+  end
 end)
 
 -- Get user NFTs handler - Compatible with research report format
@@ -414,6 +602,7 @@ Handlers.add('get_contract_stats', Handlers.utils.hasMatchingTag("Action", "Get-
     Send(response)
   end
 end)
+
 
 
 
