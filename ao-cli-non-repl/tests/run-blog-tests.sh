@@ -220,9 +220,10 @@ wait_for_expected_inbox_length() {
 # 使用ao-cli的load命令，它会自动处理模块依赖
 #
 # 📋 Inbox机制重要说明：
-# Inbox是进程内部的全局变量，只有在进程内部执行Send时，回复消息才会进入Inbox
-# 外部API调用(message命令)不会让消息进入Inbox，因为那是进程外部的操作
-# 因此测试使用eval命令在进程内部执行Send来验证Inbox功能
+# Inbox是进程内部的全局变量，只有在进程内部执行Send时，由对方进程发送的**回复消息**才会进入Inbox（注意，是回复消息！）。
+# 外部API调用(message命令)不会让消息进入Inbox，因为那是进程外部的操作。
+# 因此在下面的测试中，我们使用eval命令在进程内部执行Send来验证Inbox功能。
+# 提示：没有匹配的 handler 处理的消息才会出现在 Inbox 中。
 
 echo "🚀 开始执行测试..."
 echo "精确重现 AO-Testing-with-iTerm-MCP-Server.md 的完整测试流程："
