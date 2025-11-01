@@ -582,9 +582,8 @@ end, function(msg)
   -- Force using Send() for eval+Send context
   response.Target = msg.From
   print("SET-NFT-TRANSFERABLE: About to call Send() with Target=" .. tostring(response.Target))
-  local send_result = Send(response)
-  print("SET-NFT-TRANSFERABLE: Send() returned: " .. tostring(send_result))
-  print("SET-NFT-TRANSFERABLE: Confirmation sent via Send() to " .. tostring(msg.From))
+  Send(response)
+  print("SET-NFT-TRANSFERABLE: Confirmation sent")
 end)
 
 -- Get contract statistics handler
