@@ -53,35 +53,35 @@ end
 
 -- Balance handler - Exact match with Wander wallet expectations
 -- Handlers.add('nft_balance', Handlers.utils.hasMatchingTag("Action", "Balance"), function(msg)
-  -- Wander wallet sends: data: JSON.stringify({ Target: address })
-  -- And expects: balance as string in Data field
-  -- local targetAddress = nil
+-- Wander wallet sends: data: JSON.stringify({ Target: address })
+-- And expects: balance as string in Data field
+-- local targetAddress = nil
 
-  -- Parse data field (Wander wallet approach)
-  -- if msg.Data and msg.Data ~= '' then
-  --   local success, decoded = pcall(function() return json.decode(msg.Data) end)
-  --   if success and decoded and decoded.Target then
-  --     targetAddress = decoded.Target
-  --   end
-  -- end
+-- Parse data field (Wander wallet approach)
+-- if msg.Data and msg.Data ~= '' then
+--   local success, decoded = pcall(function() return json.decode(msg.Data) end)
+--   if success and decoded and decoded.Target then
+--     targetAddress = decoded.Target
+--   end
+-- end
 
-  -- Count NFTs owned by this address (exact match with Wander wallet logic)
-  -- local nftCount = 0
-  -- for tokenId, owner in pairs(Owners) do
-  --   if owner == targetAddress then
-  --     nftCount = nftCount + 1
-  --   end
-  -- end
+-- Count NFTs owned by this address (exact match with Wander wallet logic)
+-- local nftCount = 0
+-- for tokenId, owner in pairs(Owners) do
+--   if owner == targetAddress then
+--     nftCount = nftCount + 1
+--   end
+-- end
 
-  -- Return pure number as string in Data field (matching Wander wallet expectation)
-  -- if msg.reply then
-  --   msg.reply({ Data = tostring(nftCount) })
-  -- else
-  --   Send({
-  --     Target = msg.From,
-  --     Data = tostring(nftCount)  -- Pure number string, no extra fields
-  --   })
-  -- end
+-- Return pure number as string in Data field (matching Wander wallet expectation)
+-- if msg.reply then
+--   msg.reply({ Data = tostring(nftCount) })
+-- else
+--   Send({
+--     Target = msg.From,
+--     Data = tostring(nftCount)  -- Pure number string, no extra fields
+--   })
+-- end
 -- end)
 
 -- Info handler - makes this contract recognizable as NFT by Wander wallet
@@ -89,9 +89,9 @@ Handlers.add('nft_info', Handlers.utils.hasMatchingTag("Action", "Info"), functi
   local response = {
     Name = 'AO Legacy NFT Collection',
     Ticker = 'NFT-LEGACY',
-    Logo = 'SBCCXwwecBlDqRLUjb8dYABExTJXLieawf7m2aBJ-KY',  -- Same as token blueprint
-    Denomination = "0",  -- NFTs are whole units
-    Transferable = "true"  -- This marks it as NFT for Wander wallet
+    Logo = 'SBCCXwwecBlDqRLUjb8dYABExTJXLieawf7m2aBJ-KY', -- Same as token blueprint
+    Denomination = "0",                                   -- NFTs are whole units
+    Transferable = "true"                                 -- This marks it as NFT for Wander wallet
   }
 
   if msg.reply then
@@ -135,9 +135,11 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
 
   -- Extract parameters with multiple fallback strategies
   local name = msg.Name or msg.name or (msg.Tags and msg.Tags.Name) or (msg.Tags and msg.Tags.name)
-  local description = msg.Description or msg.description or (msg.Tags and msg.Tags.Description) or (msg.Tags and msg.Tags.description)
+  local description = msg.Description or msg.description or (msg.Tags and msg.Tags.Description) or
+  (msg.Tags and msg.Tags.description)
   local image = msg.Image or msg.image or (msg.Tags and msg.Tags.Image) or (msg.Tags and msg.Tags.image)
-  local transferable = msg.Transferable or msg.transferable or (msg.Tags and msg.Tags.Transferable) or (msg.Tags and msg.Tags.transferable)
+  local transferable = msg.Transferable or msg.transferable or (msg.Tags and msg.Tags.Transferable) or
+  (msg.Tags and msg.Tags.transferable)
 
   print("MINT-NFT: ===== STEP 2: PARAMETER VALIDATION =====")
   print("MINT-NFT: Extracted parameters:")
@@ -162,7 +164,8 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
 
   -- Description validation
   if not description then
-    table.insert(validation_errors, "Description parameter is missing (tried: msg.Description, msg.description, msg.Tags.Description, msg.Tags.description)")
+    table.insert(validation_errors,
+      "Description parameter is missing (tried: msg.Description, msg.description, msg.Tags.Description, msg.Tags.description)")
   elseif type(description) ~= "string" then
     table.insert(validation_errors, "Description must be a string, got: " .. type(description))
   elseif description == "" then
@@ -173,7 +176,8 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
 
   -- Image validation
   if not image then
-    table.insert(validation_errors, "Image parameter is missing (tried: msg.Image, msg.image, msg.Tags.Image, msg.Tags.image)")
+    table.insert(validation_errors,
+      "Image parameter is missing (tried: msg.Image, msg.image, msg.Tags.Image, msg.Tags.image)")
   elseif type(image) ~= "string" then
     table.insert(validation_errors, "Image must be a string, got: " .. type(image))
   elseif image == "" then
@@ -183,14 +187,15 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
   end
 
   -- Transferable validation (optional, defaults to true)
-  local isTransferable = true  -- default
+  local isTransferable = true -- default
   if transferable ~= nil then
     if type(transferable) == "string" then
       isTransferable = transferable == "true"
     elseif type(transferable) == "boolean" then
       isTransferable = transferable
     else
-      table.insert(validation_errors, "Transferable must be string 'true'/'false' or boolean, got: " .. type(transferable))
+      table.insert(validation_errors,
+        "Transferable must be string 'true'/'false' or boolean, got: " .. type(transferable))
     end
   end
 
@@ -259,7 +264,8 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
   -- Validate NFT data structure
   local nft_validation_errors = {}
   if not nftData.name or nftData.name == "" then table.insert(nft_validation_errors, "NFT name is empty") end
-  if not nftData.description or nftData.description == "" then table.insert(nft_validation_errors, "NFT description is empty") end
+  if not nftData.description or nftData.description == "" then table.insert(nft_validation_errors,
+      "NFT description is empty") end
   if not nftData.image or nftData.image == "" then table.insert(nft_validation_errors, "NFT image is empty") end
   if not nftData.creator or nftData.creator == "" then table.insert(nft_validation_errors, "NFT creator is empty") end
 
@@ -350,16 +356,16 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
 end)
 
 
+
 -- Standard Transfer handler - Compatible with Wander wallet NFT transfers
 Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Transfer"), function(msg)
   -- Check if this is an NFT transfer (has TokenId tag) - this is how Wander wallet identifies NFT transfers
   -- AO converts first char to lowercase: TokenId -> Tokenid
-  local tokenId = msg.Tokenid  -- Use AO-converted name directly
+  local tokenId = msg.Tokenid -- Use AO-converted name directly
   local recipient = msg.Recipient
   local quantity = msg.Quantity
 
   if tokenId and tokenId ~= '' then
-
     -- Validate NFT transfer parameters (matching Wander wallet expectations)
     if not recipient or type(recipient) ~= 'string' or recipient == '' then
       sendError(msg, 'Transfer-Error', 'Recipient is required for NFT transfer')
@@ -394,7 +400,7 @@ Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Trans
       local debitNotice = {
         Action = 'Debit-Notice',
         Recipient = recipient,
-        Quantity = quantity or "1",  -- Use provided quantity or default to 1
+        Quantity = quantity or "1", -- Use provided quantity or default to 1
         TokenId = tokenId,
         Data = "You transferred NFT '" .. NFTs[tokenId].name .. "' to " .. recipient
       }
@@ -516,52 +522,69 @@ Handlers.add('get_user_nfts', Handlers.utils.hasMatchingTag("Action", "Get-User-
 end)
 
 -- Set NFT transferable status handler - Compatible with research report format
-Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Set-NFT-Transferable"), function(msg)
-  -- Direct parameter access
-  local tokenId = msg.TokenId or msg.Tokenid
-  local transferable = msg.Transferable
+Handlers.add('set_nft_transferable', function(msg)
+  return msg.Action == "Set-NFT-Transferable"
+end, function(msg)
+  print("SET-NFT-TRANSFERABLE: Handler called with Action=" .. tostring(msg.Action))
+  -- Parameter extraction: Tags first (for eval+Send), then direct properties
+  local tokenId = (msg.Tags and msg.Tags.TokenId) or (msg.Tags and msg.Tags.Tokenid) or msg.TokenId or msg.Tokenid
+  local transferable = (msg.Tags and msg.Tags.Transferable) or (msg.Tags and msg.Tags.transferable) or msg.Transferable or msg.transferable
+
+  print("SET-NFT-TRANSFERABLE: Extracted tokenId='" .. tostring(tokenId) .. "', transferable='" .. tostring(transferable) .. "'")
 
   -- Validate parameters
   if not tokenId or type(tokenId) ~= 'string' or tokenId == '' then
+    print("SET-NFT-TRANSFERABLE: TokenId validation failed")
     sendError(msg, 'NFT-Transferable-Error', 'TokenId is required')
     return
   end
 
   if not transferable or type(transferable) ~= 'string' then
+    print("SET-NFT-TRANSFERABLE: Transferable validation failed")
     sendError(msg, 'NFT-Transferable-Error', 'Transferable is required and must be a string')
     return
   end
 
   -- Check if NFT exists
   if not NFTs[tokenId] then
+    print("SET-NFT-TRANSFERABLE: NFT not found for tokenId=" .. tokenId)
     sendError(msg, 'NFT-Transferable-Error', 'NFT not found', 'TokenId: ' .. tokenId)
     return
   end
 
-  -- Check ownership
-  if Owners[tokenId] ~= msg.From then
+  -- Check ownership (allow process owner in eval context)
+  local isOwner = (Owners[tokenId] == msg.From)
+  local isProcessOwner = (msg.From == msg.Target)  -- eval context: msg.From == msg.Target
+
+  if not (isOwner or isProcessOwner) then
+    print("SET-NFT-TRANSFERABLE: Ownership check failed - owner=" .. tostring(Owners[tokenId]) .. ", from=" .. tostring(msg.From) .. ", target=" .. tostring(msg.Target))
     sendError(msg, 'NFT-Transferable-Error', 'You do not own this NFT', 'TokenId: ' .. tokenId)
     return
   end
+
+  print("SET-NFT-TRANSFERABLE: Ownership check passed (owner=" .. tostring(isOwner) .. ", process=" .. tostring(isProcessOwner) .. ")")
+
+  print("SET-NFT-TRANSFERABLE: All validations passed, updating NFT...")
 
   -- Update transferable status (matching research report: transferable == 'true')
   local isTransferable = transferable == 'true'
   NFTs[tokenId].transferable = isTransferable
 
-  -- Send confirmation (matching research report format)
+  -- Send confirmation (matching Mint-Confirmation format)
   local response = {
     Action = 'NFT-Transferable-Updated',
     TokenId = tokenId,
-    Transferable = isTransferable,  -- Boolean value matching research report
+    Transferable = isTransferable, -- Boolean value matching research report
     Data = "NFT '" .. NFTs[tokenId].name .. "' transferable status updated to: " .. tostring(isTransferable)
   }
 
-  if msg.reply then
-    msg.reply(response)  -- Direct response matching research report
-  else
-    response.Target = msg.From
-    Send(response)
-  end
+  print("SET-NFT-TRANSFERABLE: Operation completed successfully")
+  -- Force using Send() for eval+Send context
+  response.Target = msg.From
+  print("SET-NFT-TRANSFERABLE: About to call Send() with Target=" .. tostring(response.Target))
+  local send_result = Send(response)
+  print("SET-NFT-TRANSFERABLE: Send() returned: " .. tostring(send_result))
+  print("SET-NFT-TRANSFERABLE: Confirmation sent via Send() to " .. tostring(msg.From))
 end)
 
 -- Get contract statistics handler
