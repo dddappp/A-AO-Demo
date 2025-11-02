@@ -446,11 +446,16 @@ Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), func
 
   if not tokenId then
     print("GET-NFT ERROR: No TokenId provided in message")
-    Send({
-      Target = msg.From,
+    local errorResponse = {
       Action = "Get-NFT-Error",
       Error = "TokenId is required but not provided"
-    })
+    }
+    if msg.reply then
+      msg.reply(errorResponse)
+    else
+      errorResponse.Target = msg.From
+      Send(errorResponse)
+    end
     return
   end
 
@@ -460,8 +465,7 @@ Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), func
   local nft = NFTs[tokenId]
   if nft and nft.name then
     print("GET-NFT: Found NFT with name:", nft.name)
-    Send({
-      Target = msg.From,
+    local response = {
       Action = 'NFT-Info',
       TokenId = tokenId,
       Name = nft.name,
@@ -475,14 +479,25 @@ Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), func
         image = nft.image,
         owner = Owners[tokenId]
       })
-    })
+    }
+    if msg.reply then
+      msg.reply(response)
+    else
+      response.Target = msg.From
+      Send(response)
+    end
   else
     print("GET-NFT: NFT not found or incomplete data")
-    Send({
-      Target = msg.From,
+    local errorResponse = {
       Action = 'NFT-Error',
       Data = 'NFT not found for TokenId: ' .. tokenId
-    })
+    }
+    if msg.reply then
+      msg.reply(errorResponse)
+    else
+      errorResponse.Target = msg.From
+      Send(errorResponse)
+    end
   end
 end)
 
@@ -579,9 +594,15 @@ end, function(msg)
   }
 
   print("SET-NFT-TRANSFERABLE: Operation completed successfully")
-  -- Use sendResponse for consistent response sending (same as other handlers)
-  sendResponse(msg, response)
-  print("SET-NFT-TRANSFERABLE: Confirmation sent")
+  -- Send confirmation using same pattern as Transfer handler
+  if msg.reply then
+    msg.reply(response)
+    print("SET-NFT-TRANSFERABLE: Confirmation sent via msg.reply()")
+  else
+    response.Target = msg.From
+    Send(response)
+    print("SET-NFT-TRANSFERABLE: Confirmation sent via Send() to msg.From")
+  end
 end)
 
 -- Get contract statistics handler

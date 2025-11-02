@@ -24,9 +24,11 @@ Data = "{"result":{"version":0,"quantity":100,"inventory_item_id":{"location":"y
 因为尝试使用消息的 Tags 来传递的 Saga 信息发生丢失（被 ao 新版本过滤掉了），导致 Saga 无法推进到下一步。
 比如，如果回复的消息中没有 Action 信息，就会导致无法触发（接收消息的进程中的） handler 的处理逻辑，而未被处理的消息就会出现在 Inbox 中。
 
-> NOTE：以 DDDML 工具为“方法”生成的代码来说，消息的 handlers 通常都会将回复消息发送给请求消息的发送者（`From`）。如果要想让方法的回复消息出现在一个进程 Inbox 里，可以在该进程（姑且称之为“原进程”）内用 eval 的方式来发送“调用方法”的消息。
+> NOTE Inbox 机制：当一个进程没有匹配的 handler 处理消息时，消息就会进入该进程的 Inbox 中。
+> 以 DDDML 工具为*方法*生成的代码来说，消息的 handlers 通常都会将**回复消息**发送给请求消息的发送者（`From`）。
+> 如果要想让*方法*的回复消息出现在一个进程 Inbox 里，可以在该进程内用 eval 的方式来发送触发*方法*执行（即触发 Handler 处理）的消息。
 > 这样收到消息的进程就会从消息的 From 字段中看到发送消息的进程 ID，然后将执行结果回复给这个 ID 指向的进程。
-> 如果收到消息的进程（原进程）没有 handler 可以处理消息，消息就会出现在原进程的 Inbox 中。
+> 如果收到消息的进程没有 handler 可以处理消息，消息就会出现在该进程的 Inbox 中。
 > 可以查看示例 @ao-cli-non-repl/tests/run-blog-tests.sh
 
 我们在 @SAGA-TECHNICAL-ANALYSIS.md 中分析了这个问题。
