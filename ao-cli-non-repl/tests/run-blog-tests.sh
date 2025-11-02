@@ -9,7 +9,7 @@ RESPONSE_DISPLAY_LINES=15  # Number of lines to display from ao-cli responses (s
 INBOX_DISPLAY_LINES=50     # Number of lines to display from inbox output (showing the most valuable beginning part)
 
 # Constants for Inbox waiting
-INBOX_CHECK_INTERVAL=3     # Check Inbox every 3 seconds (more conservative)
+INBOX_CHECK_INTERVAL=10     # Check Inbox every N seconds (more conservative)
 INBOX_MAX_WAIT_TIME=1800    # Maximum wait time for Inbox changes (15 minutes, more reasonable)
 INBOX_STABILIZATION_TIME=5 # Wait 5 seconds for process stabilization after spawn/load
 

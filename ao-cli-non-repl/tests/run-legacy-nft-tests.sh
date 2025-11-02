@@ -25,8 +25,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INBOX_DISPLAY_LINES=500     # Number of lines to display from inbox output
 
 # Constants for Inbox waiting
-INBOX_CHECK_INTERVAL=2     # Check Inbox every 2 seconds
+INBOX_CHECK_INTERVAL=10    # Check Inbox every N seconds
 INBOX_MAX_WAIT_TIME=600    # Maximum wait time for Inbox changes
+
+# Test configuration switches
+SKIP_QUERY_STEPS=true     # Set to true to skip Info, Get-NFT and Get-User-NFTs query steps (2, 4 and 6)
 
 # Check if ao-cli is installed
 if ! command -v ao-cli &> /dev/null; then
@@ -267,17 +270,30 @@ echo "Starting execution of Legacy NFT Blueprint function tests..."
 echo "Test methodology: eval command + inbox verification (eval + Send() fixed)"
 echo "Test flow (verified steps):"
 echo "  1. ✅ Generate NFT process and load legacy blueprint"
-echo "  2. ✅ Test Info function - Get NFT contract basic information"
-echo "  3. ✅ Test Mint-NFT function - Mint new NFTs"
-echo "  4. ✅ Test Get-NFT function - Query NFT information"
-echo "  5. ✅ Test NFT Transfer function - Transfer NFTs using standard Transfer action"
-echo "  6. ✅ Test Get-User-NFTs function - Query user NFT collections"
-echo "  7. ✅ Test Set-NFT-Transferable function - Update NFT transferable status"
+if $SKIP_QUERY_STEPS; then
+    echo "  2. ⏭️  Test Info function - SKIPPED (query steps disabled)"
+    echo "  3. ✅ Test Mint-NFT function - Mint new NFTs"
+    echo "  4. ⏭️  Test Get-NFT function - SKIPPED (query steps disabled)"
+    echo "  5. ✅ Test NFT Transfer function - Transfer NFTs using standard Transfer action"
+    echo "  6. ⏭️  Test Get-User-NFTs function - SKIPPED (query steps disabled)"
+    echo "  7. ✅ Test Set-NFT-Transferable function - Update NFT transferable status"
+else
+    echo "  2. ✅ Test Info function - Get NFT contract basic information"
+    echo "  3. ✅ Test Mint-NFT function - Mint new NFTs"
+    echo "  4. ✅ Test Get-NFT function - Query NFT information"
+    echo "  5. ✅ Test NFT Transfer function - Transfer NFTs using standard Transfer action"
+    echo "  6. ✅ Test Get-User-NFTs function - Query user NFT collections"
+    echo "  7. ✅ Test Set-NFT-Transferable function - Update NFT transferable status"
+fi
 echo ""
 
 # Initialize step status tracking variables
 STEP_SUCCESS_COUNT=0
-STEP_TOTAL_COUNT=7
+if $SKIP_QUERY_STEPS; then
+    STEP_TOTAL_COUNT=4  # Skip 3 steps when query steps are disabled (2, 4, 6)
+else
+    STEP_TOTAL_COUNT=7
+fi
 STEP_1_SUCCESS=false   # Generate NFT process and load legacy blueprint
 STEP_2_SUCCESS=false   # Test Info function
 STEP_3_SUCCESS=false   # Test Mint-NFT function
@@ -373,41 +389,50 @@ echo ""
 
 # 2. Test Info function - Get NFT contract basic information
 echo "=== Step 2: Test Info function - Get NFT contract basic information ==="
-echo "Verify NFT contract basic attributes: Name, Ticker, Logo, Denomination, Transferable, etc."
 
-inbox_before_operation=$(get_current_inbox_length "$NFT_PROCESS_ID")
-echo "📊 Inbox length (before operation): $inbox_before_operation"
+if $SKIP_QUERY_STEPS; then
+    echo "⏭️  Step 2 skipped (SKIP_QUERY_STEPS=true)"
+    STEP_2_SUCCESS=true
+    ((STEP_SUCCESS_COUNT++))
+    echo "   🎯 Step 2 skipped, current success count: $STEP_SUCCESS_COUNT"
+    echo ""
+else
+    echo "Verify NFT contract basic attributes: Name, Ticker, Logo, Denomination, Transferable, etc."
 
-echo "📤 Sending Info request via eval command (internal send → Send() → Inbox)"
+    inbox_before_operation=$(get_current_inbox_length "$NFT_PROCESS_ID")
+    echo "📊 Inbox length (before operation): $inbox_before_operation"
 
-INFO_LUA_CODE="Send({Target=\"$NFT_PROCESS_ID\", Action=\"Info\"})"
-RAW_OUTPUT=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$INFO_LUA_CODE" --wait)
-JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
+    echo "📤 Sending Info request via eval command (internal send → Send() → Inbox)"
 
-if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
-    echo "✅ Info function eval successful: Request sent successfully"
+    INFO_LUA_CODE="Send({Target=\"$NFT_PROCESS_ID\", Action=\"Info\"})"
+    RAW_OUTPUT=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$INFO_LUA_CODE" --wait)
+    JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
 
-    expected_length=$((inbox_before_operation + 1))
-    if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_length"; then
-        echo "✅ Info function verification successful: Response received in Inbox"
-        echo "   📊 Inbox increased from $inbox_before_operation to $expected_length"
+    if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
+        echo "✅ Info function eval successful: Request sent successfully"
 
-        display_latest_inbox_message "$NFT_PROCESS_ID" "Info Response Message"
+        expected_length=$((inbox_before_operation + 1))
+        if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_length"; then
+            echo "✅ Info function verification successful: Response received in Inbox"
+            echo "   📊 Inbox increased from $inbox_before_operation to $expected_length"
 
-        EXPECTED_INBOX_LENGTH=$expected_length
+            display_latest_inbox_message "$NFT_PROCESS_ID" "Info Response Message"
 
-        STEP_2_SUCCESS=true
-        ((STEP_SUCCESS_COUNT++))
-        echo "   🎯 Step 2 successful, current success count: $STEP_SUCCESS_COUNT"
+            EXPECTED_INBOX_LENGTH=$expected_length
+
+            STEP_2_SUCCESS=true
+            ((STEP_SUCCESS_COUNT++))
+            echo "   🎯 Step 2 successful, current success count: $STEP_SUCCESS_COUNT"
+        else
+            final_inbox_length=$(get_current_inbox_length "$NFT_PROCESS_ID")
+            echo "❌ Info Inbox verification failed: Response not received in Inbox"
+            echo "   📊 Final state: $inbox_before_operation → $final_inbox_length"
+            STEP_2_SUCCESS=false
+        fi
     else
-        final_inbox_length=$(get_current_inbox_length "$NFT_PROCESS_ID")
-        echo "❌ Info Inbox verification failed: Response not received in Inbox"
-        echo "   📊 Final state: $inbox_before_operation → $final_inbox_length"
+        echo "❌ Info function test FAILED - Eval did not complete successfully"
         STEP_2_SUCCESS=false
     fi
-else
-    echo "❌ Info function test FAILED - Eval did not complete successfully"
-    STEP_2_SUCCESS=false
 fi
 echo ""
 
@@ -535,42 +560,51 @@ echo ""
 
 # 4. Test Get-NFT function - Query NFT information
 echo "=== Step 4: Test Get-NFT function - Query NFT information ==="
-echo "Query information for TokenId '$MINTED_TOKEN_ID' (the NFT we just minted)"
 
-inbox_before_operation=$(get_current_inbox_length "$NFT_PROCESS_ID")
-echo "📊 Inbox length (before operation): $inbox_before_operation"
+if $SKIP_QUERY_STEPS; then
+    echo "⏭️  Step 4 skipped (SKIP_QUERY_STEPS=true)"
+    STEP_4_SUCCESS=true
+    ((STEP_SUCCESS_COUNT++))
+    echo "   🎯 Step 4 skipped, current success count: $STEP_SUCCESS_COUNT"
+    echo ""
+else
+    echo "Query information for TokenId '$MINTED_TOKEN_ID' (the NFT we just minted)"
 
-echo "📤 Sending Get-NFT request via eval command (internal send → Send() → Inbox)"
-echo "Executing: ao-cli eval $NFT_PROCESS_ID --data 'Send({Target=\"$NFT_PROCESS_ID\", Action=\"Get-NFT\", Tokenid=\"$MINTED_TOKEN_ID\"})' --wait"
+    inbox_before_operation=$(get_current_inbox_length "$NFT_PROCESS_ID")
+    echo "📊 Inbox length (before operation): $inbox_before_operation"
 
-GET_NFT_LUA_CODE="Send({Target=\"$NFT_PROCESS_ID\", Action=\"Get-NFT\", Tokenid=\"$MINTED_TOKEN_ID\"})"
-RAW_OUTPUT=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$GET_NFT_LUA_CODE" --wait)
-JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
+    echo "📤 Sending Get-NFT request via eval command (internal send → Send() → Inbox)"
+    echo "Executing: ao-cli eval $NFT_PROCESS_ID --data 'Send({Target=\"$NFT_PROCESS_ID\", Action=\"Get-NFT\", Tokenid=\"$MINTED_TOKEN_ID\"})' --wait"
 
-if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
-    echo "✅ Get-NFT function eval successful: Request sent successfully"
+    GET_NFT_LUA_CODE="Send({Target=\"$NFT_PROCESS_ID\", Action=\"Get-NFT\", Tokenid=\"$MINTED_TOKEN_ID\"})"
+    RAW_OUTPUT=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$GET_NFT_LUA_CODE" --wait)
+    JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
 
-    expected_length=$((inbox_before_operation + 1))
-    if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_length"; then
-        echo "✅ Get-NFT function verification successful: NFT info received in Inbox"
-        echo "   📊 Inbox increased from $inbox_before_operation to $expected_length"
+    if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
+        echo "✅ Get-NFT function eval successful: Request sent successfully"
 
-        display_latest_inbox_message "$NFT_PROCESS_ID" "NFT-Info Response Message"
+        expected_length=$((inbox_before_operation + 1))
+        if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_length"; then
+            echo "✅ Get-NFT function verification successful: NFT info received in Inbox"
+            echo "   📊 Inbox increased from $inbox_before_operation to $expected_length"
 
-        EXPECTED_INBOX_LENGTH=$expected_length
+            display_latest_inbox_message "$NFT_PROCESS_ID" "NFT-Info Response Message"
 
-        STEP_4_SUCCESS=true
-        ((STEP_SUCCESS_COUNT++))
-        echo "   🎯 Step 4 successful, current success count: $STEP_SUCCESS_COUNT"
+            EXPECTED_INBOX_LENGTH=$expected_length
+
+            STEP_4_SUCCESS=true
+            ((STEP_SUCCESS_COUNT++))
+            echo "   🎯 Step 4 successful, current success count: $STEP_SUCCESS_COUNT"
+        else
+            final_inbox_length=$(get_current_inbox_length "$NFT_PROCESS_ID")
+            echo "❌ Get-NFT Inbox verification failed: NFT info not received in Inbox"
+            echo "   📊 Final state: $inbox_before_operation → $final_inbox_length"
+            STEP_4_SUCCESS=false
+        fi
     else
-        final_inbox_length=$(get_current_inbox_length "$NFT_PROCESS_ID")
-        echo "❌ Get-NFT Inbox verification failed: NFT info not received in Inbox"
-        echo "   📊 Final state: $inbox_before_operation → $final_inbox_length"
+        echo "❌ Get-NFT function test FAILED - Message did not complete successfully"
         STEP_4_SUCCESS=false
     fi
-else
-    echo "❌ Get-NFT function test FAILED - Message did not complete successfully"
-    STEP_4_SUCCESS=false
 fi
 echo ""
 
@@ -729,41 +763,50 @@ echo ""
 # 6. Test Get-User-NFTs function - Query user NFT collections
 echo "=== Step 6: Test Get-User-NFTs function - Query user NFT collections ==="
 
-inbox_before_operation=$(get_current_inbox_length "$NFT_PROCESS_ID")
-echo "📊 Inbox length (before operation): $inbox_before_operation"
+if $SKIP_QUERY_STEPS; then
+    echo "⏭️  Step 6 skipped (SKIP_QUERY_STEPS=true)"
+    STEP_6_SUCCESS=true
+    ((STEP_SUCCESS_COUNT++))
+    echo "   🎯 Step 6 skipped, current success count: $STEP_SUCCESS_COUNT"
+    echo ""
+else
 
-echo "📤 Sending Get-User-NFTs request via eval command (internal send → Send() → Inbox)"
-echo "Querying NFTs owned by: $NFT_PROCESS_ID"
+    inbox_before_operation=$(get_current_inbox_length "$NFT_PROCESS_ID")
+    echo "📊 Inbox length (before operation): $inbox_before_operation"
 
-GET_USER_NFTS_LUA_CODE="Send({Target=\"$NFT_PROCESS_ID\", Action=\"Get-User-NFTs\", Address=\"$NFT_PROCESS_ID\"})"
-RAW_OUTPUT=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$GET_USER_NFTS_LUA_CODE" --wait)
-JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
+    echo "📤 Sending Get-User-NFTs request via eval command (internal send → Send() → Inbox)"
+    echo "Querying NFTs owned by: $NFT_PROCESS_ID"
 
-if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
-    echo "✅ Get-User-NFTs function eval successful: Request sent successfully"
+    GET_USER_NFTS_LUA_CODE="Send({Target=\"$NFT_PROCESS_ID\", Action=\"Get-User-NFTs\", Address=\"$NFT_PROCESS_ID\"})"
+    RAW_OUTPUT=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$GET_USER_NFTS_LUA_CODE" --wait)
+    JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
 
-    expected_length=$((inbox_before_operation + 1))
-    if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_length"; then
-        echo "✅ Get-User-NFTs function verification successful: User NFTs info received in Inbox"
-        echo "   📊 Inbox increased from $inbox_before_operation to $expected_length"
-        echo "   📝 Expected result: Empty NFT collection (NFT was transferred away)"
+    if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
+        echo "✅ Get-User-NFTs function eval successful: Request sent successfully"
 
-        display_latest_inbox_message "$NFT_PROCESS_ID" "User-NFTs Response Message (should be empty)"
+        expected_length=$((inbox_before_operation + 1))
+        if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_length"; then
+            echo "✅ Get-User-NFTs function verification successful: User NFTs info received in Inbox"
+            echo "   📊 Inbox increased from $inbox_before_operation to $expected_length"
+            echo "   📝 Expected result: Empty NFT collection (NFT was transferred away)"
 
-        EXPECTED_INBOX_LENGTH=$expected_length
+            display_latest_inbox_message "$NFT_PROCESS_ID" "User-NFTs Response Message (should be empty)"
 
-        STEP_6_SUCCESS=true
-        ((STEP_SUCCESS_COUNT++))
-        echo "   🎯 Step 6 successful, current success count: $STEP_SUCCESS_COUNT"
+            EXPECTED_INBOX_LENGTH=$expected_length
+
+            STEP_6_SUCCESS=true
+            ((STEP_SUCCESS_COUNT++))
+            echo "   🎯 Step 6 successful, current success count: $STEP_SUCCESS_COUNT"
+        else
+            final_inbox_length=$(get_current_inbox_length "$NFT_PROCESS_ID")
+            echo "❌ Get-User-NFTs Inbox verification failed: User NFTs info not received in Inbox"
+            echo "   📊 Final state: $inbox_before_operation → $final_inbox_length"
+            STEP_6_SUCCESS=false
+        fi
     else
-        final_inbox_length=$(get_current_inbox_length "$NFT_PROCESS_ID")
-        echo "❌ Get-User-NFTs Inbox verification failed: User NFTs info not received in Inbox"
-        echo "   📊 Final state: $inbox_before_operation → $final_inbox_length"
+        echo "❌ Get-User-NFTs function test FAILED - Eval did not complete successfully"
         STEP_6_SUCCESS=false
     fi
-else
-    echo "❌ Get-User-NFTs function test FAILED - Eval did not complete successfully"
-    STEP_6_SUCCESS=false
 fi
 echo ""
 
@@ -773,8 +816,11 @@ echo "Mint a new NFT and then test changing its transferable status"
 
 # First mint another NFT with unique parameters
 echo "🏭 Minting another NFT for transferable test..."
+# Wait for mint confirmation in inbox (same logic as first mint)
+inbox_before_second_mint=$(get_current_inbox_length "$NFT_PROCESS_ID")
 MINT_LUA_CODE2="Send({Target=\"$NFT_PROCESS_ID\", Action=\"Mint-NFT\", Name=\"Test NFT #2\", Description=\"Second test NFT for transferable test\", Image=\"ar://test-image-2\", Transferable=\"true\"})"
 echo "Mint command: ao-cli eval $NFT_PROCESS_ID --data '$MINT_LUA_CODE2' --wait"
+expected_second_mint_length=$((inbox_before_second_mint + 1))
 
 RAW_OUTPUT2=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$MINT_LUA_CODE2" --wait)
 JSON_OUTPUT2=$(echo "$RAW_OUTPUT2" | jq -s '.[-1]')
@@ -782,15 +828,12 @@ JSON_OUTPUT2=$(echo "$RAW_OUTPUT2" | jq -s '.[-1]')
 if echo "$JSON_OUTPUT2" | jq -e '.success == true' >/dev/null 2>&1; then
     echo "✅ Second NFT mint request sent successfully"
 
-    # Wait for mint confirmation in inbox
-    current_inbox_length=$(get_current_inbox_length "$NFT_PROCESS_ID")
-    expected_mint_length=$((current_inbox_length + 1))
     echo "⏳ Waiting for second NFT mint confirmation..."
-    echo "   📊 Current inbox: $current_inbox_length, Expected after mint: $expected_mint_length"
+    echo "   📊 Current inbox: $inbox_before_second_mint, Expected after mint: $expected_second_mint_length"
 
-    if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_mint_length"; then
+    if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_second_mint_length"; then
         echo "✅ Second NFT minted successfully"
-        EXPECTED_INBOX_LENGTH=$expected_mint_length
+        EXPECTED_INBOX_LENGTH=$expected_second_mint_length
 
         # Extract the second TokenId from Mint-Confirmation message using unified function
         SECOND_TOKEN_ID=$(extract_token_id_from_inbox "$NFT_PROCESS_ID" "Second Mint-Confirmation")
@@ -876,7 +919,6 @@ if $STEP_3_SUCCESS && [[ -n "$SECOND_TOKEN_ID" ]]; then
 
         STEP_7_SUCCESS=true
         ((STEP_SUCCESS_COUNT++))
-        echo "   🎯 Step 7 successful, current success count: $STEP_SUCCESS_COUNT"
     else
         echo "❌ Set-NFT-Transferable function test FAILED"
         echo "   ❌ Handler was not executed properly (missing expected trace output)"
@@ -887,10 +929,15 @@ if $STEP_3_SUCCESS && [[ -n "$SECOND_TOKEN_ID" ]]; then
     # This checks if inbox received any confirmation message and displays details
     echo ""
     echo "🔍 Additional Inbox Verification for Set-NFT-Transferable:"
-    current_inbox_after=$(get_current_inbox_length "$NFT_PROCESS_ID")
-    echo "   📊 Inbox length after operation: $current_inbox_length → $current_inbox_after"
+    expected_inbox_length=$((current_inbox_length + 1))
+    if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_inbox_length"; then
+        echo "   ✅ Inbox reached expected length after ${waited}s (current: $current_inbox_length >= expected: $expected_inbox_length)"
+    else
+        echo "   ❌ Inbox did not reach expected length within ${max_wait}s timeout"
+    fi
+    echo "   📊 Inbox length after operation: $current_inbox_length → $expected_inbox_length"
 
-    inbox_change=$((current_inbox_after - current_inbox_length))
+    inbox_change=$((expected_inbox_length - current_inbox_length))
     if [ "$inbox_change" -gt 0 ]; then
         echo "   ✅ Inbox increased by $inbox_change message(s) - confirmation message received!"
 

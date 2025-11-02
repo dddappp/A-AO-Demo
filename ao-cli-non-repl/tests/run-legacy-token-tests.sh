@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INBOX_DISPLAY_LINES=500     # Number of lines to display from inbox output (showing the most valuable beginning part)
 
 # Constants for Inbox waiting
-INBOX_CHECK_INTERVAL=2     # Check Inbox every 2 seconds
+INBOX_CHECK_INTERVAL=10     # Check Inbox every N seconds (more conservative)
 INBOX_MAX_WAIT_TIME=300    # Maximum wait time for Inbox changes
 
 # Check if ao-cli is installed
