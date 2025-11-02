@@ -882,6 +882,24 @@ if $STEP_3_SUCCESS && [[ -n "$SECOND_TOKEN_ID" ]]; then
         echo "   ❌ Handler was not executed properly (missing expected trace output)"
         STEP_7_SUCCESS=false
     fi
+
+    # Additional inbox verification for Set-NFT-Transferable (independent of above logic)
+    # This checks if inbox received any confirmation message and displays details
+    echo ""
+    echo "🔍 Additional Inbox Verification for Set-NFT-Transferable:"
+    current_inbox_after=$(get_current_inbox_length "$NFT_PROCESS_ID")
+    echo "   📊 Inbox length after operation: $current_inbox_length → $current_inbox_after"
+
+    inbox_change=$((current_inbox_after - current_inbox_length))
+    if [ "$inbox_change" -gt 0 ]; then
+        echo "   ✅ Inbox increased by $inbox_change message(s) - confirmation message received!"
+
+        # Display the latest inbox message details
+        echo "   📨 Latest Inbox Message Details:"
+        display_latest_inbox_message "$NFT_PROCESS_ID" "Set-NFT-Transferable Confirmation"
+    else
+        echo "   ℹ️  Inbox did not increase - no confirmation message found in inbox"
+    fi
 fi
 echo ""
 
