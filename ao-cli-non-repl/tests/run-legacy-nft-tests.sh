@@ -932,21 +932,17 @@ if $STEP_3_SUCCESS && [[ -n "$SECOND_TOKEN_ID" ]]; then
     expected_inbox_length=$((current_inbox_length + 1))
     if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_inbox_length"; then
         echo "   ✅ Inbox reached expected length after ${waited}s (current: $current_inbox_length >= expected: $expected_inbox_length)"
+        inbox_change=$((expected_inbox_length - current_inbox_length))
+        if [ "$inbox_change" -gt 0 ]; then
+            echo "   ✅ Inbox increased by $inbox_change message(s) - confirmation message received!"
+            # Display the latest inbox message details
+            echo "   📨 Latest Inbox Message Details:"
+            display_latest_inbox_message "$NFT_PROCESS_ID" "Set-NFT-Transferable Confirmation"
+        fi
     else
         echo "   ❌ Inbox did not reach expected length within ${max_wait}s timeout"
     fi
-    echo "   📊 Inbox length after operation: $current_inbox_length → $expected_inbox_length"
 
-    inbox_change=$((expected_inbox_length - current_inbox_length))
-    if [ "$inbox_change" -gt 0 ]; then
-        echo "   ✅ Inbox increased by $inbox_change message(s) - confirmation message received!"
-
-        # Display the latest inbox message details
-        echo "   📨 Latest Inbox Message Details:"
-        display_latest_inbox_message "$NFT_PROCESS_ID" "Set-NFT-Transferable Confirmation"
-    else
-        echo "   ℹ️  Inbox did not increase - no confirmation message found in inbox"
-    fi
 fi
 echo ""
 
