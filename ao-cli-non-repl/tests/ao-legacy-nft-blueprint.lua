@@ -594,8 +594,9 @@ Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Se
   NFTs[tokenId].transferable = isTransferable
 
   local response = {
-    Action = 'NFT-Transferable-Updated', -- 'Mint-Confirmation',
+    Action = 'NFT-Transferable-Updated',
     TokenId = tokenId,
+    Transferable = isTransferable, -- Boolean value matching research report
     Name = NFTs[tokenId].name,
     Data = "NFT '" .. NFTs[tokenId].name .. "' transferable status updated to: " .. tostring(isTransferable)
   }
