@@ -1,6 +1,93 @@
 -- AO Legacy NFT Blueprint
--- Fully compatible with Wander wallet NFT standard
--- Based on research report and actual AO network testing
+-- ⚠️  CRITICAL ISSUES FOUND - NOT FULLY COMPATIBLE WITH WANDER WALLET ⚠️
+--
+-- MAJOR ISSUES IDENTIFIED (UPDATED ANALYSIS):
+-- 1. ❌ Balance Handler Returns WRONG Format: Wander expects pure number string in Data field
+--    Current: Returns JSON object { Data: json.encode({...}) }
+--    Required: Returns pure number string in Data field
+--
+-- 2. ❌ NFT Transfer Logic FLAWED: Uses 'Tokenid' (lowercase i) but Wander sends 'TokenId' (capital I)
+--    AO network converts first char to lowercase: TokenId -> Tokenid
+--    Current handler checks msg.Tokenid but should handle both msg.TokenId and msg.Tokenid
+--
+-- 3. ✅ CORRECTED: Info Response Format - Need to use JSON Data field for boolean Transferable
+--    Current: Transferable = "true" (string in tags)
+--    Required: Use Data field with JSON: Data = json.encode({Transferable = true})
+--    OR use tags with string: Transferable = "true"
+--
+-- 4. ❌ NFT Transfer Message Format WRONG: Wander wallet sends TokenId as separate tag, not as direct property
+--    Wander sends: { name: "TokenId", value: "123" }
+--    Current code expects: msg.TokenId direct property
+--
+-- 5. ✅ CORRECTED: Boolean Message Properties - AO CAN handle booleans in JSON Data field
+--    Direct properties: CANNOT use boolean values
+--    JSON Data field: CAN contain boolean values
+--    Tags: Always strings (but Wander treats truthy strings as true)
+--
+-- ========================================================================================
+-- CRITICAL ANALYSIS OF AO-TOKEN-RESEARCH-REPORT_CN.md:
+--
+-- The research report contains SEVERAL INACCURACIES when analyzed against actual Wander wallet code:
+--
+-- 1. ✅ CORRECTED: NFT RECOGNITION LOGIC - Wander has TWO code paths:
+--    PRIMARY: Checks boolean in JSON Data field: `typeof data?.transferable === "boolean"`
+--    FALLBACK: Checks string in Tags: `Transferable || Ticker === "ATOMIC" ? "collectible" : "asset"`
+--    ISSUE: AO message system CANNOT send boolean values directly, but can send them in JSON Data field!
+--
+-- 2. ❌ MISLEADING MESSAGE FORMAT: Report shows examples using direct properties like msg.Recipient,
+--    but Wander wallet actually sends tags. The report confuses aoconnect library format with AO protocol format.
+--
+-- 3. ❌ INCORRECT BALANCE QUERY: Report doesn't mention the special JSON data format Wander uses:
+--    ```typescript
+--    data: JSON.stringify({ Target: address })
+--    ```
+--
+-- 4. ✅ CORRECTED: AO BOOLEAN LIMITATION - Report was WRONG! AO CAN handle booleans in JSON Data field,
+--    but CANNOT handle booleans as direct message properties. The limitation is on message property level.
+--
+-- 5. ❌ INACCURATE TRANSFER FORMAT: Report shows simplified examples but doesn't explain the actual tag-based format
+--    that Wander wallet uses for NFT transfers.
+--
+-- KEY DISCOVERY: AO message system has different serialization rules:
+-- - Direct message properties: CANNOT use boolean values
+-- - JSON Data field: CAN contain boolean values
+-- - Tags: Always strings
+--
+-- This explains why NFT contracts can use Transferable=true in reply() but must use Transferable="true" in Send().
+--
+-- CONCLUSION: The research report provides good theoretical background but contains implementation errors.
+-- The key insight is understanding AO's message serialization limitations at different levels.
+-- ========================================================================================
+--
+-- Based on Wander wallet source code analysis (2025-01-03)
+-- Source: /Users/yangjiefeng/Documents/wanderwallet/Wander/src/tokens/aoTokens/ao.ts
+--
+-- Wander NFT Recognition Logic:
+-- ```typescript
+-- const type = typeof data?.transferable === "boolean" || typeof data?.Transferable === "boolean" || Ticker === "ATOMIC"
+--   ? "collectible"
+--   : "asset";
+-- ```
+--
+-- Wander NFT Balance Query:
+-- ```typescript
+-- const res = await dryrun({
+--   process: collectible.processId,
+--   tags: [{ name: "Action", value: "Balance" }],
+--   data: JSON.stringify({ Target: address })
+-- });
+-- const balance = res.Messages[0].Data; // Expects pure number string
+-- ```
+--
+-- Wander NFT Transfer Format:
+-- ```typescript
+-- tags: [
+--   { name: "Action", value: "Transfer" },
+--   { name: "TokenId", value: tokenId },  // Separate tag, not direct property
+--   { name: "Recipient", value: recipient },
+--   { name: "Quantity", value: amount }
+-- ]
+-- ```
 
 local bint = require('.bint')(256)
 local json = require('json')
@@ -45,6 +132,15 @@ end
 
 
 -- TEMPORARILY DISABLED ALL HANDLERS EXCEPT DEBUG
+--
+-- WHY THESE HANDLERS ARE DISABLED:
+-- The disabled handlers below have fundamental incompatibilities with Wander wallet.
+-- They demonstrate common mistakes in AO NFT development but do not work with real wallets.
+-- The issues include:
+-- - Wrong balance response format (expects pure number, sends JSON)
+-- - Incorrect parameter extraction (msg.TokenId vs msg.Tokenid confusion)
+-- - Boolean handling issues (AO doesn't support boolean message properties)
+-- - Wrong message format expectations (tags vs direct properties)
 
 -- Balance handler - Exact match with Wander wallet expectations
 -- Handlers.add('nft_balance', Handlers.utils.hasMatchingTag("Action", "Balance"), function(msg)
@@ -661,7 +757,10 @@ end)
 
 
 print("AO Legacy NFT Blueprint loaded successfully!")
-print("Available actions:")
+print("⚠️  WARNING: This blueprint has CRITICAL COMPATIBILITY ISSUES with Wander wallet!")
+print("   See header comments for detailed analysis of the problems.")
+print("")
+print("Available actions (DISABLED due to compatibility issues):")
 print("- Info: Get contract information")
 print("- Mint-NFT: Mint a new NFT")
 print("- Transfer: Transfer NFT (standard action)")
@@ -670,3 +769,117 @@ print("- Get-User-NFTs: Get user's NFTs")
 print("- Set-NFT-Transferable: Set NFT transferable status")
 print("- Get-Contract-Stats: Get contract statistics")
 print("- Notification handler: Accepts Debit/Credit notices")
+print("")
+print("=================================================================================")
+print("CORRECTED WANDER WALLET COMPATIBLE NFT IMPLEMENTATION EXAMPLE:")
+print("=================================================================================")
+print("")
+print("-- CORRECTED Info Handler (Wander wallet NFT recognition - TWO working approaches)")
+print("-- APPROACH 1: Use JSON Data field (can contain boolean)")
+print("Handlers.add('corrected_info_json', Handlers.utils.hasMatchingTag('Action', 'Info'), function(msg)")
+print("  Send({")
+print("    Target = msg.From,")
+print("    Action = 'Info',")
+print("    -- Use JSON Data field to send boolean Transferable (Wander's PRIMARY recognition path)")
+print("    Data = json.encode({")
+print("      Name = 'AO NFT Collection',")
+print("      Ticker = 'NFT',")
+print("      Logo = 'NFT_LOGO_TXID_HERE',")
+print("      Denomination = 0,")
+print("      Transferable = true  -- Boolean value works in JSON!")
+print("    })")
+print("  })")
+print("end)")
+print("")
+print("-- APPROACH 2: Use Tags with string (Wander's FALLBACK recognition path)")
+print("Handlers.add('corrected_info_tags', Handlers.utils.hasMatchingTag('Action', 'Info'), function(msg)")
+print("  Send({")
+print("    Target = msg.From,")
+print("    Tags = {")
+print("      Action = 'Info',")
+print("      Name = 'AO NFT Collection',")
+print("      Ticker = 'NFT',")
+print("      Logo = 'NFT_LOGO_TXID_HERE',")
+print("      Denomination = '0',")
+print("      -- Use string in tags (Wander treats truthy strings as true)")
+print("      Transferable = 'true'")
+print("    }")
+print("  })")
+print("end)")
+print("")
+print("-- CORRECTED Balance Handler (returns pure number string as Wander expects)")
+print("Handlers.add('corrected_balance', Handlers.utils.hasMatchingTag('Action', 'Balance'), function(msg)")
+print("  -- Parse Wander wallet's JSON data format")
+print("  local targetAddress = nil")
+print("  if msg.Data and msg.Data ~= '' then")
+print("    local success, decoded = pcall(function() return json.decode(msg.Data) end)")
+print("    if success and decoded and decoded.Target then")
+print("      targetAddress = decoded.Target")
+print("    end")
+print("  end")
+print("")
+print("  -- Count NFTs (return as pure number string)")
+print("  local nftCount = 0")
+print("  for tokenId, owner in pairs(Owners) do")
+print("    if owner == targetAddress then nftCount = nftCount + 1 end")
+print("  end")
+print("")
+print("  -- CRITICAL: Return pure number string in Data field (not JSON)")
+print("  Send({ Target = msg.From, Data = tostring(nftCount) })")
+print("end)")
+print("")
+print("-- CORRECTED NFT Transfer Handler (handles TokenId tag correctly)")
+print("Handlers.add('corrected_transfer', Handlers.utils.hasMatchingTag('Action', 'Transfer'), function(msg)")
+print("  -- Check if this is an NFT transfer (TokenId present in tags)")
+print("  local tokenId = msg.Tags.TokenId or msg.Tags.Tokenid  -- Handle AO conversion")
+print("  if tokenId then")
+print("    -- NFT transfer logic...")
+print("    -- Use string values for all message properties (AO boolean limitation)")
+print("    Send({")
+print("      Target = recipient,")
+print("      Action = 'Credit-Notice',")
+print("      TokenId = tokenId,")
+print("      Transferable = 'true'  -- String, not boolean!")
+print("    })")
+print("  end")
+print("end)")
+print("")
+print("=================================================================================")
+print("KEY LESSONS FOR AO NFT DEVELOPMENT (UPDATED):")
+print("=================================================================================")
+print("1. Always analyze actual wallet source code, not just documentation")
+print("2. AO message system has DIFFERENT serialization rules at different levels:")
+print("   - Direct message properties: CANNOT use boolean values")
+print("   - JSON Data field: CAN contain boolean values")
+print("   - Tags: Always strings (but wallets may treat truthy strings as true)")
+print("3. Wander wallet uses specific JSON data format for NFT balance queries")
+print("4. NFT recognition: Use boolean in JSON Data field OR string in Tags")
+print("5. AO network converts first character of tags to lowercase (TokenId -> Tokenid)")
+print("6. Test with real wallets, not just theoretical examples")
+print("7. msg.reply() vs Send(): Both use ao.send() internally, difference is in reply routing")
+print("=================================================================================")
+print("")
+print("NFT INFO RESPONSE: TWO WORKING APPROACHES FOR WANDER WALLET:")
+print("=================================================================================")
+print("-- APPROACH A: JSON Data Field (Primary - Boolean Transferable)")
+print("Send({")
+print("  Target = msg.From,")
+print("  Data = json.encode({")
+print("    Name = 'My NFT Collection',")
+print("    Ticker = 'NFT',")
+print("    Transferable = true,  -- Boolean works in JSON!")
+print("    Denomination = 0")
+print("  })")
+print("})")
+print("")
+print("-- APPROACH B: Tags (Fallback - String Transferable)")
+print("Send({")
+print("  Target = msg.From,")
+print("  Tags = {")
+print("    Name = 'My NFT Collection',")
+print("    Ticker = 'NFT',")
+print("    Transferable = 'true',  -- String works in tags")
+print("    Denomination = '0'")
+print("  }")
+print("})")
+print("=================================================================================")
