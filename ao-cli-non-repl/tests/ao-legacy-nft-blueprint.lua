@@ -596,7 +596,7 @@ Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Se
   local response = {
     Action = 'NFT-Transferable-Updated',
     TokenId = tokenId,
-    Transferable = tostring(isTransferable), -- String value matching research report format
+    Transferable = isTransferable, -- Boolean value, let's test if AO supports boolean in messages
     Name = NFTs[tokenId].name,
     Data = "NFT '" .. NFTs[tokenId].name .. "' transferable status updated to: " .. tostring(isTransferable)
   }
