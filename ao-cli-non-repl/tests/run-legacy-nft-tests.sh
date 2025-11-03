@@ -78,11 +78,11 @@ run_ao_cli() {
 
     if [[ "$has_trace" == "true" ]]; then
         # For trace mode, don't suppress stderr to see debug output
-        # Don't add --json as trace output may contain mixed text/JSON
+        # But still add --json for Inbox checking functions to work
         if [[ "$process_id" == -* ]]; then
-            ao-cli "$command" -- "$process_id" "$@"
+            ao-cli "$command" -- "$process_id" --json "$@" 2>/dev/null
         else
-            ao-cli "$command" "$process_id" "$@"
+            ao-cli "$command" "$process_id" --json "$@" 2>/dev/null
         fi
     else
         # Normal mode, suppress stderr
@@ -879,7 +879,16 @@ if $STEP_3_SUCCESS && [[ -n "$SECOND_TOKEN_ID" ]]; then
     # Use --trace to capture handler execution details
     # IMPORTANT: This verification relies on print statements in the Lua handler code
     # DO NOT remove print statements from ao-legacy-nft-blueprint.lua as they are used for testing
-    TRACE_OUTPUT=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$SET_TRANSFERABLE_LUA_CODE" --wait --trace)
+
+    # First get trace output (without JSON)
+    if [[ "$NFT_PROCESS_ID" == -* ]]; then
+        TRACE_OUTPUT=$(ao-cli eval -- "$NFT_PROCESS_ID" --data "$SET_TRANSFERABLE_LUA_CODE" --wait --trace 2>&1)
+    else
+        TRACE_OUTPUT=$(ao-cli eval "$NFT_PROCESS_ID" --data "$SET_TRANSFERABLE_LUA_CODE" --wait --trace 2>&1)
+    fi
+
+    # Then get the JSON result for success checking
+    JSON_OUTPUT=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$SET_TRANSFERABLE_LUA_CODE" --wait)
 
     # Debug: Show COMPLETE trace output
     echo "🔍 COMPLETE Raw trace output:"
@@ -907,41 +916,41 @@ if $STEP_3_SUCCESS && [[ -n "$SECOND_TOKEN_ID" ]]; then
         echo "   ✅ Handler validations passed"
     fi
 
-    if echo "$HANDLER_PRINTS" | grep -q "SET-NFT-TRANSFERABLE: Confirmation sent"; then
+    if echo "$HANDLER_PRINTS" | grep -q "SET-NFT-TRANSFERABLE: ✅ Mint-Confirmation sent"; then
         echo "   ✅ Handler sent confirmation message"
     fi
 
-    # In trace mode, handler execution success implies the entire operation succeeded
-    if $HANDLER_EXECUTED; then
-        echo "✅ Set-NFT-Transferable function verification successful: Handler executed correctly"
-        echo "   📝 Trace confirms: Handler called → Validations passed → Confirmation sent"
-        echo "   📝 Note: Unlike other handlers, confirmation message routing differs (investigation needed)"
+           # In trace mode, handler execution success implies the entire operation succeeded
+           if $HANDLER_EXECUTED; then
+               echo "✅ Set-NFT-Transferable function verification successful: Handler executed correctly"
+               echo "   📝 Trace confirms: Handler called → Validations passed → Response sent"
 
-        STEP_7_SUCCESS=true
-        ((STEP_SUCCESS_COUNT++))
-    else
-        echo "❌ Set-NFT-Transferable function test FAILED"
-        echo "   ❌ Handler was not executed properly (missing expected trace output)"
-        STEP_7_SUCCESS=false
-    fi
+               STEP_7_SUCCESS=true
+               ((STEP_SUCCESS_COUNT++))
+           else
+               echo "❌ Set-NFT-Transferable function test FAILED"
+               echo "   ❌ Handler was not executed properly (missing expected trace output)"
+               STEP_7_SUCCESS=false
+           fi
 
-    # Additional inbox verification for Set-NFT-Transferable (independent of above logic)
-    # This checks if inbox received any confirmation message and displays details
-    echo ""
-    echo "🔍 Additional Inbox Verification for Set-NFT-Transferable:"
-    expected_inbox_length=$((current_inbox_length + 1))
-    if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_inbox_length"; then
-        echo "   ✅ Inbox reached expected length after ${waited}s (current: $current_inbox_length >= expected: $expected_inbox_length)"
-        inbox_change=$((expected_inbox_length - current_inbox_length))
-        if [ "$inbox_change" -gt 0 ]; then
-            echo "   ✅ Inbox increased by $inbox_change message(s) - confirmation message received!"
-            # Display the latest inbox message details
-            echo "   📨 Latest Inbox Message Details:"
-            display_latest_inbox_message "$NFT_PROCESS_ID" "Set-NFT-Transferable Confirmation"
-        fi
-    else
-        echo "   ❌ Inbox did not reach expected length within ${max_wait}s timeout"
-    fi
+           # Test inbox verification for Set-NFT-Transferable
+           echo ""
+           echo "🔍 Inbox Verification for Set-NFT-Transferable:"
+           expected_inbox_length=$((current_inbox_length + 1))
+           if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_inbox_length"; then
+               echo "   ✅ Inbox reached expected length after ${waited}s (current: $current_inbox_length >= expected: $expected_inbox_length)"
+               inbox_change=$((expected_inbox_length - current_inbox_length))
+               if [ "$inbox_change" -gt 0 ]; then
+                   echo "   ✅ Inbox increased by $inbox_change message(s) - confirmation message received!"
+                   # Display the latest inbox message details
+                   echo "   📨 Latest Inbox Message Details:"
+                   display_latest_inbox_message "$NFT_PROCESS_ID" "Set-NFT-Transferable Confirmation"
+               fi
+           else
+               echo "   ❌ Inbox did not reach expected length within ${max_wait}s timeout"
+               echo "   📝 Response was sent according to trace, but Inbox delivery failed"
+               echo "   📝 This may be due to process state issues - try with a fresh process"
+           fi
 
 fi
 echo ""

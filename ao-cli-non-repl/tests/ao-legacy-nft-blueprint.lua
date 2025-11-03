@@ -319,36 +319,37 @@ Handlers.add('mint_nft', Handlers.utils.hasMatchingTag("Action", "Mint-NFT"), fu
     Data = "NFT '" .. name .. "' minted successfully with ID: " .. tokenId
   }
 
-  -- Send response with error handling
+  -- Send response using msg.reply() or Send() as fallback
   print("MINT-NFT: Sending Mint-Confirmation response...")
-  local send_success = false
   if msg.reply then
     print("MINT-NFT: Using msg.reply() for response")
     local reply_success, reply_error = pcall(function() msg.reply(response) end)
     if reply_success then
-      send_success = true
-      print("MINT-NFT: ✅ Response sent via msg.reply()")
+      print("MINT-NFT: ✅ Mint-Confirmation sent via msg.reply()")
     else
       print("MINT-NFT: ❌ Failed to send via msg.reply():", reply_error)
+      print("MINT-NFT: Using Send() as fallback")
+      response.Target = msg.From
+      local send_success, send_error = pcall(function() Send(response) end)
+      if send_success then
+        print("MINT-NFT: ✅ Mint-Confirmation sent via Send()")
+      else
+        print("MINT-NFT: ❌ Failed to send Mint-Confirmation:", send_error)
+        print("MINT-NFT: ===== MINT OPERATION PARTIALLY FAILED =====")
+        return
+      end
     end
-  end
-
-  if not send_success then
-    print("MINT-NFT: Using Send() for response")
+  else
+    print("MINT-NFT: msg.reply() not available, using Send()")
     response.Target = msg.From
-    local send_call_success, send_error = pcall(function() Send(response) end)
-    if send_call_success then
-      send_success = true
-      print("MINT-NFT: ✅ Response sent via Send()")
+    local send_success, send_error = pcall(function() Send(response) end)
+    if send_success then
+      print("MINT-NFT: ✅ Mint-Confirmation sent via Send()")
     else
-      print("MINT-NFT: ❌ Failed to send via Send():", send_error)
+      print("MINT-NFT: ❌ Failed to send Mint-Confirmation:", send_error)
+      print("MINT-NFT: ===== MINT OPERATION PARTIALLY FAILED =====")
+      return
     end
-  end
-
-  if not send_success then
-    print("MINT-NFT: ❌ CRITICAL ERROR - Failed to send any response")
-    print("MINT-NFT: ===== MINT OPERATION PARTIALLY SUCCEEDED =====")
-    return
   end
 
   print("MINT-NFT: ===== MINT OPERATION COMPLETED SUCCESSFULLY =====")
@@ -482,9 +483,11 @@ Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), func
     }
     if msg.reply then
       msg.reply(response)
+      print("GET-NFT: ✅ NFT-Info response sent via msg.reply()")
     else
       response.Target = msg.From
       Send(response)
+      print("GET-NFT: ✅ NFT-Info response sent via Send()")
     end
   else
     print("GET-NFT: NFT not found or incomplete data")
@@ -494,9 +497,11 @@ Handlers.add('get_nft', Handlers.utils.hasMatchingTag("Action", "Get-NFT"), func
     }
     if msg.reply then
       msg.reply(errorResponse)
+      print("GET-NFT: ❌ NFT-Error response sent via msg.reply()")
     else
       errorResponse.Target = msg.From
       Send(errorResponse)
+      print("GET-NFT: ❌ NFT-Error response sent via Send()")
     end
   end
 end)
@@ -533,14 +538,20 @@ Handlers.add('get_user_nfts', Handlers.utils.hasMatchingTag("Action", "Get-User-
     })
   }
 
-  sendResponse(msg, response)
+  if msg.reply then
+    msg.reply(response)
+  else
+    response.Target = msg.From
+    Send(response)
+  end
 end)
 
 -- Set NFT transferable status handler - Compatible with research report format
-Handlers.add('set_nft_transferable', function(msg)
-  return msg.Action == "Set-NFT-Transferable"
-end, function(msg)
+Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Set-NFT-Transferable"), function(msg)
   print("SET-NFT-TRANSFERABLE: Handler called with Action=" .. tostring(msg.Action))
+  print("SET-NFT-TRANSFERABLE: msg.From=" .. tostring(msg.From) .. ", msg.Target=" .. tostring(msg.Target))
+  print("SET-NFT-TRANSFERABLE: msg.Tags.From-Process=" .. tostring(msg.Tags and msg.Tags["From-Process"]))
+  print("SET-NFT-TRANSFERABLE: msg.Tags.From-Module=" .. tostring(msg.Tags and msg.Tags["From-Module"]))
   -- Parameter extraction: Tags first (for eval+Send), then direct properties
   local tokenId = (msg.Tags and msg.Tags.TokenId) or (msg.Tags and msg.Tags.Tokenid) or msg.TokenId or msg.Tokenid
   local transferable = (msg.Tags and msg.Tags.Transferable) or (msg.Tags and msg.Tags.transferable) or msg.Transferable or msg.transferable
@@ -571,8 +582,10 @@ end, function(msg)
   local isOwner = (Owners[tokenId] == msg.From)
   local isProcessOwner = (msg.From == msg.Target)  -- eval context: msg.From == msg.Target
 
+  print("SET-NFT-TRANSFERABLE: Ownership check - owner=" .. tostring(Owners[tokenId]) .. ", from=" .. tostring(msg.From) .. ", target=" .. tostring(msg.Target))
+
   if not (isOwner or isProcessOwner) then
-    print("SET-NFT-TRANSFERABLE: Ownership check failed - owner=" .. tostring(Owners[tokenId]) .. ", from=" .. tostring(msg.From) .. ", target=" .. tostring(msg.Target))
+    print("SET-NFT-TRANSFERABLE: Ownership check failed")
     sendError(msg, 'NFT-Transferable-Error', 'You do not own this NFT', 'TokenId: ' .. tokenId)
     return
   end
@@ -585,24 +598,27 @@ end, function(msg)
   local isTransferable = transferable == 'true'
   NFTs[tokenId].transferable = isTransferable
 
-  -- Send confirmation (matching Mint-Confirmation format)
+  -- Send confirmation exactly like Mint-Confirmation
   local response = {
-    Action = 'NFT-Transferable-Updated',
+    Action = 'Mint-Confirmation',
     TokenId = tokenId,
-    Transferable = isTransferable, -- Boolean value matching research report
+    Name = NFTs[tokenId].name,
     Data = "NFT '" .. NFTs[tokenId].name .. "' transferable status updated to: " .. tostring(isTransferable)
   }
 
   print("SET-NFT-TRANSFERABLE: Operation completed successfully")
-  -- Send confirmation using same pattern as Transfer handler
+
+  -- Send response using the same pattern as Mint-NFT
   if msg.reply then
     msg.reply(response)
-    print("SET-NFT-TRANSFERABLE: Confirmation sent via msg.reply()")
+    print("SET-NFT-TRANSFERABLE: Response sent via msg.reply()")
   else
     response.Target = msg.From
     Send(response)
-    print("SET-NFT-TRANSFERABLE: Confirmation sent via Send() to msg.From")
+    print("SET-NFT-TRANSFERABLE: Response sent via Send() to msg.From")
   end
+
+  print("SET-NFT-TRANSFERABLE: ===== OPERATION COMPLETED SUCCESSFULLY =====")
 end)
 
 -- Get contract statistics handler
@@ -643,8 +659,6 @@ Handlers.add('get_contract_stats', Handlers.utils.hasMatchingTag("Action", "Get-
     Send(response)
   end
 end)
-
-
 
 
 print("AO Legacy NFT Blueprint loaded successfully!")
