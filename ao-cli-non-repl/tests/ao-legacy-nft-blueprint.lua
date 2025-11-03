@@ -26,16 +26,6 @@ local utils = {
   end
 }
 
--- Unified response sender function
-local function sendResponse(msg, response)
-  if msg.reply then
-    msg.reply(response)
-  else
-    response.Target = msg.From
-    Send(response)
-  end
-end
-
 -- Unified error sender function
 local function sendError(msg, action, error, data)
   local errorMsg = {
@@ -45,7 +35,12 @@ local function sendError(msg, action, error, data)
   if data then
     errorMsg.Data = data
   end
-  sendResponse(msg, errorMsg)
+  if msg.reply then
+    msg.reply(errorMsg)
+  else
+    errorMsg.Target = msg.From
+    Send(errorMsg)
+  end
 end
 
 
@@ -598,9 +593,8 @@ Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Se
   local isTransferable = transferable == 'true'
   NFTs[tokenId].transferable = isTransferable
 
-  -- Send confirmation exactly like Mint-Confirmation
   local response = {
-    Action = 'Mint-Confirmation',
+    Action = 'NFT-Transferable-Updated', -- 'Mint-Confirmation',
     TokenId = tokenId,
     Name = NFTs[tokenId].name,
     Data = "NFT '" .. NFTs[tokenId].name .. "' transferable status updated to: " .. tostring(isTransferable)
