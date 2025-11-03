@@ -593,10 +593,14 @@ Handlers.add('set_nft_transferable', Handlers.utils.hasMatchingTag("Action", "Se
   local isTransferable = transferable == 'true'
   NFTs[tokenId].transferable = isTransferable
 
+  -- NOTE: AO MESSAGE SYSTEM LIMITATION
+  -- Boolean values CANNOT be used as message properties in AO!
+  -- AO's message serialization/deserialization does not support boolean values
+  -- Always convert booleans to strings using tostring() for message properties
   local response = {
     Action = 'NFT-Transferable-Updated',
     TokenId = tokenId,
-    Transferable = tostring(isTransferable), -- AO requires string values for message properties
+    Transferable = tostring(isTransferable), -- MUST use tostring() - AO doesn't support boolean message properties!
     Name = NFTs[tokenId].name,
     Data = "NFT '" .. NFTs[tokenId].name .. "' transferable status updated to: " .. tostring(isTransferable)
   }
