@@ -286,6 +286,7 @@ if $SKIP_QUERY_STEPS; then
     echo "  5. ✅ Test NFT Transfer function - Transfer NFTs using standard Transfer action"
     echo "  6. ⏭️  Test Get-User-NFTs function - SKIPPED (query steps disabled)"
     echo "  7. ✅ Test Set-NFT-Transferable function - Update NFT transferable status"
+    echo "  8. ✅ Test Balance function - Check NFT balance using JSON format"
 else
     echo "  2. ✅ Test Info function - Get NFT contract basic information"
     echo "  3. ✅ Test Mint-NFT function - Mint new NFTs"
@@ -293,15 +294,16 @@ else
     echo "  5. ✅ Test NFT Transfer function - Transfer NFTs using standard Transfer action"
     echo "  6. ✅ Test Get-User-NFTs function - Query user NFT collections"
     echo "  7. ✅ Test Set-NFT-Transferable function - Update NFT transferable status"
+    echo "  8. ✅ Test Balance function - Check NFT balance using JSON format"
 fi
 echo ""
 
 # Initialize step status tracking variables
 STEP_SUCCESS_COUNT=0
 if $SKIP_QUERY_STEPS; then
-    STEP_TOTAL_COUNT=4  # Skip 3 steps when query steps are disabled (2, 4, 6)
+    STEP_TOTAL_COUNT=5  # Skip 3 steps when query steps are disabled (2, 4, 6), but include Balance (8)
 else
-    STEP_TOTAL_COUNT=7
+    STEP_TOTAL_COUNT=8
 fi
 STEP_1_SUCCESS=false   # Generate NFT process and load legacy blueprint
 STEP_2_SUCCESS=false   # Test Info function
@@ -310,6 +312,7 @@ STEP_4_SUCCESS=false   # Test Get-NFT function
 STEP_5_SUCCESS=false   # Test NFT Transfer function
 STEP_6_SUCCESS=false   # Test Get-User-NFTs function
 STEP_7_SUCCESS=false   # Test Set-NFT-Transferable function
+STEP_8_SUCCESS=false   # Test Balance function
 
 # Track expected Inbox length and initial state
 EXPECTED_INBOX_LENGTH=0
@@ -500,7 +503,7 @@ if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
 
         echo ""
         echo "🚨 CRITICAL FAILURE: Mint-NFT step failed!"
-        echo "🚨 ALL SUBSEQUENT TESTS WILL BE SKIPPED (Step 4-7)"
+        echo "🚨 ALL SUBSEQUENT TESTS WILL BE SKIPPED (Step 4-8)"
         echo "🚨 This prevents false test results and wasted resources"
         echo ""
 
@@ -509,6 +512,7 @@ if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
         STEP_5_SUCCESS=false
         STEP_6_SUCCESS=false
         STEP_7_SUCCESS=false
+        STEP_8_SUCCESS=false
 
         echo "=== Test completed (early termination due to Mint failure) ==="
         echo "Total time: $(( $(date +%s) - START_TIME )) seconds"
@@ -521,6 +525,7 @@ if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
         echo "⏭️  Step 5 (Test NFT Transfer function): SKIPPED"
         echo "⏭️  Step 6 (Test Get-User-NFTs function): SKIPPED"
         echo "⏭️  Step 7 (Test Set-NFT-Transferable function): SKIPPED"
+        echo "⏭️  Step 8 (Test Balance function): SKIPPED"
         echo ""
         echo "⚠️ ${STEP_SUCCESS_COUNT} / ${STEP_TOTAL_COUNT} test steps successful"
         echo "⚠️ Critical Mint step failed - remaining tests skipped"
@@ -533,9 +538,9 @@ else
     STEP_3_SUCCESS=false
 
     echo ""
-    echo "🚨 CRITICAL FAILURE: Mint-NFT step failed!"
-    echo "🚨 ALL SUBSEQUENT TESTS WILL BE SKIPPED (Step 4-7)"
-    echo "🚨 This prevents false test results and wasted resources"
+        echo "🚨 CRITICAL FAILURE: Mint-NFT step failed!"
+        echo "🚨 ALL SUBSEQUENT TESTS WILL BE SKIPPED (Step 4-8)"
+        echo "🚨 This prevents false test results and wasted resources"
     echo ""
 
     # Mark remaining steps as failed without executing them
@@ -543,6 +548,7 @@ else
     STEP_5_SUCCESS=false
     STEP_6_SUCCESS=false
     STEP_7_SUCCESS=false
+    STEP_8_SUCCESS=false
 
     echo "=== Test completed (early termination due to Mint failure) ==="
     echo "Total time: $(( $(date +%s) - START_TIME )) seconds"
@@ -964,6 +970,57 @@ if $STEP_3_SUCCESS && [[ -n "$SECOND_TOKEN_ID" ]]; then
 fi
 echo ""
 
+# 8. Test Balance function - Check NFT balance for an address (Wander wallet format)
+echo "=== Step 8: Test Balance function - Check NFT balance (Wander wallet JSON format) ==="
+echo "Test Balance function using Wander wallet's JSON data format"
+
+inbox_before_operation=$(get_current_inbox_length "$NFT_PROCESS_ID")
+echo "📊 Inbox length (before operation): $inbox_before_operation"
+
+echo "📤 Sending Balance request via eval command (Wander wallet JSON format)"
+echo "Querying balance for: $NFT_PROCESS_ID (the NFT contract owner)"
+
+# Wander wallet sends balance queries with JSON data: {Target: address}
+# Note: eval environment needs explicit json require, separate from blueprint scope
+BALANCE_LUA_CODE="json = require('json'); Send({Target=\"$NFT_PROCESS_ID\", Action=\"Balance\", Data=json.encode({Target=\"$NFT_PROCESS_ID\"})})"
+RAW_OUTPUT=$(run_ao_cli eval "$NFT_PROCESS_ID" --data "$BALANCE_LUA_CODE" --wait)
+JSON_OUTPUT=$(echo "$RAW_OUTPUT" | jq -s '.[-1]')
+
+if echo "$JSON_OUTPUT" | jq -e '.success == true' >/dev/null 2>&1; then
+    echo "✅ Balance function eval successful: Request sent successfully"
+
+    expected_length=$((inbox_before_operation + 1))
+    if wait_for_expected_inbox_length "$NFT_PROCESS_ID" "$expected_length"; then
+        echo "✅ Balance function verification successful: Balance response received in Inbox"
+        echo "   📊 Inbox increased from $inbox_before_operation to $expected_length"
+
+        display_latest_inbox_message "$NFT_PROCESS_ID" "Balance Response Message"
+
+        # Check if the response contains a pure number string (Wander wallet expects this)
+        latest_data=$(run_ao_cli inbox "$NFT_PROCESS_ID" --latest 2>/dev/null | grep "Data =" | head -1 | sed 's/.*Data = \\"\([^\\]*\)\\".*/\1/')
+        if [[ "$latest_data" =~ ^[0-9]+$ ]]; then
+            echo "   ✅ Balance response format correct: Pure number string '$latest_data' (Wander wallet compatible)"
+        else
+            echo "   ⚠️  Balance response format may be incorrect: '$latest_data' (expected pure number)"
+        fi
+
+        EXPECTED_INBOX_LENGTH=$expected_length
+
+        STEP_8_SUCCESS=true
+        ((STEP_SUCCESS_COUNT++))
+        echo "   🎯 Step 8 successful, current success count: $STEP_SUCCESS_COUNT"
+    else
+        final_inbox_length=$(get_current_inbox_length "$NFT_PROCESS_ID")
+        echo "❌ Balance Inbox verification failed: Response not received in Inbox"
+        echo "   📊 Final state: $inbox_before_operation → $final_inbox_length"
+        STEP_8_SUCCESS=false
+    fi
+else
+    echo "❌ Balance function test FAILED - Eval did not complete successfully"
+    STEP_8_SUCCESS=false
+fi
+echo ""
+
 END_TIME=$(date +%s)
 
 echo ""
@@ -1030,6 +1087,14 @@ else
     echo "   ❌ Set-NFT-Transferable request failed"
 fi
 
+if $STEP_8_SUCCESS; then
+    echo "✅ Step 8 (Test Balance function): SUCCESS"
+    echo "   💰 NFT balance queried using Wander wallet JSON format"
+else
+    echo "❌ Step 8 (Test Balance function): FAILED"
+    echo "   ❌ Balance request failed"
+fi
+
 echo ""
 echo "Test summary:"
 if [ "$STEP_SUCCESS_COUNT" -eq "$STEP_TOTAL_COUNT" ]; then
@@ -1049,7 +1114,7 @@ echo "  • ✅ Get-NFT function: TokenId as tag parameter"
 echo "  • ✅ NFT Transfer function: Standard Transfer action with TokenId tag"
 echo "  • ✅ Get-User-NFTs function: Address as tag parameter"
 echo "  • ✅ Set-NFT-Transferable function: Parameters as tags"
-echo "  • ✅ Balance function: JSON data format {Target: address}"
+echo "  • ✅ Balance function: JSON data format {Target: address} → pure number response"
 echo "  • ✅ Direct verification: parse EVAL RESULT for msg.reply() handlers"
 echo "  • ✅ Inbox verification: used for Send() handlers (all NFT operations)"
 echo "  • ✅ wait_for_expected_inbox_length(): efficient Inbox tracking"
@@ -1066,9 +1131,9 @@ echo "  - Consider testing with actual Wander wallet integration"
 
 echo ""
 echo "Usage tips:"
-echo "  - This script tests all 7 implemented functions with Wander wallet compatibility:"
+echo "  - This script tests all 8 implemented functions with Wander wallet compatibility:"
 echo "    1. Process generation, 2. Info (JSON boolean), 3. Mint-NFT (tags), 4. Get-NFT (tags),"
-echo "    5. NFT Transfer (tags), 6. Get-User-NFTs (tags), 7. Set-NFT-Transferable (tags)"
+echo "    5. NFT Transfer (tags), 6. Get-User-NFTs (tags), 7. Set-NFT-Transferable (tags), 8. Balance (JSON data)"
 echo "  - All parameters sent as tags (Wander wallet format)"
 echo "  - Inbox verification: all handlers use Send() in eval context, responses go to Inbox"
 echo "  - Selective inbox tracking: Info (self), Mint (self), Get-NFT (self), Transfer (sender+receiver), Get-User-NFTs (self), Set-Transferable (self)"
