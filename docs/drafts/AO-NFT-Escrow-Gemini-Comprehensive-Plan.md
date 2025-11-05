@@ -1,7 +1,7 @@
 # AO NFT Escrow 简化设计与实施规划 (AO 原生所有权转移模型)
 
-> **文档状态**：v2.0 - 简化版  
-> **核心目标**：核心目标：基于对AO异步消息模型和原生所有权转移机制的深刻理解，设计并实现一个健壮、高效的NFT托管Saga。
+> **文档状态**：v2.0 - 简化版
+> **核心目标**：基于对AO异步消息模型和原生所有权转移机制的深刻理解，设计并实现一个健壮、高效的NFT托管Saga。
 > **作者**：Gemini（AI）
 
 ---
@@ -173,7 +173,6 @@ services:
           CompleteEscrow:
             invokeLocal: "mark_escrow_as_completed"
             description: "所有步骤均已确认，将托管记录标记为完成"
-
 ```
 
 ### 3.2. 其他复杂场景
@@ -219,7 +218,6 @@ Handlers.add(
 为确保与AO生态系统的兼容性并降低实施风险，所有Saga与代理合约之间的交互遵循以下规约：
 
 **参数传递**
-
 当Saga通过代理调用外部合约（如NFT、Token）时，代理实现**必须**将业务参数（如`TokenId`, `Recipient`, `Quantity`）放入消息的 `Tags` 中。这是AO生态（特别是与钱包兼容的合约）的通用实践。
 
 *示例: `NftTransferProxy.Transfer` 的实现*
@@ -238,29 +236,37 @@ ao.send({
 ```
 
 **复杂返回值**
-
 当一个代理方法需要返回复杂数据（多个字段）或布尔值时，它**必须**将返回数据 `json.encode` 为一个字符串，并将其放入回复消息的 `Data` 字段中。Saga的 `onReply` 逻辑则负责从 `Data` 字段中解码JSON。
 
 *示例: `NftTransferProxy.IsApproved` 的回复消息*
 ```lua
 -- 正确的回复消息格式
 Send({
-        Target = saga_process_id,
-        Data = json.encode({ is_approved = true, operator = "..." })
-        -- 其他必要的Saga路由Tags
+    Target = saga_process_id,
+    Data = json.encode({ is_approved = true, operator = "..." })
+    -- 其他必要的Saga路由Tags
 })
 ```
 
-**支付确认**
+**触发Saga事件**
+当代理监听到外部合约的响应或确认后，它**必须**通过调用DDDML工具生成的 `trigger_local_saga_event(saga_id, event_type, event_data)` API来触发相应的Saga事件，以推动Saga流程继续。`event_type` 必须与Saga定义中 `waitForEvent` 声明的事件类型匹配。
 
+**代理内部状态管理**
+代理在处理外部响应并触发Saga事件时，其内部状态（如 `pending_requests`）的更新**必须**遵循“先缓存后commit”的模式，以确保与Saga的整体事务一致性。这意味着在所有验证和准备工作完成后，才进行状态的实际修改和事件的触发。
+
+**健壮性与错误处理**
+代理实现**必须**考虑以下健壮性机制：
+*   **幂等性**：通过检查唯一的 `Message-Id` 或业务ID来防止重复处理外部响应。
+*   **重复消息处理**：能够识别并安全地忽略重复的外部消息。
+*   **内存泄漏防护**：实现机制来清理过时或超时的 `pending_requests` 记录，防止内存无限增长。
+
+**支付确认**
 `PaymentVerificationProxy` 依赖于监听Token合约的 `Credit-Notice`。其核心职责是从 `Credit-Notice` 的 `Tags` 中提取 `Sender` 和 `Quantity`，并与 `intentId` 绑定的预期支付进行匹配。
 
 **NFT存入确认**
-
 需要一个 `NftDepositProxy` (逻辑上)来监听NFT合约的 `Credit-Notice`。当托管合约收到发给自己的NFT时，该代理负责验证收到的NFT是否与 `WaitForNftDeposit` 步骤中等待的NFT匹配，并触发 `NftDeposited` 事件。
 
 **链上效果确认**
-
 代理层现在还必须监听来自NFT和Token合约的 `Debit-Notice`。当托管合约成功转出NFT或Token后，它会收到相应的 `Debit-Notice`。代理监听到这些通知后，负责触发 `NftTransferredToBuyer` 和 `FundsTransferredToSeller` 事件，以推动Saga进入下一个状态。
 
 ---
