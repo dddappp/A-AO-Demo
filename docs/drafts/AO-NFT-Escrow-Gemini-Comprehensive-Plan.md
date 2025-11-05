@@ -37,19 +37,36 @@
                     └─> 5. Saga 完成
 ```
 
-## 2. AO 平台特性适配
+### 核心流程时间轴（估算）
 
-本设计的所有关键决策都根植于对AO平台核心特性的深刻理解和适配。
+```
+T=0s:   买家向托管合约地址发送转账消息。
+T=1s:   Token合约处理转账，并向托管合约发送 `Credit-Notice`。
+T=2s:   托管合约的 `PaymentVerificationProxy` 监听到 `Credit-Notice`，验证后触发 `PaymentCompleted` 本地事件。
+T=2.1s: `ProcessStandardSale` Saga被唤醒，执行 `ValidateNftApproval` 步骤，向NFT合约查询授权。
+T=3s:   NFT合约返回授权状态，Saga验证通过。
+T=3.1s: Saga执行 `TransferNftToBuyer` 步骤，向NFT合约发送 `Transfer` 消息。
+T=4s:   NFT合约处理转移，并向Saga返回成功响应。
+T=4.1s: Saga接收到NFT转移成功响应，执行 `TransferFundsToSeller` 步骤，向Token合约发送 `Transfer` 消息。
+T=5s:   Token合约处理资金转移。
+T=5.1s: Saga执行 `CompleteEscrow` 本地步骤，更新状态为 `COMPLETED`。
 
-- **异步消息驱动**: AO中没有同步函数调用，所有跨进程交互都是异步消息。这决定了我们必须采用 **Saga模式** 来编排多步事务，而不能像EVM那样在单次调用中完成所有操作。
+【总耗时估算：~5-6秒】
+```
 
-- **最终一致性**: 由于异步和多进程的特性，我们无法实现强一致性。Saga的 **补偿（Compensation）机制** 是实现最终一致性的唯一途径。这意味着每一步操作都必须有一个对应的“逆操作”。
+## 2. AO 平台特性适配：设计决策的基石
 
-- **原生超时机制 (`cron`)**: AO支持通过为消息添加 `cron` 标签来调度未来的消息。我们利用此特性来处理 `maxWaitTime`，替代了对外部监控服务的依赖，使设计更内聚、更健壮。
+本设计的所有关键决策都根植于对AO平台核心特性的深刻理解和适配。理解这些差异是理解本方案的关键。
 
-- **状态持久化与 `bint`**: AO进程的状态（Lua全局变量）会自动持久化。为处理大额token数量并避免Lua原生数字的精度问题，所有金额都将使用字符串形式的`bint`（大整数）进行处理，这已成为AO生态的事实标准。
-
-- **单线程与幂等性**: AO进程内的消息是串行处理的，天然避免了竞态条件。但网络可能导致消息重发，因此所有关键的入口消息处理器（特别是接收支付事件的）都必须实现 **幂等性**，通过 `event_id` 或 `Message-Id` 防止重复处理。
+| 特性 | EVM (同步模型) | AO (异步Actor模型) & 本方案的适配 |
+| :--- | :--- | :--- |
+| **调用模型** | `nft.transfer()` 是一个阻塞式调用，立即返回成功或失败。 | `ao.send({Target=NFT, ...})` 是一个非阻塞消息，立即返回。**适配**：必须使用 **Saga模式** 来编排需要多个异步消息交互的流程。 |
+| **事务与状态** | 单次交易内所有操作要么全部成功，要么全部回滚 (ACID)。 | 每个消息处理都是一个原子操作，状态立即持久化。**适配**：无法回滚，必须通过Saga的 **补偿(Compensation)** 机制来执行业务逆操作，以实现最终一致性。 |
+| **超时处理** | `block.timestamp < deadline` 可在合约内直接判断。 | 进程无法自我唤醒。**适配**：利用AO原生的 **`cron` 标签** 调度一条未来的消息给自己，实现内聚、可靠的超时检查，无需依赖外部服务。 |
+| **大数处理** | 原生支持 `uint256`。 | Lua原生数字是双精度浮点数，会丢失精度。**适配**：遵循AO生态标准，所有金额、余额等都使用字符串形式的 **`bint`** (大整数) 进行处理。 |
+| **消息可靠性** | - | 消息可能因网络问题重发。**适配**：所有接收外部事件的处理器（如支付验证）必须实现 **幂等性**，通过检查唯一的 `Message-Id` 或业务ID (`intentId`) 来防止重复处理。 |
+| **数据获取** | 前端可直接调用合约的 `view` 函数同步获取状态。 | 前端无法直接查询进程内存。**适配**：1. 通过发送只读消息异步获取状态。2. 更常见的是，依赖 **外部索引器** (如GraphQL) 监听合约日志（通过 `print` 输出）来构建可查询的数据库。 |
+| **部署模型** | 所有逻辑在一个合约地址。 | 提倡多进程协作。**适配**：虽然本简化方案可置于单进程，但推荐将不同职责（如Saga服务、代理）逻辑上分离，通过配置文件管理依赖的进程ID，便于未来扩展为多进程部署。 |
 
 ---
 
@@ -186,10 +203,60 @@ Handlers.add(
 
 ## 5. 测试、监控与部署
 
+### 5.1. 测试策略
+
 所有测试、监控和部署计划将同样简化，仅聚焦于验证这一个核心交易流程的正确性、安全性和性能。
 
 - **测试**: 重点测试“支付-转移NFT-转移资金”的Saga流程，及其在`TransferFundsToSeller`和`TransferNftToBuyer`失败时的补偿路径。
 - **监控**: 核心监控此Saga的执行时长、成功率和失败率。
+
+### 5.2. 部署与运维
+
+#### 部署架构
+
+推荐将核心服务（Saga、代理、聚合根）部署在**单一AO进程**中，以简化状态管理和内部通信。通过清晰的模块划分（不同的Lua文件）来保持逻辑上的分离。
+
+```
+AO Escrow Process (单一进程)
+├─ main.lua (入口, Handlers注册)
+├─ escrow_service.lua (DDDML服务实现)
+├─ saga_service.lua (DDDML Saga实现)
+├─ proxies/ (目录)
+│  ├─ payment_proxy.lua
+│  └─ nft_proxy.lua
+└─ config.lua (环境配置)
+```
+
+#### 配置管理
+
+通过一个中心化的 `config.lua` 文件管理所有可调参数，方便在不同环境中部署。
+
+```lua
+-- config.lua
+
+local function get_env(key, default)
+    local value = os.getenv(key)
+    if value == nil then return default end
+    return value
+end
+
+return {
+    service = {
+        name = "AO-NFT-Escrow-v1.0"
+    },
+    contracts = {
+        -- 在测试或部署时通过环境变量注入
+        token_contract_id = get_env("TOKEN_ID", "wARJz1KwxRWzi2r9daH4o0MKdlp0W_QgLqhah5zu4E")
+    },
+    business = {
+        platform_fee_basis_points = 250,  -- 2.5%
+        min_price = 1000, -- 最小价格，单位 aotest
+    },
+    security = {
+        event_ttl_seconds = 86400, -- 24小时
+    }
+}
+```
 
 ---
 
