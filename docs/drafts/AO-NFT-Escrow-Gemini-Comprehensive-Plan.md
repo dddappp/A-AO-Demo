@@ -1,60 +1,78 @@
 # AO NFT Escrow 简化设计与实施规划 (AO 原生所有权转移模型)
 
-> **文档状态**：v2.0 - 简化版
-> **核心目标**：基于对AO异步消息模型和原生所有权转移机制的深刻理解，设计并实现一个健壮、高效的NFT托管Saga。
+> **文档状态**：v3.0 - Aggregate + Saga 整合版
+> **核心优化**：将托管记录抽象为 Aggregate，完全整合 Saga 流程。使用本地代理函数进行外部合约交互，不在 DDDML 中建模代理服务。
 > **作者**：Gemini（AI）
 
 ---
 
 ## 1. 核心业务流程 (AO 原生所有权转移模型)
 
+> **关键优化**: 整个交易由单个 Saga 控制，从创建托管记录开始，完全整合业务流程。
+
 纠正了关键的认知偏差：AO中没有EVM的`approve`授权模型。资产转移必须由当前所有者发起。因此，托管流程被重构为以下符合AO原生模型的步骤：
 
 | 步骤 | 操作方 | 动作 | 目标合约 | 结果 |
 | :--- | :--- | :--- | :--- | :--- |
-| 1. **创建托管** | 卖家 | 发送 `CreateEscrow` 消息 | **托管合约** | 托管记录被创建，状态为 `AWAITING_DEPOSIT`。Saga启动，等待NFT存入。 |
+| 1. **启动交易** | 卖家 | 发送 `ExecuteNftEscrowTransaction` 消息 | **托管合约** | Saga 创建托管记录（Aggregate），生成 EscrowId，开始等待 NFT 存入。 |
 | 2. **存入NFT** | 卖家 | 调用 `Transfer` | **NFT合约** | 将NFT的所有权直接转移给**托管合约的地址**。NFT被锁定。 |
-| 3. **确认存入** | NFT合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约监听到通知，触发 `NftDeposited` 事件，Saga状态推进到 `AWAITING_PAYMENT`。 |
+| 3. **确认存入** | NFT合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约监听到通知，触发 `NftDeposited` 事件，Saga 更新状态为 `NFT_DEPOSITED`。 |
 | 4. **买家支付** | 买家 | 调用 `Transfer` | **Token合约** | 将约定金额的Token所有权转移给**托管合约的地址**。 |
-| 5. **确认支付** | Token合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约监听到通知，触发 `PaymentCompleted` 事件，Saga被唤醒。 |
-| 6. **转移NFT** | **托管合约** | 调用 `Transfer` | **NFT合约** | 将NFT从**自己**转移给买家。 |
-| 7. **转移资金** | **托管合约** | 调用 `Transfer` | **Token合约** | 将资金从**自己**转移给卖家。 |
+| 5. **确认支付** | Token合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约监听到通知，触发 `PaymentCompleted` 事件，Saga 更新状态为 `PAYMENT_COMPLETED`。 |
+| 6. **转移NFT** | **托管合约** | 调用 `Transfer` | **NFT合约** | 将NFT从**自己**转移给买家，等待链上确认。 |
+| 7. **确认NFT转移** | NFT合约 | 发送 `Debit-Notice` | **托管合约** | 托管合约监听到通知，确认 NFT 已转移给买家，更新状态为 `NFT_TRANSFERRED`。 |
+| 8. **转移资金** | **托管合约** | 调用 `Transfer` | **Token合约** | 将资金从**自己**转移给卖家，等待链上确认。 |
+| 9. **确认资金转移** | Token合约 | 发送 `Debit-Notice` | **托管合约** | 托管合约监听到通知，确认资金已转移给卖家，更新状态为 `FUNDS_TRANSFERRED`，最终标记为 `COMPLETED`。 |
 
-### 正确的 AO Saga 流程
+### 完整的 AO Saga 流程
 
 ```
-(前提: 卖家CreateEscrow)
-
-1. Saga 等待NFT存入 (waitForEvent: NftDeposited)
+1. Saga 创建托管记录 (invoke: CreateNftEscrowRecord)
+     │ 生成 EscrowId
      │
-     └─> (卖家 Transfer NFT -> 托管合约)
+     └─> 2. Saga 等待NFT存入 (waitForEvent: NftDeposited)
+          │ 筛选条件: escrowId == EscrowId
           │
-          └─> 2. Saga 等待买家支付 (waitForEvent: PaymentCompleted)
+          └─> (卖家 Transfer NFT -> 托管合约)
                │
-               └─> (买家 Transfer Token -> 托管合约)
+               └─> 3. Saga 更新状态为 NFT_DEPOSITED (invoke: UpdateEscrowNftDeposited)
                     │
-                    └─> 3. Saga 发送转移NFT指令 (invoke: TransferNftToBuyer)
+                    └─> 4. Saga 等待买家支付 (waitForEvent: PaymentCompleted)
+                         │ 筛选条件: escrowId == EscrowId
                          │
-                         └─> 4. Saga 等待NFT转移确认 (waitForEvent: NftTransferredToBuyer)
+                         └─> (买家 Transfer Token -> 托管合约)
                               │
-                              └─> (监听NFT合约的Debit-Notice)
+                              └─> 5. Saga 更新状态为 PAYMENT_COMPLETED (invoke: UpdateEscrowPaymentCompleted)
                                    │
-                                   └─> 5. Saga 发送转移资金指令 (invoke: TransferFundsToSeller)
+                                   └─> 6. Saga 发送转移NFT指令 (invoke: TransferNftToBuyer)
                                         │
-                                        └─> 6. Saga 等待资金转移确认 (waitForEvent: FundsTransferredToSeller)
+                                        └─> 7. Saga 等待NFT转移确认 (waitForEvent: NftTransferredToBuyer)
+                                             │ 筛选条件: escrowId == EscrowId
                                              │
-                                             └─> (监听Token合约的Debit-Notice)
+                                             └─> (监听NFT合约的Debit-Notice)
                                                   │
-                                                  └─> 7. Saga 完成 (invoke: CompleteEscrow)
+                                                  └─> 8. Saga 更新状态为 NFT_TRANSFERRED (invoke: UpdateEscrowNftTransferred)
+                                                       │
+                                                       └─> 9. Saga 发送转移资金指令 (invoke: TransferFundsToSeller)
+                                                            │
+                                                            └─> 10. Saga 等待资金转移确认 (waitForEvent: FundsTransferredToSeller)
+                                                                 │ 筛选条件: escrowId == EscrowId
+                                                                 │
+                                                                 └─> (监听Token合约的Debit-Notice)
+                                                                      │
+                                                                      └─> 11. Saga 更新状态为 FUNDS_TRANSFERRED (invoke: UpdateEscrowFundsTransferred)
+                                                                           │
+                                                                           └─> 12. Saga 完成交易 (invoke: CompleteEscrowTransaction)
+                                                                                │ 更新状态为 COMPLETED
 ```
 
 ### 核心流程时间轴（估算）
 
 ```
-T=0s:   卖家发送 `CreateEscrow` 消息，Saga启动并等待NFT存入。
+T=0s:   卖家发送 `ExecuteNftEscrowTransaction` 消息，Saga 创建托管记录，生成 EscrowId，开始等待 NFT 存入。
 T=10s:  卖家发送 `Transfer` 消息给NFT合约，将NFT转入托管合约。
 T=11s:  NFT合约处理转移，并向托管合约发送 `Credit-Notice`。
-T=12s:  托管合约监听到 `Credit-Notice`，触发 `NftDeposited` 事件，Saga推进到等待支付状态。
+T=12s:  托管合约监听到 `Credit-Notice`，触发 `NftDeposited` 事件，Saga 更新状态为 NFT_DEPOSITED，推进到等待支付状态。
 T=20s:  买家向Token合约发送 `Transfer` 消息支付费用。
 T=21s:  Token合约处理转账，并向托管合约发送 `Credit-Notice`。
 T=22s:  托管合约监听到支付 `Credit-Notice`，触发 `PaymentCompleted` 事件，Saga被唤醒。
@@ -91,95 +109,246 @@ T=26.1s: Saga执行 `CompleteEscrow`，交易完成。
 
 我们将所有复杂性移除，只留下最核心的Saga定义。
 
-### 3.1. 简化的 DDDML 服务定义
+### 3.1. 基于 Aggregate 的 DDDML 模型定义
+
+> **关键优化**: 将托管记录抽象为 Aggregate，完全整合 Saga 流程。参考 `blog.yaml` 的 Aggregate 设计模式。
 
 ```yaml
-services:
-  # 用户交互服务，用于创建和查询
-  EscrowService:
+aggregates:
+  NftEscrow:
+    module: "NftEscrow"
+    metadata:
+      Preprocessors: ["CRUD_IT"]
+      CRUD_IT_NO_UPDATE: true  # 托管记录一旦创建，业务规则不允许修改
+      CRUD_IT_NO_DELETE: true  # 托管记录不可删除，只能标记为完成或取消
+    id:
+      name: EscrowId
+      type: bint
+      # 可以使用 SagaId 作为 EscrowId
+      # generator:
+      #   class: sequence
+      #   structName: EscrowIdSequence
+    properties:
+      SellerAddress:
+        type: string
+        immutable: true  # 卖家地址一旦设置不可更改
+      BuyerAddress:
+        type: string
+        immutable: true  # 买家地址一旦设置不可更改
+      NftContract:
+        type: string
+        immutable: true  # NFT 合约地址不可更改
+      TokenId:
+        type: bint
+        immutable: true  # Token ID 不可更改
+      Price:
+        type: number
+        immutable: true  # 价格一旦确定不可更改
+      EscrowTerms:
+        type: string
+        immutable: true  # 托管条款不可更改
+      # Saga 本身有状态管理，所以不需要再定义状态字段
+      # Status:
+      #   type: string
+      #   enum: ["CREATED", "NFT_DEPOSITED", "PAYMENT_COMPLETED", "NFT_TRANSFERRED", "FUNDS_TRANSFERRED", "COMPLETED", "CANCELLED"]
+      #   initializationLogic:
+      #     __CONSTANT__: "CREATED"
+      CreatedAt:
+        type: number
+        initializationLogic:
+          __CONTEXT_VARIABLE__: BlockTimestamp
+      # UpdatedAt:
+      #   type: number
+      #   initializationLogic:
+      #     __CONTEXT_VARIABLE__: BlockTimestamp
     methods:
-      CreateEscrow:
-        # ... 创建托管记录的本地步骤
-      GetEscrow:
-        # ... 查询托管记录的本地步骤
-      StartPurchaseSaga: # 买家表达购买意图，启动等待支付的Saga
-        parameters:
-          EscrowId: string
-          BuyerAddress: string
-        steps:
-          InitiateSaga:
-            invokeParticipant: "NftEscrowSagaService.ProcessStandardSale"
-            # ... 传递必要的上下文
+      Create:
+        isInternal: true
+        # 仅限 Saga 内部调用
+      # UpdateStatus:
+      #   isInternal: true
+      #   parameters:
+      #     Status: string
+      #   event:
+      #     name: "EscrowStatusUpdated"
 
-  # 核心交易编排Saga
-  NftEscrowSagaService:
+services:
+  # 统一的 NFT 托管服务 - 基于 Aggregate 构建
+  NftEscrowService:
+    requiredComponents:
+      NftEscrow:
+        type: NftEscrow
+        # 依赖托管聚合根，用于状态管理和业务规则验证
+
     methods:
-      ProcessStandardSale:
+      # 查询托管记录（同步本地操作）
+      GetEscrow:
         parameters:
-          EscrowId: string
-          # ... (其他参数)
+          EscrowId: bint
+        # 本地操作，查询托管状态
+
+      # 完整的 NFT 托管交易 Saga（在一个方法内完成所有步骤编排）
+      # Saga 第一步创建托管记录，然后控制整个交易生命周期
+      ExecuteNftEscrowTransaction:
+        parameters:
+          SellerAddress: string
+          BuyerAddress: string
+          NftContract: string
+          TokenId: bint
+          Price: number
+          EscrowTerms: string
+        description: "完整的 NFT 托管交易流程编排，从创建托管记录开始，所有步骤在一个方法内定义"
         steps:
-          # 步骤1: 等待卖家将NFT转移至本合约 (外部用户操作)
+          # 步骤1: 创建托管记录（本地操作，生成 EscrowId）
+          CreateNftEscrowRecord:
+            invokeParticipant: "NftEscrow.CreateNftEscrow"
+            description: "创建托管记录，初始化所有必要字段，生成唯一的 EscrowId"
+            exportVariables:
+              EscrowId:
+                extractionPath: ".EscrowId"
+                # 从创建响应中提取生成的 EscrowId，用于后续步骤
+            # 这一步本身没有什么可补偿的
+            # withCompensation: "cancel_created_escrow_record"
+
+          # 步骤2: 等待卖家将NFT转移至本合约（外部用户操作）
           WaitForNftDeposit:
             waitForEvent: "NftDeposited"
             description: "等待卖家将NFT的所有权转移给本托管合约"
-            # ... (onSuccess, failureEvent, etc.)
-            withCompensation: "cancel_escrow_record"
+            eventFilter:
+              escrowId: "EscrowId"  # 只监听对应 EscrowId 的 NFT 存入事件
+            maxWaitTime: "24h"  # 24小时超时
+            # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，这一步对应的补偿操作是 "将 NFT 返还给卖家"
+            withCompensation: "return_nft_to_seller"
 
-          # 步骤2: 等待买家支付 (外部用户操作)
+          # # 步骤3: 更新托管状态为 NFT 已存入（本地操作）
+          # UpdateEscrowNftDeposited:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "NFT 已存入托管合约，更新托管记录状态"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "NFT_DEPOSITED"
+
+          # 步骤4: 等待买家支付（外部用户操作）
           WaitForPayment:
             waitForEvent: "PaymentCompleted"
             description: "NFT已入库，等待买家完成支付"
-            # ... (onSuccess, failureEvent, etc.)
-            withCompensation: "ReturnNftToSeller"
+            eventFilter:
+              escrowId: "EscrowId"  # 只监听对应 EscrowId 的支付事件
+            maxWaitTime: "1h"  # 1小时支付超时
+            # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，这一步对应的补偿操作是 "退款给买家"
+            withCompensation: "refund_buyer"
+
+          # # 步骤5: 更新托管状态为支付已完成（本地操作）
+          # UpdateEscrowPaymentCompleted:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "买家已完成支付，更新托管记录状态"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "PAYMENT_COMPLETED"
 
           # --- 与外部合约交互的标准模式: invoke + waitForEvent ---
 
-          # 步骤3.1: 发送“转移NFT给买家”指令
+          # 步骤6.1: 发送"转移NFT给买家"指令（通过本地代理）
           SendTransferNftToBuyer:
-            invokeParticipant: "NftTransferProxy.Transfer"
-            description: "通过代理，向外部NFT合约发送转移指令"
-            arguments:
-              From: "ao.id"
-              To: "context.BuyerAddress"
-              NftContract: "context.NftContract"
-              TokenId: "context.TokenId"
-            # 此步骤的补偿将在下一步骤的补偿中处理
+            invokeLocal: "transfer_nft_to_buyer_via_proxy"
+            description: "调用本地 NFT 转移代理，向外部 NFT 合约发送转移指令"
+            # 这个步骤只是发送一条异步消息，结果未知，所以这一步本身没有什么可补偿的
 
-          # 步骤3.2: 等待NFT转移的链上确认
+          # 步骤6.2: 等待NFT转移的链上确认
           WaitForNftTransferConfirmation:
             waitForEvent: "NftTransferredToBuyer"
-            description: "等待代理监听到NFT合约的Debit-Notice后，发出的链上确认事件"
+            description: "等待本地代理监听到 NFT 合约的 Debit-Notice 后，发出的链上确认事件"
+            eventFilter:
+              escrowId: "EscrowId"
             maxWaitTime: "5m"
-            withCompensation: "ReturnNftToSellerAndRefundBuyer"
+            # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，但是补偿操作的逻辑是定义在之前的步骤中的
+            # withCompensation: "return_nft_to_seller_and_refund_buyer"
 
-          # 步骤4.1: 发送“转移资金给卖家”指令
+          # # 步骤7: 更新托管状态为 NFT 已转移（本地操作）
+          # UpdateEscrowNftTransferred:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "NFT 已成功转移给买家，更新托管记录状态"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "NFT_TRANSFERRED"
+
+          # 步骤8.1: 发送"转移资金给卖家"指令（通过本地代理）
           SendTransferFundsToSeller:
-            invokeParticipant: "TokenTransferProxy.Transfer"
-            description: "通过代理，向外部Token合约发送转移指令"
-            arguments:
-              Recipient: "context.SellerAddress"
-              Amount: "calculate_seller_payout(context.ActualAmount)"
-            # 此步骤的补偿将在下一步骤的补偿中处理
+            invokeLocal: "transfer_funds_to_seller_via_proxy"
+            description: "调用本地 Token 转移代理，向外部 Token 合约发送转移指令"
+            # 这个步骤只是发送一条异步消息，结果未知，所以这一步本身没有什么可补偿的
 
-          # 步骤4.2: 等待资金转移的链上确认
+          # 步骤8.2: 等待资金转移的链上确认
           WaitForFundsTransferConfirmation:
             waitForEvent: "FundsTransferredToSeller"
-            description: "等待代理监听到Token合约的Debit-Notice后，发出的链上确认事件"
-            maxWaitTime: "5m"
-            withCompensation: "notify_admin_of_reversal_needed" # NFT已到买家手，但资金步骤失败
+            description: "等待本地代理监听到 Token 合约的 Debit-Notice 后，发出的链上确认事件"
+            eventFilter:
+              escrowId: "EscrowId"
+            # maxWaitTime: "5m" # 不要处理超时，可以等待人工介入
+            # 这是最后一步，成功了就结束了，没有什么可以补偿的
+            # withCompensation: "notify_admin_of_reversal_needed" # NFT已到买家手，但资金步骤失败
 
-          # 步骤5: 完成托管 (内部操作)
-          CompleteEscrow:
-            invokeLocal: "mark_escrow_as_completed"
-            description: "所有步骤均已确认，将托管记录标记为完成"
+          # # 步骤9: 更新托管状态为资金已转移（本地操作）
+          # UpdateEscrowFundsTransferred:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "资金已成功转移给卖家，更新托管记录状态"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "FUNDS_TRANSFERRED"
+
+          # # 步骤10: 完成托管交易（内部操作）
+          # CompleteEscrowTransaction:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "所有步骤均已确认，将托管记录标记为完成"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "COMPLETED"
 ```
 
-### 3.2. 其他复杂场景
+### 3.2. 本地代理实现模式
+
+> **重要架构决策**: Saga 不直接调用外部合约，而是通过本地代理模块进行间接调用。
+
+**为什么需要本地代理？**
+- **技术集成层**: 本地代理负责与外部 AO 合约的通信细节
+- **不在 DDDML 中建模**: 代理不是业务服务，不需要领域建模
+- **运行时组件**: 代理作为 Lua 模块存在于 AO 进程中
+
+**代理实现位置**:
+```lua
+-- 在生成的 nft_escrow_service_local.lua 中实现
+function transfer_nft_to_buyer_via_proxy(context)
+    -- 调用本地 NFT 转移代理模块
+    local nft_proxy = require("nft_transfer_proxy")
+    return nft_proxy.transfer({
+        from = ao.id,
+        to = context.BuyerAddress,
+        nft_contract = context.NftContract,
+        token_id = context.TokenId
+    })
+end
+
+function transfer_funds_to_seller_via_proxy(context)
+    -- 调用本地 Token 转移代理模块
+    local token_proxy = require("token_transfer_proxy")
+    return token_proxy.transfer({
+        recipient = context.SellerAddress,
+        amount = calculate_seller_payout(context.ActualAmount)
+    })
+end
+```
+
+**代理职责**:
+1. **消息构造**: 构建正确的 AO 消息格式
+2. **错误处理**: 处理外部合约调用失败
+3. **事件监听**: 监听外部合约的 Credit/Debit Notice
+4. **状态转换**: 将外部事件转换为 Saga 可识别的内部事件
+
+### 3.4. 其他复杂场景
 
 如价格协商、批量托管、拍卖等更复杂的场景，可以在此核心Saga模型的基础上，通过增加更多的`waitForEvent`步骤或引入新的Saga来进行扩展。当前设计将不再对它们进行详细阐述。
 
-### 3.3. 超时处理器
+### 3.5. 超时处理器
 
 `waitForEvent` 步骤的 `maxWaitTime` 机制依赖于**外部监控系统**。外部监控系统会定期检查Saga实例的等待状态，并在检测到超时时，向托管合约发送一个特定的消息来触发超时事件。
 
@@ -291,28 +460,29 @@ Send({
 | Escrow AO Process                  |
 |                                    |
 |  +-------------------------------+ |
-|  | Saga Service (DDDML-generated)  | |
+|  | NftEscrowService (DDDML-gen)  | |
 |  |-------------------------------| |
-|  | - ProcessStandardSale Saga    | |
+|  | - ExecuteNftEscrowTransaction| |
+|  |   Saga (all steps in one     | |
+|  |   method per DDDML limits)   | |
+|  | - NftEscrow Aggregate         | |
 |  | - Saga Runtime & State        | |
 |  +-------------------------------+ |
 |                                    |
 |  +-------------------------------+ |
-|  | Local Proxies (Lua Modules)   | |
+|  | Local Proxy Functions         | |
+|  | (in nft_escrow_service_local.lua)|
 |  |-------------------------------| |
-|  | - NftDepositProxy             | |
-|  | - PaymentVerificationProxy    | |
-|  | - NftTransferProxy            | |
-|  | - TokenTransferProxy          | |
+|  | - transfer_nft_to_buyer_via_proxy |
+|  | - transfer_funds_to_seller_via_proxy |
 |  +-------------------------------+ |
 |                                    |
 |  +-------------------------------+ |
-|  | Handlers (Lua Module)         | |
+|  | External Contract Listeners   | |
+|  | (in main handlers)            | |
 |  |-------------------------------| |
-|  | - Listens for Credit/Debit    | |
-|  |   Notices from external       | |
-|  |   contracts and forwards to   | |
-|  |   the appropriate proxy.      | |
+|  | - Credit/Debit Notice handlers |
+|  |   for NFT & Token contracts   | |
 |  +-------------------------------+ |
 |                                    |
 +------------------------------------+
@@ -357,10 +527,11 @@ return {
 
 ### 6.1. 快速启动检查清单
 
-- [ ] 理解AO原生所有权转移模型下的7步Saga流程。
-- [ ] 研究`ProcessStandardSale` Saga中 **`waitForEvent`** 的用法。
-- [ ] 理解**代理合约**在支付验证和资产转移中的作用。
-- [ ] 审查**补偿路径**，特别是`TransferFundsToSeller`失败后如何退款给买家。
+- [ ] 理解AO原生所有权转移模型下的12步Saga流程（在一个方法内完成，从创建托管记录开始）。
+- [ ] 研究`ExecuteNftEscrowTransaction` Saga中 **`waitForEvent`** 的用法和事件过滤。
+- [ ] 理解**本地代理函数**（在 `nft_escrow_service_local.lua` 中）如何与外部合约交互。
+- [ ] 理解**NftEscrow Aggregate** 的状态管理和业务规则。
+- [ ] 审查**补偿路径**，特别是资金转移失败后如何退款给买家。
 
 ### 6.2. 相关文档导航
 
