@@ -17,8 +17,8 @@
 | 1. **启动交易** | 卖家 | 发送 `ExecuteNftEscrowTransaction` 消息 | **托管合约** | Saga 创建托管记录（Aggregate），指定 NFT 和支付代币合约，生成 EscrowId。系统检查**币种+金额唯一性约束**，确保不会与现有等待支付交易冲突。开始等待 NFT 存入。 |
 | 2. **存入NFT** | 卖家 | 调用 `Transfer` | **NFT合约** | 将NFT的所有权直接转移给**托管合约的地址**。NFT被锁定。 |
 | 3. **确认存入** | NFT合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约监听到通知，触发 `NftDeposited` 事件，Saga 继续执行。 |
-| 4. **买家支付** | 买家 | 调用 `Transfer` | **指定的Token合约** | 将约定金额的指定代币所有权转移给**托管合约的地址**（支持 ETH、USDC、SOL 等多种代币）。 |
-| 5. **确认支付** | Token合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约通过**金额+发送者+时间窗口匹配**验证支付，确认属于正确的Escrow交易后，触发 `PaymentCompleted` 事件，Saga 继续执行。 |
+| 4. **买家指定支付** | 买家 | 调用 `UseEscrowPayment` | **托管合约** | 指定使用预存的 EscrowPayment 记录来支付当前 Escrow 交易。 |
+| 5. **确认支付** | 托管合约 | 内部处理 | **托管合约** | 验证并锁定指定的 EscrowPayment，确认支付信息匹配 Escrow 要求，触发 `EscrowPaymentUsed` 事件，Saga 继续执行。 |
 | 6. **转移NFT** | **托管合约** | 调用 `Transfer` | **NFT合约** | 将NFT从**自己**转移给买家，等待链上确认。 |
 | 7. **确认NFT转移** | NFT合约 | 发送 `Debit-Notice` | **托管合约** | 托管合约监听到通知，确认 NFT 已转移给买家，Saga 继续执行。 |
 | 8. **转移资金** | **托管合约** | 调用 `Transfer` | **Token合约** | 将资金从**自己**转移给卖家，等待链上确认。 |
@@ -35,11 +35,11 @@
           │
           └─> (卖家 Transfer NFT -> 托管合约)
                │
-               └─> 3. Saga 等待买家支付 (waitForEvent: PaymentCompleted)
+               └─> 3. Saga 等待买家指定支付 (waitForEvent: EscrowPaymentUsed)
                     │ 筛选条件: escrowId == EscrowId
-                    │ 匹配机制: 通过金额+发送者+时间窗口验证支付属于正确交易
+                    │ 匹配机制: 买家指定使用预存的 EscrowPayment 记录
                     │
-                    └─> (买家 Transfer Token -> 托管合约)
+                    └─> (买家 UseEscrowPayment -> 托管合约)
                          │
                          └─> 4. Saga 发送转移NFT指令 (invokeLocal: transfer_nft_to_buyer_via_proxy)
                               │
@@ -64,10 +64,10 @@
 T=0s:   卖家发送 `ExecuteNftEscrowTransaction` 消息，系统验证币种+金额唯一性约束，Saga 创建托管记录，生成 EscrowId，开始等待 NFT 存入。
 T=10s:  卖家发送 `Transfer` 消息给NFT合约，将NFT转入托管合约。
 T=11s:  NFT合约处理转移，并向托管合约发送 `Credit-Notice`。
-T=12s:  托管合约监听到 `Credit-Notice`，触发 `NftDeposited` 事件，Saga 继续执行，等待买家支付。
-T=20s:  买家向Token合约发送 `Transfer` 消息支付费用。
-T=21s:  Token合约处理转账，并向托管合约发送 `Credit-Notice`。
-T=22s:  托管合约通过**金额+发送者+时间窗口匹配**验证支付属于正确的Escrow交易，触发 `PaymentCompleted` 事件，Saga 被唤醒，开始转移 NFT。
+T=12s:  托管合约监听到 `Credit-Notice`，触发 `NftDeposited` 事件，Saga 继续执行，等待买家指定支付。
+T=20s:  买家发送 `UseEscrowPayment` 消息，指定使用预存的 EscrowPayment 记录支付。
+T=21s:  托管合约验证并锁定指定的 EscrowPayment，确认支付信息匹配 Escrow 要求。
+T=22s:  托管合约触发 `EscrowPaymentUsed` 事件，Saga 被唤醒，开始转移 NFT。
 T=22.1s: Saga执行本地代理函数，向NFT合约发送 `Transfer` 消息。
 T=22.2s: Saga进入 `WaitForNftTransferConfirmation` 等待状态。
 T=23s:  NFT合约处理转移，并向托管合约(原Owner)发送 `Debit-Notice`。
@@ -106,6 +106,54 @@ T=26s:  托管合约监听到 `Debit-Notice`，触发 `FundsTransferredToSeller`
 
 ```yaml
 aggregates:
+  # 预存支付资金管理
+  EscrowPayment:
+    module: "EscrowPayment"
+    metadata:
+      Preprocessors: ["CRUD_IT"]
+      CRUD_IT_NO_UPDATE: true  # 支付记录一旦创建不可修改
+      CRUD_IT_NO_DELETE: true  # 支付记录不可删除，只能标记为已使用或退款
+    id:
+      name: PaymentId
+      type: bint
+      generator:
+        class: sequence
+        structName: PaymentIdSequence
+    properties:
+      PayerAddress:
+        type: string
+        immutable: true  # 付款人地址不可更改
+      TokenContract:
+        type: string
+        immutable: true  # 支付代币合约地址不可更改
+      Amount:
+        type: bint
+        immutable: true  # 支付金额不可更改
+      Status:
+        type: string
+        # enum: ["AVAILABLE", "USED", "REFUNDED"]
+        initializationLogic:
+          __CONSTANT__: "AVAILABLE"
+      CreatedAt:
+        type: number
+        initializationLogic:
+          __CONTEXT_VARIABLE__: MsgTimestamp
+      UsedByEscrowId:
+        type: bint  # 关联的Escrow交易ID（使用时填充）
+    methods:
+      Create:
+        isInternal: true
+        # 仅限支付接收代理调用
+      MarkAsUsed:
+        isInternal: true
+        parameters:
+          EscrowId: bint
+        # 标记支付已被特定Escrow交易使用
+      Refund:
+        isInternal: true
+        # 退款给付款人
+
+  # NFT托管交易记录
   NftEscrow:
     module: "NftEscrow"
     metadata:
@@ -179,11 +227,18 @@ services:
         # 依赖托管聚合根，用于状态管理和业务规则验证
 
     methods:
-      # 查询托管记录（同步本地操作）
-      GetEscrow:
+      # # 查询托管记录（同步本地操作）
+      # GetEscrow:
+      #   parameters:
+      #     EscrowId: bint
+      #   # 本地操作，查询托管状态
+
+      # 买家指定使用预存的 EscrowPayment 支付
+      UseEscrowPayment:
         parameters:
           EscrowId: bint
-        # 本地操作，查询托管状态
+          PaymentId: bint
+        description: "买家指定使用预存的 EscrowPayment 记录来支付指定的 Escrow 交易。系统会验证支付记录的有效性和匹配性，并锁定支付记录"
 
       # 完整的 NFT 托管交易 Saga（在一个方法内完成所有步骤编排）
       # Saga 第一步创建托管记录，然后控制整个交易生命周期
@@ -227,15 +282,15 @@ services:
           #     EscrowId: "EscrowId"
           #     Status: "NFT_DEPOSITED"
 
-          # 步骤3: 等待买家支付（外部用户操作）
+          # 步骤3: 等待买家指定使用预存的 EscrowPayment 支付（外部用户操作）
           WaitForPayment:
-            waitForEvent: "PaymentCompleted"
-            description: "NFT已入库，等待买家完成支付"
+            waitForEvent: "EscrowPaymentUsed"
+            description: "NFT已入库，等待买家指定使用预存的 EscrowPayment 记录完成支付"
             eventFilter:
-              escrowId: "EscrowId"  # 只监听对应 EscrowId 的支付事件
+              escrowId: "EscrowId"  # 只监听对应 EscrowId 的 EscrowPayment 使用事件
             maxWaitTime: "1h"  # 1小时支付超时
-            # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，这一步对应的补偿操作是 "退款给买家"
-            withCompensation: "refund_buyer"
+            # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，这一步对应的补偿操作是 "解锁 EscrowPayment"
+            withCompensation: "unlock_escrow_payment"
 
           # # 已移除的步骤: 更新托管状态为支付已完成（本地操作）
           # UpdateEscrowPaymentCompleted:
@@ -612,6 +667,8 @@ function findMatchingEscrow(token_contract, amount, sender, current_time) {
 |  | - ExecuteNftEscrowTransaction| |
 |  |   Saga (all steps in one     | |
 |  |   method per DDDML limits)   | |
+|  | - UseEscrowPayment           | |
+|  |   (specify payment for escrow)| |
 |  | - NftEscrow Aggregate         | |
 |  | - Saga Runtime & State        | |
 |  +-------------------------------+ |
@@ -678,7 +735,7 @@ return {
 - [ ] 研究`ExecuteNftEscrowTransaction` Saga中 **`waitForEvent`** 的用法和事件过滤。
 - [ ] 理解**本地代理函数**（在 `nft_escrow_service_local.lua` 中）如何与外部合约交互。
 - [ ] 理解**NftEscrow Aggregate** 的数据持久化和业务规则（支持多币种支付，Saga 自身管理执行状态）。掌握**币种+金额唯一性约束**，确保支付匹配的安全性。
-- [ ] 掌握**支付匹配机制**：金额+时间窗口+唯一性约束匹配逻辑，确保支付与正确的Escrow交易关联。理解币种+金额唯一性安全保障。
+- [ ] 掌握**预存支付机制**：买家预存资金到 EscrowPayment，支付时明确指定使用哪个预存记录，确保支付精确匹配。理解 EscrowPayment 锁定和验证逻辑。
 - [ ] 审查**补偿路径**，特别是资金转移失败后如何退款给买家。
 
 ### 6.2. 相关文档导航
