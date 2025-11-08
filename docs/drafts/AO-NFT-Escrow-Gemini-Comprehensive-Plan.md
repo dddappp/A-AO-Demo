@@ -14,11 +14,11 @@
 
 | 步骤 | 操作方 | 动作 | 目标合约 | 结果 |
 | :--- | :--- | :--- | :--- | :--- |
-| 1. **启动交易** | 卖家 | 发送 `ExecuteNftEscrowTransaction` 消息 | **托管合约** | Saga 创建托管记录（Aggregate），指定 NFT 和支付代币合约，生成 EscrowId，开始等待 NFT 存入。 |
+| 1. **启动交易** | 卖家 | 发送 `ExecuteNftEscrowTransaction` 消息 | **托管合约** | Saga 创建托管记录（Aggregate），指定 NFT 和支付代币合约，生成 EscrowId。系统检查**币种+金额唯一性约束**，确保不会与现有等待支付交易冲突。开始等待 NFT 存入。 |
 | 2. **存入NFT** | 卖家 | 调用 `Transfer` | **NFT合约** | 将NFT的所有权直接转移给**托管合约的地址**。NFT被锁定。 |
 | 3. **确认存入** | NFT合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约监听到通知，触发 `NftDeposited` 事件，Saga 继续执行。 |
 | 4. **买家支付** | 买家 | 调用 `Transfer` | **指定的Token合约** | 将约定金额的指定代币所有权转移给**托管合约的地址**（支持 ETH、USDC、SOL 等多种代币）。 |
-| 5. **确认支付** | Token合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约监听到通知，触发 `PaymentCompleted` 事件，Saga 继续执行。 |
+| 5. **确认支付** | Token合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约通过**金额+发送者+时间窗口匹配**验证支付，确认属于正确的Escrow交易后，触发 `PaymentCompleted` 事件，Saga 继续执行。 |
 | 6. **转移NFT** | **托管合约** | 调用 `Transfer` | **NFT合约** | 将NFT从**自己**转移给买家，等待链上确认。 |
 | 7. **确认NFT转移** | NFT合约 | 发送 `Debit-Notice` | **托管合约** | 托管合约监听到通知，确认 NFT 已转移给买家，Saga 继续执行。 |
 | 8. **转移资金** | **托管合约** | 调用 `Transfer` | **Token合约** | 将资金从**自己**转移给卖家，等待链上确认。 |
@@ -28,7 +28,7 @@
 
 ```
 1. Saga 创建托管记录 (invoke: CreateNftEscrowRecord)
-     │ 生成 EscrowId
+     │ 生成 EscrowId，验证币种+金额唯一性约束
      │
      └─> 2. Saga 等待NFT存入 (waitForEvent: NftDeposited)
           │ 筛选条件: escrowId == EscrowId
@@ -37,6 +37,7 @@
                │
                └─> 3. Saga 等待买家支付 (waitForEvent: PaymentCompleted)
                     │ 筛选条件: escrowId == EscrowId
+                    │ 匹配机制: 通过金额+发送者+时间窗口验证支付属于正确交易
                     │
                     └─> (买家 Transfer Token -> 托管合约)
                          │
@@ -60,13 +61,13 @@
 ### 核心流程时间轴（估算）
 
 ```
-T=0s:   卖家发送 `ExecuteNftEscrowTransaction` 消息，Saga 创建托管记录，生成 EscrowId，开始等待 NFT 存入。
+T=0s:   卖家发送 `ExecuteNftEscrowTransaction` 消息，系统验证币种+金额唯一性约束，Saga 创建托管记录，生成 EscrowId，开始等待 NFT 存入。
 T=10s:  卖家发送 `Transfer` 消息给NFT合约，将NFT转入托管合约。
 T=11s:  NFT合约处理转移，并向托管合约发送 `Credit-Notice`。
 T=12s:  托管合约监听到 `Credit-Notice`，触发 `NftDeposited` 事件，Saga 继续执行，等待买家支付。
 T=20s:  买家向Token合约发送 `Transfer` 消息支付费用。
 T=21s:  Token合约处理转账，并向托管合约发送 `Credit-Notice`。
-T=22s:  托管合约监听到支付 `Credit-Notice`，触发 `PaymentCompleted` 事件，Saga 被唤醒，开始转移 NFT。
+T=22s:  托管合约通过**金额+发送者+时间窗口匹配**验证支付属于正确的Escrow交易，触发 `PaymentCompleted` 事件，Saga 被唤醒，开始转移 NFT。
 T=22.1s: Saga执行本地代理函数，向NFT合约发送 `Transfer` 消息。
 T=22.2s: Saga进入 `WaitForNftTransferConfirmation` 等待状态。
 T=23s:  NFT合约处理转移，并向托管合约(原Owner)发送 `Debit-Notice`。
@@ -111,6 +112,8 @@ aggregates:
       Preprocessors: ["CRUD_IT"]
       CRUD_IT_NO_UPDATE: true  # 托管记录一旦创建，业务规则不允许修改
       CRUD_IT_NO_DELETE: true  # 托管记录不可删除，只能标记为完成或取消
+      # 业务约束：同一币种+金额组合在等待支付状态下必须唯一
+      # 以确保支付匹配的安全性
     id:
       name: EscrowId
       type: bint
@@ -159,6 +162,7 @@ aggregates:
       Create:
         isInternal: true
         # 仅限 Saga 内部调用
+        # 业务规则：在创建前必须检查同一币种+金额组合的唯一性
       # UpdateStatus:
       #   isInternal: true
       #   parameters:
@@ -197,7 +201,7 @@ services:
           # 步骤1: 创建托管记录（本地操作，生成 EscrowId）
           CreateNftEscrowRecord:
             invokeParticipant: "NftEscrow.CreateNftEscrow"
-            description: "创建托管记录，初始化所有必要字段，生成唯一的 EscrowId"
+            description: "创建托管记录，初始化所有必要字段，生成唯一的 EscrowId。系统会验证币种+金额唯一性约束，确保不会与现有等待支付交易冲突"
             exportVariables:
               EscrowId:
                 extractionPath: ".EscrowId"
@@ -425,8 +429,155 @@ Send({
 *   **重复消息处理**：能够识别并安全地忽略重复的外部消息。
 *   **内存泄漏防护**：实现机制来清理过时或超时的 `pending_requests` 记录，防止内存无限增长。
 
-**支付确认**
-`PaymentVerificationProxy` 依赖于监听Token合约的 `Credit-Notice`。其核心职责是从 `Credit-Notice` 的 `Tags` 中提取 `Sender` 和 `Quantity`，并与 `intentId` 绑定的预期支付进行匹配。
+**支付确认与转账匹配机制**
+`PaymentVerificationProxy` 依赖于监听Token合约的 `Credit-Notice`。其核心职责是从 `Credit-Notice` 的 `Tags` 中提取 `Sender` 和 `Quantity`，并通过**业务参数匹配机制**将转账关联到正在进行的Escrow交易。
+
+### 🔑 转账匹配核心机制
+
+当用户向托管合约转账时，Token合约会发送 `Credit-Notice` 消息给托管合约（作为接收者）。代理需要通过业务参数将这笔转账正确匹配到对应的Escrow交易。
+
+#### 匹配策略（按优先级）
+
+1. **X-RequestId 直接匹配**（最快）
+   ```lua
+   -- 如果消息包含X-RequestId，直接通过ID查找
+   local request_id = msg.Tags["X-RequestId"]
+   if request_id then
+       return pending_requests[request_id]  -- O(1)
+   end
+   ```
+
+2. **业务参数精确匹配**（核心机制）
+   ```lua
+   -- 提取转账业务参数
+   local transfer_amount = msg.Tags.Quantity    -- 转账金额
+   local transfer_sender = msg.Tags.Sender      -- 发送者地址
+   local escrow_id = -- 如何关联到具体的Escrow交易？
+
+   -- 通过金额 + EscrowId 进行精确匹配
+   local composite_key = tostring(transfer_amount) .. "|" .. tostring(escrow_id)
+   local request_info = business_param_index[composite_key]
+   ```
+
+#### Escrow交易关联机制
+
+在我们的NFT Escrow场景中，任何人都可以购买Escrow中的NFT，但系统需要将转账与特定的Escrow交易关联起来：
+
+**关联方式**：
+1. **用户在转账时附加Memo信息**：包含EscrowId
+2. **前端生成唯一的支付意图ID**：并在转账消息中包含此ID
+3. **通过金额精确匹配**：如果每个Escrow的金额都是唯一的
+
+### ⚠️ **AO Token Blueprint 限制：不支持Memo**
+
+经过调研AO官方token blueprint和Wander钱包实现，发现**AO token transfer目前不支持Memo信息**：
+
+#### AO Token Blueprint分析
+- **Transfer函数**：只接受`Recipient`、`Quantity`、`From`等标准参数
+- **Credit-Notice/Debit-Notice转发**：只转发以`"X-"`开头的标签（标准AO生态行为）
+- **Memo字段**：没有专门的Memo字段，必须使用X-标签传递业务信息
+
+```lua
+-- AO token blueprint Transfer handler (第149-236行)
+Handlers.add('transfer', Handlers.utils.hasMatchingTag("Action", "Transfer"), function(msg)
+  assert(type(msg.Recipient) == 'string', 'Recipient is required!')
+  assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+  -- ... 没有Memo参数验证 ...
+
+  -- 转发X-前缀标签到通知消息 (第188-194行)
+  for tagName, tagValue in pairs(msg) do
+    if string.sub(tagName, 1, 2) == "X-" then
+      debitNotice[tagName] = tagValue
+      creditNotice[tagName] = tagValue
+    end
+  end
+end)
+```
+
+#### Wander钱包实现分析
+- **底层支持tags**：`sendAoTransferForWallet`函数接受`tags`参数，可传递额外标签
+- **UI不支持自定义标签**：用户界面没有暴露添加自定义X-标签的功能
+- **Note功能仅限Arweave**：用户可以添加note，但只用于Arweave交易，不传递给AO transfer
+
+```typescript
+// Wander钱包AO transfer调用 (confirm.tsx 第316-325行)
+const res = await sendAoTransfer(
+  ao,
+  tokenID,
+  recipient.address,
+  fractionedToBalance(amount, { decimals: token.Denomination }, "AO"),
+  // 注意：没有传递额外的tags，所以note信息丢失
+);
+```
+
+### 💡 **解决方案：金额+时间窗口匹配**
+
+由于AO token blueprint只转发X-标签，而当前钱包UI不支持传递自定义标签，我们采用金额精确匹配+时间窗口的方案：
+
+#### 当前可行方案：金额+时间窗口+唯一性约束匹配
+
+**关键安全约束**：为确保用户买到正确的NFT，系统必须保证**同一币种下的相同支付金额不会同时存在多个等待支付的Escrow记录**。
+
+```lua
+-- 创建Escrow时的唯一性检查
+function createEscrowRecord(seller_address, buyer_address, token_contract, price, ...) {
+    -- 检查是否已存在相同币种+金额的等待支付记录
+    local existing_escrow = findExistingPendingEscrow(token_contract, price)
+    if existing_escrow then
+        error("相同币种和金额的交易已在进行中，请使用不同的金额或稍后再试")
+    end
+
+    -- 创建新的Escrow记录
+    local escrow_id = generateUniqueEscrowId()
+    -- ... 创建逻辑 ...
+}
+
+-- 支付匹配逻辑
+function handleCreditNotice(msg) {
+    local amount = msg.Tags.Quantity
+    local sender = msg.Tags.Sender
+    local token_contract = msg.Tags.TokenContract  -- 从消息中获取币种信息
+    local current_time = os.time()
+
+    -- 查找匹配的Escrow记录（由于唯一性约束，最多只应找到一个）
+    local matching_escrow = findMatchingEscrow(token_contract, amount, sender, current_time)
+
+    if matching_escrow then
+        -- 确认支付
+        triggerPaymentConfirmed(matching_escrow.id, {
+            amount = amount,
+            sender = sender,
+            token_contract = token_contract,
+            transaction_id = msg.Tags["Message-Id"]
+        })
+    else
+        -- 记录未匹配的支付（可能需要人工处理）
+        logUnmatchedPayment(msg)
+    end
+}
+
+function findMatchingEscrow(token_contract, amount, sender, current_time) {
+    -- 由于唯一性约束，这里应该最多只找到一个匹配的记录
+    for escrow_id, escrow_data in pairs(pending_escrows) do
+        if escrow_data.token_contract == token_contract and
+           escrow_data.price == amount and
+           escrow_data.buyer_address == sender and
+           escrow_data.status == "waiting_payment" and
+           current_time - escrow_data.created_at < 300 then -- 5分钟窗口
+            return escrow_data
+        end
+    end
+    return nil
+}
+```
+
+**安全保障**：
+1. **金额精确验证**：确保转账金额与Escrow价格完全匹配
+2. **币种验证**：确保支付的代币类型与Escrow记录匹配
+3. **发送者验证**：确认转账来自正确的买家地址
+4. **唯一性约束**：**同一币种+金额组合在等待支付状态下必须唯一**
+5. **时间窗口限制**：只匹配最近5分钟内的pending交易
+6. **幂等性保护**：防止重复处理同一笔支付
 
 **NFT存入确认**
 需要一个 `NftDepositProxy` (逻辑上)来监听NFT合约的 `Credit-Notice`。当托管合约收到发给自己的NFT时，该代理负责验证收到的NFT是否与 `WaitForNftDeposit` 步骤中等待的NFT匹配，并触发 `NftDeposited` 事件。
@@ -526,7 +677,8 @@ return {
 - [ ] 理解AO原生所有权转移模型下的7步Saga流程（在一个方法内完成，从创建托管记录开始）。
 - [ ] 研究`ExecuteNftEscrowTransaction` Saga中 **`waitForEvent`** 的用法和事件过滤。
 - [ ] 理解**本地代理函数**（在 `nft_escrow_service_local.lua` 中）如何与外部合约交互。
-- [ ] 理解**NftEscrow Aggregate** 的数据持久化和业务规则（支持多币种支付，Saga 自身管理执行状态）。
+- [ ] 理解**NftEscrow Aggregate** 的数据持久化和业务规则（支持多币种支付，Saga 自身管理执行状态）。掌握**币种+金额唯一性约束**，确保支付匹配的安全性。
+- [ ] 掌握**支付匹配机制**：金额+时间窗口+唯一性约束匹配逻辑，确保支付与正确的Escrow交易关联。理解币种+金额唯一性安全保障。
 - [ ] 审查**补偿路径**，特别是资金转移失败后如何退款给买家。
 
 ### 6.2. 相关文档导航
