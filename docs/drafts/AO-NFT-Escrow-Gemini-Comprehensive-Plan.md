@@ -379,8 +379,8 @@ services:
 ```lua
 -- 在生成的 nft_escrow_service_local.lua 中实现
 function transfer_nft_to_buyer_via_proxy(context)
-    -- 从关联的NftEscrow记录中获取买家地址
-    local escrow_record = get_nft_escrow(context.EscrowId)
+    -- 从NftEscrow Aggregate中获取买家地址（DDDML生成的辅助函数）
+    local escrow_record = NftEscrow.get(context.EscrowId)
 
     -- 调用本地 NFT 转移代理模块
     local nft_proxy = require("nft_transfer_proxy")
@@ -393,8 +393,9 @@ function transfer_nft_to_buyer_via_proxy(context)
 end
 
 function transfer_funds_to_seller_via_proxy(context)
-    -- 从关联的EscrowPayment中获取支付信息
-    local escrow_payment = get_escrow_payment(context.EscrowId)
+    -- 从NftEscrow Aggregate中获取关联的PaymentId，然后获取EscrowPayment信息
+    local escrow_record = NftEscrow.get(context.EscrowId)
+    local escrow_payment = EscrowPayment.get(escrow_record.PaymentId)
 
     -- 调用本地 Token 转移代理模块
     local token_proxy = require("token_transfer_proxy")
