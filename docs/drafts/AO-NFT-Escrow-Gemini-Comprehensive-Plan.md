@@ -135,7 +135,7 @@ aggregates:
         type: string
         immutable: true  # 支付代币合约地址不可更改（如 ETH、USDC、SOL 等）
       Price:
-        type: number
+        type: bint
         immutable: true  # 价格一旦确定不可更改
       EscrowTerms:
         type: string
@@ -143,17 +143,18 @@ aggregates:
       # Saga 本身有状态管理，所以不需要再定义状态字段
       # Status:
       #   type: string
+      #   # 注意下面这样定义“枚举”其实是错误的，不符合 DDDML 规范
       #   enum: ["CREATED", "NFT_DEPOSITED", "PAYMENT_COMPLETED", "NFT_TRANSFERRED", "FUNDS_TRANSFERRED", "COMPLETED", "CANCELLED"]
       #   initializationLogic:
       #     __CONSTANT__: "CREATED"
       CreatedAt:
         type: number
         initializationLogic:
-          __CONTEXT_VARIABLE__: BlockTimestamp
+          __CONTEXT_VARIABLE__: MsgTimestamp
       # UpdatedAt:
       #   type: number
       #   initializationLogic:
-      #     __CONTEXT_VARIABLE__: BlockTimestamp
+      #     __CONTEXT_VARIABLE__: MsgTimestamp
     methods:
       Create:
         isInternal: true
@@ -189,7 +190,7 @@ services:
           NftContract: string
           TokenId: bint
           TokenContract: string  # 支持多币种支付（如 ETH、USDC、SOL 等）
-          Price: number
+          Price: bint
           EscrowTerms: string
         description: "完整的 NFT 托管交易流程编排，从创建托管记录开始，所有步骤在一个方法内定义"
         steps:
@@ -214,7 +215,7 @@ services:
             # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，这一步对应的补偿操作是 "将 NFT 返还给卖家"
             withCompensation: "return_nft_to_seller"
 
-          # # 步骤3: 更新托管状态为 NFT 已存入（本地操作）
+          # # 已移除的步骤: 更新托管状态为 NFT 已存入（本地操作）
           # UpdateEscrowNftDeposited:
           #   invokeParticipant: "NftEscrow.UpdateStatus"
           #   description: "NFT 已存入托管合约，更新托管记录状态"
@@ -222,7 +223,7 @@ services:
           #     EscrowId: "EscrowId"
           #     Status: "NFT_DEPOSITED"
 
-          # 步骤4: 等待买家支付（外部用户操作）
+          # 步骤3: 等待买家支付（外部用户操作）
           WaitForPayment:
             waitForEvent: "PaymentCompleted"
             description: "NFT已入库，等待买家完成支付"
@@ -232,7 +233,7 @@ services:
             # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，这一步对应的补偿操作是 "退款给买家"
             withCompensation: "refund_buyer"
 
-          # # 步骤5: 更新托管状态为支付已完成（本地操作）
+          # # 已移除的步骤: 更新托管状态为支付已完成（本地操作）
           # UpdateEscrowPaymentCompleted:
           #   invokeParticipant: "NftEscrow.UpdateStatus"
           #   description: "买家已完成支付，更新托管记录状态"
@@ -242,13 +243,13 @@ services:
 
           # --- 与外部合约交互的标准模式: invoke + waitForEvent ---
 
-          # 步骤6.1: 发送"转移NFT给买家"指令（通过本地代理）
+          # 步骤4.1: 发送"转移NFT给买家"指令（通过本地代理）
           SendTransferNftToBuyer:
             invokeLocal: "transfer_nft_to_buyer_via_proxy"
             description: "调用本地 NFT 转移代理，向外部 NFT 合约发送转移指令"
             # 这个步骤只是发送一条异步消息，结果未知，所以这一步本身没有什么可补偿的
 
-          # 步骤6.2: 等待NFT转移的链上确认
+          # 步骤4.2: 等待NFT转移的链上确认
           WaitForNftTransferConfirmation:
             waitForEvent: "NftTransferredToBuyer"
             description: "等待本地代理监听到 NFT 合约的 Debit-Notice 后，发出的链上确认事件"
@@ -258,7 +259,7 @@ services:
             # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，但是补偿操作的逻辑是定义在之前的步骤中的
             # withCompensation: "return_nft_to_seller_and_refund_buyer"
 
-          # # 步骤7: 更新托管状态为 NFT 已转移（本地操作）
+          # # 已移除的步骤: 更新托管状态为 NFT 已转移（本地操作）
           # UpdateEscrowNftTransferred:
           #   invokeParticipant: "NftEscrow.UpdateStatus"
           #   description: "NFT 已成功转移给买家，更新托管记录状态"
@@ -266,13 +267,13 @@ services:
           #     EscrowId: "EscrowId"
           #     Status: "NFT_TRANSFERRED"
 
-          # 步骤8.1: 发送"转移资金给卖家"指令（通过本地代理）
+          # 步骤5.1: 发送"转移资金给卖家"指令（通过本地代理）
           SendTransferFundsToSeller:
             invokeLocal: "transfer_funds_to_seller_via_proxy"
             description: "调用本地 Token 转移代理，向外部 Token 合约发送转移指令"
             # 这个步骤只是发送一条异步消息，结果未知，所以这一步本身没有什么可补偿的
 
-          # 步骤8.2: 等待资金转移的链上确认
+          # 步骤5.2: 等待资金转移的链上确认
           WaitForFundsTransferConfirmation:
             waitForEvent: "FundsTransferredToSeller"
             description: "等待本地代理监听到 Token 合约的 Debit-Notice 后，发出的链上确认事件"
@@ -282,7 +283,7 @@ services:
             # 这是最后一步，成功了就结束了，没有什么可以补偿的
             # withCompensation: "notify_admin_of_reversal_needed" # NFT已到买家手，但资金步骤失败
 
-          # # 步骤9: 更新托管状态为资金已转移（本地操作）
+          # # 已移除的步骤: 更新托管状态为资金已转移（本地操作）
           # UpdateEscrowFundsTransferred:
           #   invokeParticipant: "NftEscrow.UpdateStatus"
           #   description: "资金已成功转移给卖家，更新托管记录状态"
@@ -290,7 +291,7 @@ services:
           #     EscrowId: "EscrowId"
           #     Status: "FUNDS_TRANSFERRED"
 
-          # # 步骤10: 完成托管交易（内部操作）
+          # # 已移除的步骤: 完成托管交易（内部操作）
           # CompleteEscrowTransaction:
           #   invokeParticipant: "NftEscrow.UpdateStatus"
           #   description: "所有步骤均已确认，将托管记录标记为完成"
