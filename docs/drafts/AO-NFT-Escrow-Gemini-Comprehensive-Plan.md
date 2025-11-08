@@ -14,14 +14,14 @@
 
 | 步骤 | 操作方 | 动作 | 目标合约 | 结果 |
 | :--- | :--- | :--- | :--- | :--- |
-| 1. **启动交易** | 卖家 | 发送 `ExecuteNftEscrowTransaction` 消息 | **托管合约** | Saga 创建托管记录（Aggregate），指定 NFT 信息，生成 EscrowId。开始等待 NFT 存入。 |
+| 1. **启动交易** | 卖家 | 发送 `ExecuteNftEscrowTransaction` 消息 | **托管合约** | Saga 创建托管记录（Aggregate），指定 NFT 信息和交易条件（币种+价格），生成 EscrowId。开始等待 NFT 存入。 |
 | 2. **存入NFT** | 卖家 | 调用 `Transfer` | **NFT合约** | 将NFT的所有权直接转移给**托管合约的地址**。NFT被锁定。 |
 | 3. **确认存入** | NFT合约 | 发送 `Credit-Notice` | **托管合约** | 托管合约监听到通知，触发 `NftDeposited` 事件，Saga 继续执行。 |
 | 4. **买家指定支付** | 买家 | 调用 `UseEscrowPayment` | **托管合约** | 指定使用预存的 EscrowPayment 记录来支付当前 Escrow 交易。 |
 | 5. **确认支付** | 托管合约 | 内部处理 | **托管合约** | 验证并锁定指定的 EscrowPayment，确认支付信息匹配 Escrow 要求，触发 `EscrowPaymentUsed` 事件，Saga 继续执行。 |
 | 6. **转移NFT** | **托管合约** | 调用 `Transfer` | **NFT合约** | 将NFT从**自己**转移给买家，等待链上确认。 |
 | 7. **确认NFT转移** | NFT合约 | 发送 `Debit-Notice` | **托管合约** | 托管合约监听到通知，确认 NFT 已转移给买家，Saga 继续执行。 |
-| 8. **转移资金** | **托管合约** | 调用 `Transfer` | **Token合约** | 将资金从**自己**转移给卖家，等待链上确认。 |
+| 8. **转移资金** | **托管合约** | 调用 `Transfer` | **Token合约** | 将预存资金（从EscrowPayment中获取）转移给卖家，等待链上确认。 |
 | 9. **确认资金转移** | Token合约 | 发送 `Debit-Notice` | **托管合约** | 托管合约监听到通知，确认资金已转移给卖家，Saga 标记为完成。 |
 
 ### 完整的 AO Saga 流程
@@ -61,7 +61,7 @@
 ### 核心流程时间轴（估算）
 
 ```
-T=0s:   卖家发送 `ExecuteNftEscrowTransaction` 消息，Saga 创建托管记录，生成 EscrowId，开始等待 NFT 存入。
+T=0s:   卖家发送 `ExecuteNftEscrowTransaction` 消息（指定交易条件），Saga 创建托管记录，生成 EscrowId，开始等待 NFT 存入。
 T=10s:  卖家发送 `Transfer` 消息给NFT合约，将NFT转入托管合约。
 T=11s:  NFT合约处理转移，并向托管合约发送 `Credit-Notice`。
 T=12s:  托管合约监听到 `Credit-Notice`，触发 `NftDeposited` 事件，Saga 继续执行，等待买家指定支付。
@@ -160,7 +160,7 @@ aggregates:
       Preprocessors: ["CRUD_IT"]
       CRUD_IT_NO_UPDATE: true  # 托管记录一旦创建，业务规则不允许修改
       CRUD_IT_NO_DELETE: true  # 托管记录不可删除，只能标记为完成或取消
-      # 业务约束：在预存支付模式下，通过明确的PaymentId指定确保安全性
+      # 业务约束：在预存支付模式下，EscrowPayment的金额/币种必须与NftEscrow的交易条件匹配
     id:
       name: EscrowId
       type: bint
@@ -174,7 +174,7 @@ aggregates:
         immutable: true  # 卖家地址一旦设置不可更改
       BuyerAddress:
         type: string
-        immutable: true  # 买家地址一旦设置不可更改
+        optional: true  # 创建时可选，在UseEscrowPayment时填充
       NftContract:
         type: string
         immutable: true  # NFT 合约地址不可更改
@@ -183,11 +183,13 @@ aggregates:
         immutable: true  # Token ID 不可更改
       TokenContract:
         type: string
-        immutable: true  # 支付代币合约地址不可更改（如 ETH、USDC、SOL 等）
-        # 使用 EscrowPayment 时需要检查和匹配
+        immutable: true  # 交易期望的支付代币合约地址（如 ETH、USDC、SOL 等）
       Price:
         type: bint
-        immutable: true  # 价格一旦确定不可更改
+        immutable: true  # 交易价格，UseEscrowPayment时需要与EscrowPayment匹配
+      PaymentId:
+        type: bint
+        # 使用时填充，关联实际使用的预存支付记录
       EscrowTerms:
         type: string
         immutable: true  # 托管条款不可更改
@@ -210,7 +212,6 @@ aggregates:
       Create:
         isInternal: true
         # 仅限 Saga 内部调用
-        # 业务规则：在创建前必须检查同一币种+金额组合的唯一性
       # UpdateStatus:
       #   isInternal: true
       #   parameters:
@@ -238,18 +239,17 @@ services:
         parameters:
           EscrowId: bint
           PaymentId: bint
-        description: "买家指定使用预存的 EscrowPayment 记录来支付指定的 Escrow 交易。系统会验证支付记录的有效性和匹配性，并锁定支付记录"
+        description: "买家指定使用预存的 EscrowPayment 记录来支付指定的 Escrow 交易。系统会验证支付记录的有效性，检查EscrowPayment的金额/币种是否与Escrow交易条件匹配，将买家地址和PaymentId关联到Escrow记录，并锁定支付记录防止重复使用。最后触发EscrowPaymentUsed事件推动Saga继续"
 
       # 完整的 NFT 托管交易 Saga（在一个方法内完成所有步骤编排）
       # Saga 第一步创建托管记录，然后控制整个交易生命周期
       ExecuteNftEscrowTransaction:
         parameters:
           SellerAddress: string
-          BuyerAddress: string
           NftContract: string
           TokenId: bint
-          TokenContract: string  # 支持多币种支付（如 ETH、USDC、SOL 等）
-          Price: bint
+          TokenContract: string  # 期望的支付币种
+          Price: bint  # 期望的交易价格
           EscrowTerms: string
         description: "完整的 NFT 托管交易流程编排，从创建托管记录开始，所有步骤在一个方法内定义"
         steps:
@@ -257,6 +257,13 @@ services:
           CreateNftEscrowRecord:
             invokeParticipant: "NftEscrow.CreateNftEscrow"
             description: "创建托管记录，初始化所有必要字段，生成唯一的 EscrowId"
+            arguments:
+              SellerAddress: "SellerAddress"
+              NftContract: "NftContract"
+              TokenId: "TokenId"
+              TokenContract: "TokenContract"  # 期望的支付币种
+              Price: "Price"  # 期望的交易价格
+              EscrowTerms: "EscrowTerms"
             exportVariables:
               EscrowId:
                 extractionPath: ".EscrowId"
@@ -372,23 +379,29 @@ services:
 ```lua
 -- 在生成的 nft_escrow_service_local.lua 中实现
 function transfer_nft_to_buyer_via_proxy(context)
+    -- 从关联的NftEscrow记录中获取买家地址
+    local escrow_record = get_nft_escrow(context.EscrowId)
+
     -- 调用本地 NFT 转移代理模块
     local nft_proxy = require("nft_transfer_proxy")
     return nft_proxy.transfer({
         from = ao.id,
-        to = context.BuyerAddress,
+        to = escrow_record.BuyerAddress,
         nft_contract = context.NftContract,
         token_id = context.TokenId
     })
 end
 
 function transfer_funds_to_seller_via_proxy(context)
+    -- 从关联的EscrowPayment中获取支付信息
+    local escrow_payment = get_escrow_payment(context.EscrowId)
+
     -- 调用本地 Token 转移代理模块
     local token_proxy = require("token_transfer_proxy")
     return token_proxy.transfer({
-        token_contract = context.TokenContract,  -- 指定支付代币合约（如 ETH、USDC 等）
+        token_contract = escrow_payment.TokenContract,  -- 从EscrowPayment获取币种
         recipient = context.SellerAddress,
-        amount = calculate_seller_payout(context.ActualAmount)
+        amount = escrow_payment.Amount  -- 转出全部预存金额
     })
 end
 ```
@@ -599,7 +612,7 @@ return {
 - [ ] 理解AO原生所有权转移模型下的7步Saga流程（在一个方法内完成，从创建托管记录开始）。
 - [ ] 研究`ExecuteNftEscrowTransaction` Saga中 **`waitForEvent`** 的用法和事件过滤。
 - [ ] 理解**本地代理函数**（在 `nft_escrow_service_local.lua` 中）如何与外部合约交互。
-- [ ] 理解**NftEscrow Aggregate** 的数据持久化和业务规则（预存支付模式，Saga 自身管理执行状态）。掌握通过**明确的PaymentId指定**确保支付安全性的机制。
+- [ ] 理解**NftEscrow和EscrowPayment Aggregate** 的数据持久化和业务规则（预存支付模式，Saga 自身管理执行状态）。掌握**交易条件匹配验证**机制，确保EscrowPayment与NftEscrow的金额/币种完全匹配。
 - [ ] 掌握**预存支付机制**：买家预存资金到 EscrowPayment，支付时明确指定使用哪个预存记录，确保支付精确匹配。理解 EscrowPayment 锁定和验证逻辑。
 - [ ] 审查**补偿路径**，特别是资金转移失败后如何退款给买家。
 
