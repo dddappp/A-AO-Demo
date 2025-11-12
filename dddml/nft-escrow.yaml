@@ -1,0 +1,267 @@
+
+aggregates:
+  # 预存支付资金管理
+  EscrowPayment:
+    module: "NftEscrow"
+    metadata:
+      Preprocessors: ["CRUD_IT"]
+      CRUD_IT_NO_UPDATE: true  # 支付记录一旦创建不可修改
+      CRUD_IT_NO_DELETE: true  # 支付记录不可删除，只能标记为已使用或退款
+    id:
+      name: PaymentId
+      type: bint
+      generator:
+        class: sequence
+        structName: PaymentIdSequence
+    properties:
+      PayerAddress:
+        type: string
+        immutable: true  # 付款人地址不可更改
+      TokenContract:
+        type: string
+        immutable: true  # 支付代币合约地址不可更改
+      Amount:
+        type: bint
+        immutable: true  # 支付金额不可更改
+      Status:
+        type: string
+        # enum: ["AVAILABLE", "USED", "REFUNDED"]
+        initializationLogic:
+          Lua: "\"AVAILABLE\""
+      CreatedAt:
+        type: number
+        initializationLogic:
+          __CONTEXT_VARIABLE__: MsgTimestamp
+      UsedByEscrowId:
+        type: bint  # 关联的Escrow交易ID（使用时填充）
+    methods:
+      Create:
+        isInternal: true
+        # 仅限支付接收代理调用
+      MarkAsUsed:
+        isInternal: true
+        parameters:
+          EscrowId:
+            type: bint
+        # 标记支付已被特定Escrow交易使用
+      Refund:
+        isInternal: true
+        # 退款给付款人
+
+  # NFT托管交易记录
+  NftEscrow:
+    module: "NftEscrow"
+    metadata:
+      Preprocessors: ["CRUD_IT"]
+      CRUD_IT_NO_UPDATE: true  # 托管记录一旦创建，业务规则不允许修改
+      CRUD_IT_NO_DELETE: true  # 托管记录不可删除，只能标记为完成或取消
+      # 业务约束：在预存支付模式下，EscrowPayment的金额/币种必须与NftEscrow的交易条件匹配
+    id:
+      name: EscrowId
+      type: bint
+      # 可以使用 SagaId 作为 EscrowId
+      # generator:
+      #   class: sequence
+      #   structName: EscrowIdSequence
+    properties:
+      SellerAddress:
+        type: string
+        immutable: true  # 卖家地址一旦设置不可更改
+      BuyerAddress:
+        type: string
+        optional: true  # 创建时可选，在UseEscrowPayment时填充
+      NftContract:
+        type: string
+        immutable: true  # NFT 合约地址不可更改
+      TokenId:
+        type: bint
+        immutable: true  # Token ID 不可更改
+      TokenContract:
+        type: string
+        immutable: true  # 交易期望的支付代币合约地址（如 ETH、USDC、SOL 等）
+      Price:
+        type: bint
+        immutable: true  # 交易价格，UseEscrowPayment时需要与EscrowPayment匹配
+      PaymentId:
+        type: bint
+        # 使用时填充，关联实际使用的预存支付记录
+      EscrowTerms:
+        type: string
+        immutable: true  # 托管条款不可更改
+      # Saga 本身有状态管理，所以不需要再定义状态字段
+      # Status:
+      #   type: string
+      #   # 注意下面这样定义“枚举”其实是错误的，不符合 DDDML 规范
+      #   enum: ["CREATED", "NFT_DEPOSITED", "PAYMENT_COMPLETED", "NFT_TRANSFERRED", "FUNDS_TRANSFERRED", "COMPLETED", "CANCELLED"]
+      #   initializationLogic:
+      #     __CONSTANT__: "CREATED"
+      CreatedAt:
+        type: number
+        initializationLogic:
+          __CONTEXT_VARIABLE__: MsgTimestamp
+      # UpdatedAt:
+      #   type: number
+      #   initializationLogic:
+      #     __CONTEXT_VARIABLE__: MsgTimestamp
+    methods:
+      Create:
+        isInternal: true
+        # 仅限 Saga 内部调用
+      # UpdateStatus:
+      #   isInternal: true
+      #   parameters:
+      #     Status: string
+      #   event:
+      #     name: "EscrowStatusUpdated"
+
+services:
+  # 统一的 NFT 托管服务 - 基于 Aggregate 构建
+  NftEscrowService:
+    module: "NftEscrow"
+    # 一般来说，requiredComponents 用来声明“远程”组件
+    # requiredComponents:
+    #   NftEscrow:
+    #     type: NftEscrow
+    #     # 依赖托管聚合根，用于状态管理和业务规则验证
+
+    methods:
+      # # 查询托管记录（同步本地操作）
+      # GetEscrow:
+      #   parameters:
+      #     EscrowId: bint
+      #   # 本地操作，查询托管状态
+
+      # 买家指定使用预存的 EscrowPayment 支付
+      UseEscrowPayment:
+        parameters:
+          EscrowId:
+            type: bint
+          PaymentId:
+            type: bint
+        description: "买家指定使用预存的 EscrowPayment 记录来支付指定的 Escrow 交易。系统会验证支付记录的有效性，检查EscrowPayment的金额/币种是否与Escrow交易条件匹配，将买家地址和PaymentId关联到Escrow记录，并锁定支付记录防止重复使用。最后触发EscrowPaymentUsed事件推动Saga继续"
+
+      # 完整的 NFT 托管交易 Saga（在一个方法内完成所有步骤编排）
+      # Saga 第一步创建托管记录，然后控制整个交易生命周期
+      ExecuteNftEscrowTransaction:
+        parameters:
+          SellerAddress:
+            type: string
+          NftContract:
+            type: string
+          TokenId:
+            type: bint
+          TokenContract:
+            type: string  # 期望的支付币种
+          Price:
+            type: bint  # 期望的交易价格
+          EscrowTerms:
+            type: string
+        description: "完整的 NFT 托管交易流程编排，从创建托管记录开始，所有步骤在一个方法内定义"
+        steps:
+          # 步骤1: 创建托管记录（本地操作，生成 EscrowId）
+          CreateNftEscrowRecord:
+            # 跨进程调用的时候才使用 invokeParticipant，本地调用的时候使用 invokeLocal
+            # invokeParticipant: "NftEscrow.CreateNftEscrow"
+            invokeLocal: "create_nft_escrow_record"
+            description: "创建托管记录，初始化所有必要字段，生成唯一的 EscrowId"
+            exportVariables:
+              EscrowId:
+                extractionPath: ".EscrowId"
+                # 从创建响应中提取生成的 EscrowId，用于后续步骤
+            # 这一步本身没有什么可补偿的
+            # withCompensation: "cancel_created_escrow_record"
+
+          # 步骤2: 等待卖家将NFT转移至本合约（外部用户操作）
+          WaitForNftDeposit:
+            waitForEvent: "NftDeposited"
+            description: "等待卖家将NFT的所有权转移给本托管合约"
+            # eventFilter:
+            #   escrowId: "EscrowId"  # 只监听对应 EscrowId 的 NFT 存入事件
+            maxWaitTime: "24h"  # 24小时超时
+            # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，这一步对应的补偿操作是 "将 NFT 返还给卖家"
+            withCompensation: "return_nft_to_seller"
+
+          # # 已移除的步骤: 更新托管状态为 NFT 已存入（本地操作）
+          # UpdateEscrowNftDeposited:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "NFT 已存入托管合约，更新托管记录状态"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "NFT_DEPOSITED"
+
+          # 步骤3: 等待买家指定使用预存的 EscrowPayment 支付（外部用户操作）
+          WaitForPayment:
+            waitForEvent: "EscrowPaymentUsed"
+            description: "NFT已入库，等待买家指定使用预存的 EscrowPayment 记录完成支付"
+            # eventFilter:
+            #   escrowId: "EscrowId"  # 只监听对应 EscrowId 的 EscrowPayment 使用事件
+            maxWaitTime: "1h"  # 1小时支付超时
+            # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，这一步对应的补偿操作是 "解锁 EscrowPayment"
+            withCompensation: "unlock_escrow_payment"
+
+          # # 已移除的步骤: 更新托管状态为支付已完成（本地操作）
+          # UpdateEscrowPaymentCompleted:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "买家已完成支付，更新托管记录状态"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "PAYMENT_COMPLETED"
+
+          # --- 与外部合约交互的标准模式: invoke + waitForEvent ---
+
+          # 步骤4.1: 发送"转移NFT给买家"指令（通过本地代理）
+          SendTransferNftToBuyer:
+            invokeLocal: "transfer_nft_to_buyer"
+            description: "调用本地 NFT 转移代理，向外部 NFT 合约发送转移指令"
+            # 这个步骤只是发送一条异步消息，结果未知，所以这一步本身没有什么可补偿的
+
+          # 步骤4.2: 等待NFT转移的链上确认
+          WaitForNftTransferConfirmation:
+            waitForEvent: "NftTransferredToBuyer"
+            description: "等待本地代理监听到 NFT 合约的 Debit-Notice 后，发出的链上确认事件"
+            # 没有 eventFilter 这个关键字
+            # eventFilter:
+            #   escrowId: "EscrowId"
+            maxWaitTime: "5m"
+            # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，但是补偿操作的逻辑是定义在之前的步骤中的
+            # withCompensation: "return_nft_to_seller_and_refund_buyer"
+
+          # # 已移除的步骤: 更新托管状态为 NFT 已转移（本地操作）
+          # UpdateEscrowNftTransferred:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "NFT 已成功转移给买家，更新托管记录状态"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "NFT_TRANSFERRED"
+
+          # 步骤5.1: 发送"转移资金给卖家"指令（通过本地代理）
+          SendTransferFundsToSeller:
+            invokeLocal: "transfer_funds_to_seller"
+            description: "调用本地 Token 转移代理，向外部 Token 合约发送转移指令"
+            # 这个步骤只是发送一条异步消息，结果未知，所以这一步本身没有什么可补偿的
+
+          # 步骤5.2: 等待资金转移的链上确认
+          WaitForFundsTransferConfirmation:
+            waitForEvent: "FundsTransferredToSeller"
+            description: "等待本地代理监听到 Token 合约的 Debit-Notice 后，发出的链上确认事件"
+            # eventFilter:
+            #   escrowId: "EscrowId"
+            # maxWaitTime: "5m" # 不要处理超时，可以等待人工介入
+            # 这是最后一步，成功了就结束了，没有什么可以补偿的
+            # withCompensation: "notify_admin_of_reversal_needed" # NFT已到买家手，但资金步骤失败
+
+          # # 已移除的步骤: 更新托管状态为资金已转移（本地操作）
+          # UpdateEscrowFundsTransferred:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "资金已成功转移给卖家，更新托管记录状态"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "FUNDS_TRANSFERRED"
+
+          # # 已移除的步骤: 完成托管交易（内部操作）
+          # CompleteEscrowTransaction:
+          #   invokeParticipant: "NftEscrow.UpdateStatus"
+          #   description: "所有步骤均已确认，将托管记录标记为完成"
+          #   arguments:
+          #     EscrowId: "EscrowId"
+          #     Status: "COMPLETED"
