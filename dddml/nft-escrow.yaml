@@ -180,6 +180,10 @@ services:
             maxWaitTime: "24h"  # 24小时超时
             # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，这一步对应的补偿操作是 "将 NFT 返还给卖家"
             withCompensation: "return_nft_to_seller"
+            onSuccess:
+              Lua: "-- TODO"
+            onFailure:
+              Lua: "-- TODO"
 
           # # 已移除的步骤: 更新托管状态为 NFT 已存入（本地操作）
           # UpdateEscrowNftDeposited:
