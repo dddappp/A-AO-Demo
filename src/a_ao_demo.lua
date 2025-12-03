@@ -543,3 +543,18 @@ Handlers.add(
     inventory_service.process_inventory_surplus_or_shortage_complete_in_out_callback
 )
 
+-- NFT Escrow Service handlers (added for reference)
+Handlers.add(
+    "nft_escrow_service_use_escrow_payment",
+    Handlers.utils.hasMatchingTag("Action",
+        nft_escrow_service.ACTIONS.USE_ESCROW_PAYMENT),
+    nft_escrow_service.use_escrow_payment
+)
+
+Handlers.add(
+    "nft_escrow_service_execute_nft_escrow_transaction",
+    Handlers.utils.hasMatchingTag("Action", 
+        nft_escrow_service.ACTIONS.EXECUTE_NFT_ESCROW_TRANSACTION),
+    nft_escrow_service.execute_nft_escrow_transaction
+)
+
