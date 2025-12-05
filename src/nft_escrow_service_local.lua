@@ -68,24 +68,6 @@ function nft_escrow_service_local.process_nft_deposit_on_success(context, event_
     return short_circuited, is_error, result_or_error
 end
 
--- Callback function for NFT deposit success
-function nft_escrow_service_local.process_nft_deposit_on_success(context, event_data)
-    -- Validate that the NFT deposit matches our expectations
-    if event_data.escrowId ~= context.EscrowId then
-        -- Not for this escrow, this shouldn't happen but let's be safe
-        local short_circuited = true
-        local is_error = true
-        local result_or_error = "NFT deposit escrowId mismatch"
-        return short_circuited, is_error, result_or_error
-    end
-
-    -- Success: NFT has been deposited, continue with saga
-    local short_circuited = false
-    local is_error = false
-    local result_or_error = nil
-    return short_circuited, is_error, result_or_error
-end
-
 -- Callback function for NFT deposit failure
 -- onFailure: No return value specification - must execute compensation flow
 function nft_escrow_service_local.process_nft_deposit_on_failure(context, event_data)
@@ -172,6 +154,67 @@ function nft_escrow_service_local.use_escrow_payment(context)
             escrowId = escrow_id,
             buyerAddress = escrow_payment.PayerAddress
         })
+    end
+
+    return result, commit
+end
+
+-- Compensation logic functions for Saga
+function nft_escrow_service_local.return_nft_to_seller(context)
+    -- Compensation: Return NFT to seller when escrow fails after NFT deposit
+    -- Get escrow record to find seller address
+    local escrow_record = NftEscrowTable[context.EscrowId]
+    if not escrow_record or not escrow_record.SellerAddress then
+        error("Escrow record not found or seller address not set")
+    end
+
+    -- Call NFT transfer proxy (simplified implementation)
+    local nft_proxy = require("nft_transfer_proxy")
+    local result = nft_proxy.transfer({
+        from = ao.id,
+        to = escrow_record.SellerAddress,
+        nft_contract = context.NftContract,
+        token_id = context.TokenId
+    })
+
+    -- Return result and commit function
+    return result, function()
+        -- Message sent, waiting for external confirmation
+    end
+end
+
+function nft_escrow_service_local.unlock_escrow_payment(context)
+    -- Compensation: Unlock escrow payment when escrow fails after payment is applied
+    -- Get escrow record to find PaymentId
+    local escrow_record = NftEscrowTable[context.EscrowId]
+    if not escrow_record or not escrow_record.PaymentId then
+        error("Escrow record not found or payment not linked")
+    end
+
+    -- Get payment record and unlock it
+    local escrow_payment = EscrowPaymentTable[escrow_record.PaymentId]
+    if not escrow_payment then
+        error("Payment record not found")
+    end
+
+    -- Reset payment status to AVAILABLE and clear escrow link
+    escrow_payment.Status = "AVAILABLE"
+    escrow_payment.UsedByEscrowId = nil
+    EscrowPaymentTable[escrow_record.PaymentId] = escrow_payment
+
+    -- Also clear payment link from escrow record
+    escrow_record.PaymentId = nil
+    escrow_record.BuyerAddress = nil
+    NftEscrowTable[context.EscrowId] = escrow_record
+
+    -- Return result and commit function
+    local result = {
+        paymentId = escrow_record.PaymentId,
+        escrowId = context.EscrowId
+    }
+
+    local commit = function()
+        -- Records are already updated above
     end
 
     return result, commit

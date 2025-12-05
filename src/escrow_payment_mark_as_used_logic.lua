@@ -31,24 +31,10 @@ end
 -- @param env any The environment context
 -- @return table The updated state of the EscrowPayment
 function escrow_payment_mark_as_used_logic.mutate(state, event, msg, env)
-    --- TODO: Update the current state with the event properties then return it
-    -- state.{STATE_PROPERTY} = event.{EVENT_PROPERTY}
-    -- return state
-    --
-    --- Alternatively, you can choose to return a recreated state:
-    --[[
-    return escrow_payment.new(
-        payer_address, -- type: string
-        token_contract, -- type: string
-        amount, -- type: bint
-        status, -- type: string
-        used_by_escrow_id -- type: bint
-    )
-    ]]
-    --- There is some overhead in creating new objects. 
-    -- However, this approach does not modify the original state, 
-    -- and it is possible that other parts of the code depend on the invariance of the original state - although this is unlikely to happen.
-    --
+    -- Update the current state with the event properties
+    state.status = "USED"
+    state.used_by_escrow_id = event.escrow_id
+    return state
 end
 
 return escrow_payment_mark_as_used_logic

@@ -25,6 +25,10 @@ local transfer_funds_to_seller =
     nft_escrow_service_local.transfer_funds_to_seller
 local use_escrow_payment =
     nft_escrow_service_local.use_escrow_payment
+local return_nft_to_seller =
+    nft_escrow_service_local.return_nft_to_seller
+local unlock_escrow_payment =
+    nft_escrow_service_local.unlock_escrow_payment
 
 local nft_escrow_service = {}
 
@@ -80,7 +84,7 @@ function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
     local cmd = json.decode(msg.Data)
 
     local context = cmd
-    context.Timestamp = msg.Timestamp  -- Add timestamp to context for AO environment
+    context.Timestamp = msg.Timestamp -- Add timestamp to context for AO environment
 
     local local_steps = {
         create_nft_escrow_record,
@@ -117,7 +121,7 @@ function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
         success_event_type = "NftDeposited",
         failure_event_type = nil,
         step_name = "WaitForNftDeposit",
-        started_at = msg.Timestamp,  -- Use AO message timestamp (already in milliseconds)
+        started_at = msg.Timestamp,       -- Use AO message timestamp (already in milliseconds)
         max_wait_time_seconds = 86400000, -- 24 hours in milliseconds
         continuation_handler = nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_deposit_callback,
         data_mapping_rules = {
@@ -223,7 +227,13 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_payment_call
         end))
         if (not local_status) then
             saga.set_instance_compensating(saga_id, 1)()
-            rollback_saga_instance_respond_original_requester(saga_instance, local_result_or_error)
+            -- Execute compensation for WaitForPayment step:
+            -- Local step 1 (transfer_nft_to_buyer) failed: nil
+            -- Business compensation: unlock_escrow_payment
+            local pre_local_compensations = { nil, unlock_escrow_payment }
+            -- Then rollback the saga with compensations
+            execute_local_compensations_respond_original_requester(saga_instance, context, local_result_or_error,
+                pre_local_compensations)
             return
         else
             local_commits[#local_commits + 1] = local_commit
@@ -288,7 +298,14 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_transfer
         end))
         if (not local_status) then
             saga.set_instance_compensating(saga_id, 1)()
-            rollback_saga_instance_respond_original_requester(saga_instance, local_result_or_error)
+            -- Execute compensations for previous successful steps:
+            -- Local step 1 (transfer_nft_to_buyer) succeeded: return_nft_to_seller
+            -- Local step 2 (transfer_funds_to_seller) failed: nil
+            -- Business compensation: unlock_escrow_payment
+            local pre_local_compensations = { return_nft_to_seller, nil, unlock_escrow_payment }
+            -- Then rollback the saga with compensations
+            execute_local_compensations_respond_original_requester(saga_instance, context, local_result_or_error,
+                pre_local_compensations)
             return
         else
             local_commits[#local_commits + 1] = local_commit

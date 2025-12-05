@@ -22,7 +22,7 @@ local nft_escrow_create_logic = {}
 -- @param env table The environment context
 -- @return table The event, can use `nft_escrow.new_nft_escrow_created` to create it
 function nft_escrow_create_logic.verify(escrow_id, seller_address, buyer_address, nft_contract, token_id, token_contract, price, payment_id, escrow_terms, cmd, msg, env)
-    return nft_escrow.new_nft_escrow_created(escrow_id, seller_address, buyer_address, nft_contract, token_id, token_contract, price, payment_id, escrow_terms, created_at)
+    return nft_escrow.new_nft_escrow_created(escrow_id, seller_address, buyer_address, nft_contract, token_id, token_contract, price, payment_id, escrow_terms, msg.Timestamp)
 end
 
 --- Creates a new NftEscrow
