@@ -58,8 +58,9 @@ function saga.create_saga_instance(saga_type, target, tags, context, original_me
             step_name = nil,
             started_at = nil,
             max_wait_time_seconds = nil,
-            on_success_handler = nil,
-            on_failure_handler = nil,
+            -- TODO 不应该在 saga 实例中使用这两个字段。应该直接在 continuation_handler 函数中调用成功或者失败的本地回调函数
+            -- on_success_handler = nil,
+            -- on_failure_handler = nil,
             data_mapping_rules = nil,
             compensation_config = nil,
             continuation_handler = nil
@@ -186,10 +187,12 @@ function saga.trigger_local_event(saga_id, event_type, event_data)
     local waiting_state = saga_instance.waiting_state
     local context = saga_instance.context
 
+    -- TODO 不应该在这里处理成功或者失败的情况！直接在 continuation_handler 指向的那个函数内部处理成功或者失败的情况
     if event_type == waiting_state.success_event_type then
         print("Handling success event '" .. event_type .. "' for Saga " .. saga_id)
         local short_circuited, is_error, result_or_error
 
+        -- TODO 不要使用 on_success_handler 字段！直接在 continuation_handler 指向的那个函数内部处理成功的情况
         if waiting_state.on_success_handler then
             short_circuited, is_error, result_or_error = waiting_state.on_success_handler(event_data, context)
         else
@@ -212,6 +215,7 @@ function saga.trigger_local_event(saga_id, event_type, event_data)
         -- Continue execution: update context, clear waiting state, and call continuation handler.
         saga_instance.context = result_or_error or context
         saga_instance.waiting_state = { is_waiting = false }
+        -- TODO 不要让 continuation_handler 的值是一个字符串！直接保存函数引用！
         local continuation_handler_name = waiting_state.continuation_handler
 
         local commit = function() entity_coll.update(saga_instances, saga_id, saga_instance) end
@@ -242,6 +246,7 @@ function saga.trigger_local_event(saga_id, event_type, event_data)
 
     elseif event_type == waiting_state.failure_event_type then
         print("Handling failure event '" .. event_type .. "' for Saga " .. saga_id)
+        -- TODO 不要使用 on_failure_handler 字段！直接在 continuation_handler 指向的那个函数内部处理失败的情况
         if waiting_state.on_failure_handler then
             waiting_state.on_failure_handler(event_data, context)
         end

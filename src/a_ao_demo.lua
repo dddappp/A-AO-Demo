@@ -211,29 +211,29 @@ local function get_escrow_payment(msg, env, response)
     messaging.respond(status, result, msg)
 end
 
-local function create_escrow_payment(msg, env, response)
-    local status, result, commit = pcall((function()
-        local cmd = json.decode(msg.Data)
-        return escrow_payment_aggregate.create(cmd, msg, env)
-    end))
-    messaging.process_operation_result(status, result, commit, msg)
-end
+-- local function create_escrow_payment(msg, env, response)
+--     local status, result, commit = pcall((function()
+--         local cmd = json.decode(msg.Data)
+--         return escrow_payment_aggregate.create(cmd, msg, env)
+--     end))
+--     messaging.process_operation_result(status, result, commit, msg)
+-- end
 
-local function mark_as_used(msg, env, response)
-    local status, result, commit = pcall((function()
-        local cmd = json.decode(msg.Data)
-        return escrow_payment_aggregate.mark_as_used(cmd, msg, env)
-    end))
-    messaging.process_operation_result(status, result, commit, msg)
-end
+-- local function mark_as_used(msg, env, response)
+--     local status, result, commit = pcall((function()
+--         local cmd = json.decode(msg.Data)
+--         return escrow_payment_aggregate.mark_as_used(cmd, msg, env)
+--     end))
+--     messaging.process_operation_result(status, result, commit, msg)
+-- end
 
-local function refund(msg, env, response)
-    local status, result, commit = pcall((function()
-        local cmd = json.decode(msg.Data)
-        return escrow_payment_aggregate.refund(cmd, msg, env)
-    end))
-    messaging.process_operation_result(status, result, commit, msg)
-end
+-- local function refund(msg, env, response)
+--     local status, result, commit = pcall((function()
+--         local cmd = json.decode(msg.Data)
+--         return escrow_payment_aggregate.refund(cmd, msg, env)
+--     end))
+--     messaging.process_operation_result(status, result, commit, msg)
+-- end
 
 local function get_nft_escrow(msg, env, response)
     local status, result = pcall((function()
@@ -385,23 +385,25 @@ Handlers.add(
     end
 )
 
-Handlers.add(
-    "create_escrow_payment",
-    Handlers.utils.hasMatchingTag("Action", "CreateEscrowPayment"),
-    create_escrow_payment
-)
+-- 内部方法，不应该生成 message handlers
 
-Handlers.add(
-    "mark_as_used",
-    Handlers.utils.hasMatchingTag("Action", "MarkAsUsed"),
-    mark_as_used
-)
+-- Handlers.add(
+--     "create_escrow_payment",
+--     Handlers.utils.hasMatchingTag("Action", "CreateEscrowPayment"),
+--     create_escrow_payment
+-- )
 
-Handlers.add(
-    "refund",
-    Handlers.utils.hasMatchingTag("Action", "Refund"),
-    refund
-)
+-- Handlers.add(
+--     "mark_as_used",
+--     Handlers.utils.hasMatchingTag("Action", "MarkAsUsed"),
+--     mark_as_used
+-- )
+
+-- Handlers.add(
+--     "refund",
+--     Handlers.utils.hasMatchingTag("Action", "Refund"),
+--     refund
+-- )
 
 Handlers.add(
     "get_nft_escrow",
