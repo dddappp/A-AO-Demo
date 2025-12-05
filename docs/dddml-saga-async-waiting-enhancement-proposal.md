@@ -60,6 +60,56 @@ AO的编程模型本身就是异步消息驱动的，当前DDDML生成的Saga代
 3. **确保兼容性**：新功能与现有机制无缝集成，100%向后兼容
 4. **保持简洁性**：复用现有语法元素（如`exportVariables`），避免发明新概念
 
+### 对关键注释的理解
+
+在实现过程中，我们发现了一个重要的代码注释（位于nft_escrow_service.lua:283-286），它深刻地揭示了continuation_handler的设计哲学：
+
+```lua
+-- todo 这个函数的行为应该和 inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback 这类方法类似。
+--   不同之处只是 inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback 这样的方法是外部的消息触发执行的，而这里是本地的 saga 实例内部触发的。
+--   外部消息触发执行的时候，也会有成功或失败的情形，和内部事件（内部事件也有可能是成功事件或失败事件）触发其他类似。所以这里的处理流程应该是大同小异的。
+```
+
+#### 核心洞察
+
+这个注释揭示了**Saga continuation_handler的行为模式应该与外部消息回调函数保持一致**：
+
+**外部消息回调模式**（inventory_service）：
+1. 验证消息和Saga状态
+2. **检查错误条件（如data.error）并早期return**
+3. 调用onReply处理函数
+4. **检查short_circuited并早期return**
+5. 继续正常的业务逻辑
+
+**内部事件回调模式**（nft_escrow_service continuation_handler）：
+1. 验证事件和Saga状态
+2. **检查错误条件（如event_type不匹配）并早期return**
+3. 调用onSuccess处理函数
+4. **检查short_circuited并早期return**
+5. 继续正常的业务逻辑
+
+#### 关键相似性
+
+- ✅ **相同的处理流程**：验证 → 检查错误 → 调用处理函数 → 检查short_circuit → 继续业务逻辑
+- ✅ **相同的早期return模式**：错误情况和short_circuit情况都立即return
+- ✅ **相同的onXxx处理模式**：调用本地处理函数，处理返回值
+
+#### 关键差异
+
+- 🔸 **触发方式**：inventory_service是**外部消息触发**，continuation_handler是**内部事件触发**
+- 🔸 **错误检查**：inventory_service检查`data.error`，continuation_handler检查`event_type`
+- 🔸 **继续逻辑**：inventory_service发送下一个请求，continuation_handler执行本地步骤并设置等待状态
+
+#### 架构意义
+
+这个注释提醒我们，**无论外部消息还是内部事件，Saga的错误处理和流程控制模式都是一致的**。这为waitForEvent扩展提供了重要的设计指导原则：
+
+1. **统一的事件处理模式**：外部消息和内部事件的处理逻辑应该遵循相同的模式
+2. **一致的short_circuit语义**：无论触发方式如何，onReply/onSuccess的返回值语义都应该一致
+3. **相同的错误处理流程**：验证 → 错误检查 → 处理函数调用 → short_circuit检查 → 业务逻辑继续
+
+这个理解对于正确实现DDDML的Saga模式至关重要，确保了waitForEvent扩展与现有Saga机制的完美融合。
+
 ## waitForEvent语法规范概览
 
 为便于DDDML工具团队快速理解，这里先给出`waitForEvent`步骤类型的完整语法规范。详细设计考量和实现细节见后续章节。
@@ -95,9 +145,18 @@ steps:
 ### 关键设计决策
 
 1. **复用现有语法**：`exportVariables`、`withCompensation`等与现有Saga步骤一致
-2. **命名一致性**：`onSuccess`/`onFailure`遵循`onReply`模式
-3. **区块链友好**：`maxWaitTime`声明式，超时由外部监控触发
-4. **灵活过滤**：`onSuccess`中实现任意复杂的业务验证逻辑
+2. **区块链友好**：`maxWaitTime`声明式，超时由外部监控触发
+3. **灵活过滤**：`onSuccess`中实现任意复杂的业务验证逻辑
+4. **返回值规范**：
+   - `onSuccess`: 与`onReply`保持一致的三值返回模式（short_circuited, is_error, result_or_error）
+     - `short_circuited`: true表示立即完成Saga，false表示继续执行后续步骤
+     - `is_error`: true表示处理失败，false表示处理成功
+     - `result_or_error`: 成功时返回结果，失败时返回错误信息
+   - `onFailure`: **无返回值规范**
+     - **关键**：一旦失败事件触发，**必须执行补偿流程**
+     - 无法忽略失败或继续等待
+     - 立即回滚Saga实例并触发补偿操作
+   - **重要**：`onSuccess`与`onReply`完全一致的语义；`onFailure`强制补偿
 
 ### DDDML命名规范说明
 
@@ -769,7 +828,6 @@ steps:
 - **状态一致性**：确保等待步骤的补偿与普通步骤的补偿逻辑一致
 
 **命名一致性考量**：
-- `onSuccess` 和 `onFailure` 完全遵循DDDML现有的 `onReply` 模式
 - `waitForEvent` 和 `failureEvent` 只声明事件类型，不涉及处理逻辑
 - 移除了复杂的主动超时机制，采用外部监控触发的被动补偿方式
 
