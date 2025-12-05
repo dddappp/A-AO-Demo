@@ -108,7 +108,7 @@ function nft_escrow_service_local.create_nft_escrow_record(context)
         TokenContract = context.TokenContract,
         Price = context.Price,
         EscrowTerms = context.EscrowTerms,
-        CreatedAt = os.time(),
+        CreatedAt = context.Timestamp,
         -- BuyerAddress will be set later when payment is applied
         -- PaymentId will be set later when payment is applied
     }

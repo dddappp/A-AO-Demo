@@ -80,6 +80,7 @@ function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
     local cmd = json.decode(msg.Data)
 
     local context = cmd
+    context.Timestamp = msg.Timestamp  -- Add timestamp to context for AO environment
 
     local local_steps = {
         create_nft_escrow_record,
@@ -116,8 +117,8 @@ function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
         success_event_type = "NftDeposited",
         failure_event_type = nil,
         step_name = "WaitForNftDeposit",
-        started_at = os.time() * 1000,    -- Convert to milliseconds to match AO timestamp format
-        max_wait_time_seconds = 86400000, -- Convert to milliseconds
+        started_at = msg.Timestamp,  -- Use AO message timestamp (already in milliseconds)
+        max_wait_time_seconds = 86400000, -- 24 hours in milliseconds
         continuation_handler = nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_deposit_callback,
         data_mapping_rules = {
         },
@@ -175,7 +176,7 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_deposit_
         success_event_type = "EscrowPaymentUsed",
         failure_event_type = nil,
         step_name = "WaitForPayment",
-        started_at = os.time() * 1000,
+        started_at = msg.Timestamp,
         max_wait_time_seconds = 3600000,
         continuation_handler = nft_escrow_service.execute_nft_escrow_transaction_wait_for_payment_callback,
         data_mapping_rules = {},
@@ -236,7 +237,7 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_payment_call
         success_event_type = "NftTransferredToBuyer",
         failure_event_type = nil,
         step_name = "WaitForNftTransferConfirmation",
-        started_at = os.time() * 1000,
+        started_at = msg.Timestamp,
         max_wait_time_seconds = 300000,
         continuation_handler = nft_escrow_service
             .execute_nft_escrow_transaction_wait_for_nft_transfer_confirmation_callback,
@@ -301,7 +302,7 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_transfer
         success_event_type = "FundsTransferredToSeller",
         failure_event_type = nil,
         step_name = "WaitForFundsTransferConfirmation",
-        started_at = os.time() * 1000,
+        started_at = msg.Timestamp,
         max_wait_time_seconds = 0,
         continuation_handler = nft_escrow_service
             .execute_nft_escrow_transaction_wait_for_funds_transfer_confirmation_callback,
