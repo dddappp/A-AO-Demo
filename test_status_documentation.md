@@ -18,6 +18,8 @@
 - Escrow合约的Credit-Notice监听机制
 - 完整交易的Saga编排
 
+重要参考：[docs/dddml-saga-async-waiting-enhancement-proposal.md](docs/dddml-saga-async-waiting-enhancement-proposal.md)的 `#### 核心洞察` 一节。
+
 ## 已确定的结论
 
 ### 关于 Inbox 的使用
