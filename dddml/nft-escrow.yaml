@@ -107,6 +107,14 @@ aggregates:
       Create:
         isInternal: true
         # 仅限 Saga 内部调用
+      LinkPayment:
+        isInternal: true
+        parameters:
+          BuyerAddress:
+            type: string
+          PaymentId:
+            type: bint
+        # 将买家地址和支付ID关联到Escrow记录
       # UpdateStatus:
       #   isInternal: true
       #   parameters:
@@ -226,7 +234,7 @@ services:
             # 没有 eventFilter 这个关键字
             # eventFilter:
             #   escrowId: "EscrowId"
-            maxWaitTime: "5m"
+            # maxWaitTime: "5m" # 不要处理超时，可以等待人工介入
             # 如果这一步成功、此后的步骤失败，那么需要执行补偿操作，但是补偿操作的逻辑是定义在之前的步骤中的
             # withCompensation: "return_nft_to_seller_and_refund_buyer"
 

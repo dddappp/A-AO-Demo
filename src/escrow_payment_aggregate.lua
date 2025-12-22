@@ -6,6 +6,7 @@
 local entity_coll = require("entity_coll")
 local bint = require('.bint')(256)
 local json = require("json")
+local escrow_payment_create_logic = require("escrow_payment_create_logic")
 
 local escrow_payment_aggregate = {}
 
@@ -21,9 +22,76 @@ escrow_payment_aggregate.ERRORS = ERRORS
 local escrow_payment_table
 local payment_id_sequence
 
+local function current_escrow_payment_id()
+    if (payment_id_sequence == nil) then
+        error(ERRORS.NIL_ENTITY_ID_SEQUENCE)
+    end
+    return payment_id_sequence.current
+end
+
+local function next_escrow_payment_id()
+    if (payment_id_sequence == nil) then
+        error(ERRORS.NIL_ENTITY_ID_SEQUENCE)
+    end
+    local current_bint = bint(payment_id_sequence.current)
+    local next_bint = current_bint + 1
+    payment_id_sequence.current = tostring(next_bint)
+    return payment_id_sequence.current
+end
+
 function escrow_payment_aggregate.init(table, sequence)
     escrow_payment_table = table
     payment_id_sequence = sequence
+end
+
+function escrow_payment_aggregate.create(cmd, msg, env)
+    local payment_id = next_escrow_payment_id()
+    local _event = escrow_payment_create_logic.verify(
+        payment_id,
+        cmd.PayerAddress,
+        cmd.TokenContract,
+        cmd.Amount,
+        cmd.Status,
+        cmd.UsedByEscrowId,
+        cmd,
+        msg,
+        env
+    )
+    if (_event.payment_id ~= current_escrow_payment_id()
+        or _event.payment_id ~= payment_id
+    ) then
+        error(ERRORS.ENTITY_ID_MISMATCH)
+    end
+    local _state = escrow_payment_create_logic.new(_event, msg, env)
+    _state.payment_id = _event.payment_id
+    local commit = function()
+        entity_coll.add(escrow_payment_table, payment_id, _state)
+    end
+
+    return _event, commit
+end
+
+local escrow_payment_mark_as_used_logic = require("escrow_payment_mark_as_used_logic")
+
+function escrow_payment_aggregate.mark_as_used(payment_id, escrow_id, msg, env)
+    local _state = entity_coll.get_copy(escrow_payment_table, payment_id)
+    if (_state.version ~= nil) then
+        -- Check version for concurrency control if needed
+    end
+
+    local _event = escrow_payment_mark_as_used_logic.verify(_state, escrow_id, {PaymentId = payment_id}, msg, env)
+    if (_event.payment_id ~= payment_id) then
+        error(ERRORS.ENTITY_ID_MISMATCH)
+    end
+
+    local _new_state = escrow_payment_mark_as_used_logic.mutate(_state, _event, msg, env)
+    _new_state.version = tostring(bint(_state.version or "0") + 1)
+
+    local commit = function()
+        entity_coll.update(escrow_payment_table, payment_id, _new_state)
+    end
+
+    return _event, commit
 end
 
 -- Internal methods only - no external message handlers

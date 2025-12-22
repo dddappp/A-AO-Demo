@@ -7,8 +7,15 @@ local token_transfer_proxy = {}
 -- @param params table with fields: token_contract, recipient, amount
 -- @return result table with transfer details
 function token_transfer_proxy.transfer(params)
+    print("🔄 TOKEN_TRANSFER_PROXY: Starting token transfer")
+    print("  - TokenContract: " .. tostring(params.token_contract))
+    print("  - Recipient: " .. tostring(params.recipient))
+    print("  - Amount: " .. tostring(params.amount))
+    print("  - EscrowId: " .. tostring(params.escrow_id))
+
     -- Validate required parameters
     if not params.token_contract or not params.recipient or not params.amount then
+        print("❌ TOKEN_TRANSFER_PROXY: Missing required parameters")
         error("Missing required parameters for token transfer")
     end
 
@@ -23,8 +30,10 @@ function token_transfer_proxy.transfer(params)
         EscrowId = params.escrow_id or "unknown"
     }
 
+    print("🔄 TOKEN_TRANSFER_PROXY: Sending Transfer message to token contract")
     -- Send the message
     local result = Send(transfer_msg)
+    print("✅ TOKEN_TRANSFER_PROXY: Transfer message sent, message_id: " .. tostring(result))
 
     return {
         success = true,

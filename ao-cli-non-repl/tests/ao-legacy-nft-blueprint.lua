@@ -465,9 +465,9 @@ end)
 Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Transfer"), function(msg)
   -- Check if this is an NFT transfer (has TokenId tag) - this is how Wander wallet identifies NFT transfers
   -- AO converts first char to lowercase: TokenId -> Tokenid
-  local tokenId = msg.Tokenid -- Use AO-converted name directly
-  local recipient = msg.Recipient
-  local quantity = msg.Quantity
+  local tokenId = msg.Tokenid or msg.TokenId or (msg.Tags and (msg.Tags.Tokenid or msg.Tags.TokenId)) -- Check multiple sources
+  local recipient = msg.Recipient or (msg.Tags and msg.Tags.Recipient)
+  local quantity = msg.Quantity or (msg.Tags and msg.Tags.Quantity) or "1"
 
   if tokenId and tokenId ~= '' then
     -- Validate NFT transfer parameters (matching Wander wallet expectations)
@@ -499,7 +499,8 @@ Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Trans
     Owners[tokenId] = recipient
 
     -- Send Debit-Notice and Credit-Notice (matching Wander wallet expectations)
-    if not msg.Cast then
+    -- Always send notifications regardless of msg.Cast for testing
+    -- if not msg.Cast then
       -- Debit-Notice (to sender)
       local debitNotice = {
         Action = 'Debit-Notice',
@@ -520,15 +521,27 @@ Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Trans
       }
 
       -- Send notifications (matching Wander wallet logic)
+      print("NFT TRANSFER: About to send Credit-Notice")
+      print("NFT TRANSFER: creditNotice.Target = " .. tostring(creditNotice.Target))
+      print("NFT TRANSFER: creditNotice.TokenId = " .. tostring(creditNotice.TokenId))
+      print("NFT TRANSFER: msg.reply exists = " .. tostring(msg.reply ~= nil))
       if msg.reply then
         msg.reply(debitNotice)
+        -- For Credit-Notice, use Send since it goes to recipient
+        print("NFT TRANSFER: Sending Credit-Notice via Send()")
+        local sendResult = Send(creditNotice)
+        print("NFT TRANSFER: Send() returned: " .. tostring(sendResult))
+        print("NFT TRANSFER: Credit-Notice sent successfully")
       else
         -- NOTE 调用 Send 之前注意设置 Target
         debitNotice.Target = msg.From
         Send(debitNotice)
+        print("NFT TRANSFER: Sending Credit-Notice via Send()")
+        local sendResult = Send(creditNotice)
+        print("NFT TRANSFER: Send() returned: " .. tostring(sendResult))
+        print("NFT TRANSFER: Credit-Notice sent successfully")
       end
-      Send(creditNotice)
-    end
+    -- end
   else
     -- Regular token transfer - not supported by this NFT contract
     sendError(msg, 'Transfer-Error', 'This NFT contract only supports NFT transfers with TokenId parameter')

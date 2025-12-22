@@ -32,6 +32,15 @@ local unlock_escrow_payment =
 
 local nft_escrow_service = {}
 
+-- Helper function
+function table_keys(t)
+    local keys = {}
+    for k, v in pairs(t) do
+        table.insert(keys, tostring(k))
+    end
+    return keys
+end
+
 
 local ERRORS = {
     INVALID_MESSAGE = "INVALID_MESSAGE",
@@ -45,6 +54,14 @@ local ACTIONS = {
     "NftEscrowService_UseEscrowPayment",
     EXECUTE_NFT_ESCROW_TRANSACTION =
     "NftEscrowService_ExecuteNftEscrowTransaction",
+    EXECUTE_NFT_ESCROW_TRANSACTION_WAIT_FOR_NFT_DEPOSIT_CALLBACK =
+    "NftEscrowService_ExecuteNftEscrowTransaction_WaitForNftDeposit_Callback",
+    EXECUTE_NFT_ESCROW_TRANSACTION_WAIT_FOR_PAYMENT_CALLBACK =
+    "NftEscrowService_ExecuteNftEscrowTransaction_WaitForPayment_Callback",
+    EXECUTE_NFT_ESCROW_TRANSACTION_WAIT_FOR_NFT_TRANSFER_CONFIRMATION_CALLBACK =
+    "NftEscrowService_ExecuteNftEscrowTransaction_WaitForNftTransferConfirmation_Callback",
+    EXECUTE_NFT_ESCROW_TRANSACTION_WAIT_FOR_FUNDS_TRANSFER_CONFIRMATION_CALLBACK =
+    "NftEscrowService_ExecuteNftEscrowTransaction_WaitForFundsTransferConfirmation_Callback",
 }
 
 nft_escrow_service.ACTIONS = ACTIONS
@@ -81,7 +98,20 @@ end
 
 
 function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
-    local cmd = json.decode(msg.Data)
+    local cmd
+    if msg.Data and msg.Data ~= "" then
+        cmd = json.decode(msg.Data)
+    else
+        -- Handle data sent via --prop parameters
+        cmd = {
+            SellerAddress = msg.SellerAddress or (msg.Tags and msg.Tags.SellerAddress),
+            NftContract = msg.NftContract or (msg.Tags and msg.Tags.NftContract),
+            TokenId = msg.TokenId or (msg.Tags and msg.Tags.TokenId),
+            TokenContract = msg.TokenContract or (msg.Tags and msg.Tags.TokenContract),
+            Price = msg.Price or (msg.Tags and msg.Tags.Price),
+            EscrowTerms = msg.EscrowTerms or (msg.Tags and msg.Tags.EscrowTerms)
+        }
+    end
 
     local context = cmd
     context.Timestamp = msg.Timestamp -- Add timestamp to context for AO environment
@@ -105,12 +135,15 @@ function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
 
     -- This is the first step, create saga instance first.
     local original_message = messaging.extract_reply_context(msg)
+    -- Debug: check if saga creation works
+    print("Creating SAGA with context keys: " .. table.concat(table_keys(context), ", "))
     local saga_instance, commit = saga.create_saga_instance(ACTIONS.EXECUTE_NFT_ESCROW_TRANSACTION, nil, -- no target for local wait
         nil,                                                                                             -- no tags for local wait
         context,
         original_message,
         #local_steps
     )
+    print("SAGA created: " .. tostring(saga_instance ~= nil) .. ", saga_id: " .. tostring(saga_instance and saga_instance.saga_id))
     local saga_id = saga_instance.saga_id
     commit() -- must commit here to save the saga instance
     local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, nil, nil, context)
@@ -130,6 +163,12 @@ function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
     local update_commit = function() SagaInstances[saga_id] = saga_instance end
 
     local total_commit = function()
+        -- Execute all local commits first
+        for i = 1, #local_commits, 1 do
+            local local_commit = local_commits[i]
+            local_commit()
+        end
+        -- Then execute saga commit
         commit()
         update_commit()
     end

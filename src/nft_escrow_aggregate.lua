@@ -6,6 +6,8 @@
 local entity_coll = require("entity_coll")
 local bint = require('.bint')(256)
 local json = require("json")
+local nft_escrow_create_logic = require("nft_escrow_create_logic")
+local nft_escrow_link_payment_logic = require("nft_escrow_link_payment_logic")
 
 local nft_escrow_aggregate = {}
 
@@ -19,9 +21,79 @@ local ERRORS = {
 nft_escrow_aggregate.ERRORS = ERRORS
 
 local nft_escrow_table
+local nft_escrow_id_sequence
 
-function nft_escrow_aggregate.init(table)
+local function current_nft_escrow_id()
+    if (nft_escrow_id_sequence == nil) then
+        error(ERRORS.NIL_ENTITY_ID_SEQUENCE)
+    end
+    return nft_escrow_id_sequence.current
+end
+
+local function next_nft_escrow_id()
+    if (nft_escrow_id_sequence == nil) then
+        error(ERRORS.NIL_ENTITY_ID_SEQUENCE)
+    end
+    local current_bint = bint(nft_escrow_id_sequence.current)
+    local next_bint = current_bint + 1
+    nft_escrow_id_sequence.current = tostring(next_bint)
+    return nft_escrow_id_sequence.current
+end
+
+function nft_escrow_aggregate.init(table, sequence)
     nft_escrow_table = table
+    nft_escrow_id_sequence = sequence
+end
+
+function nft_escrow_aggregate.create(cmd, msg, env)
+    local escrow_id = next_nft_escrow_id()
+    local _event = nft_escrow_create_logic.verify(
+        escrow_id,
+        cmd.SellerAddress,
+        cmd.BuyerAddress,
+        cmd.NftContract,
+        cmd.TokenId,
+        cmd.TokenContract,
+        cmd.Price,
+        cmd.PaymentId,
+        cmd.EscrowTerms,
+        cmd,
+        msg,
+        env
+    )
+    if (_event.escrow_id ~= current_nft_escrow_id()
+        or _event.escrow_id ~= escrow_id
+    ) then
+        error(ERRORS.ENTITY_ID_MISMATCH)
+    end
+    local _state = nft_escrow_create_logic.new(_event, msg, env)
+    _state.escrow_id = _event.escrow_id
+    local commit = function()
+        entity_coll.add(nft_escrow_table, escrow_id, _state)
+    end
+
+    return _event, commit
+end
+
+function nft_escrow_aggregate.link_payment(escrow_id, buyer_address, payment_id, msg, env)
+    print("🔗 LINK_PAYMENT: Starting link_payment for escrow_id=" .. tostring(escrow_id) .. ", buyer_address=" .. tostring(buyer_address))
+    local _state = entity_coll.get_copy(nft_escrow_table, escrow_id)
+    print("🔗 LINK_PAYMENT: Got state with version=" .. tostring(_state.version))
+
+    local _event = nft_escrow_link_payment_logic.verify(_state, buyer_address, payment_id, {EscrowId = escrow_id}, msg, env)
+    print("🔗 LINK_PAYMENT: Created event with buyer_address=" .. tostring(_event.buyer_address))
+
+    local _new_state = nft_escrow_link_payment_logic.mutate(_state, _event, msg, env)
+    print("🔗 LINK_PAYMENT: Mutated state, new buyer_address=" .. tostring(_new_state.buyer_address))
+    _new_state.version = tostring(bint(_state.version or "0") + 1)
+
+    local commit = function()
+        print("🔗 LINK_PAYMENT: Executing commit, updating escrow_id=" .. tostring(escrow_id))
+        entity_coll.update(nft_escrow_table, escrow_id, _new_state)
+        print("🔗 LINK_PAYMENT: Commit completed")
+    end
+
+    return _event, commit
 end
 
 -- Internal methods only - no external message handlers

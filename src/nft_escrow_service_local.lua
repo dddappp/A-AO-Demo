@@ -1,53 +1,158 @@
 local nft_escrow_service_local = {}
 
 -- Global tables will be available at runtime
+local saga = require("saga")
 
-function nft_escrow_service_local.transfer_nft_to_buyer(context)
-    -- Get escrow record to find buyer address
-    local escrow_record = NftEscrowTable[context.EscrowId]
-    if not escrow_record or not escrow_record.BuyerAddress then
-        error("Escrow record not found or buyer address not set")
-    end
-
-    -- Call NFT transfer proxy (simplified implementation)
-    local nft_proxy = require("nft_transfer_proxy")
-    local result = nft_proxy.transfer({
-        from = ao.id,
-        to = escrow_record.BuyerAddress,
-        nft_contract = context.NftContract,
-        token_id = context.TokenId
-    })
-
-    -- Return result and commit function
-    return result, function()
-        -- Message sent, waiting for external confirmation
+-- Helper: trigger waiting sagas by event type and escrowId match
+local function trigger_waiting_saga_event(event_type, escrow_id, event_data)
+    for saga_id, saga_instance in pairs(SagaInstances or {}) do
+        local waiting = saga_instance.waiting_state
+        if waiting and waiting.is_waiting and waiting.success_event_type == event_type then
+            local ctx = saga_instance.context or {}
+            local ctx_escrow_id = ctx.EscrowId or ctx.escrow_id
+            if ctx_escrow_id and tostring(ctx_escrow_id) == tostring(escrow_id) then
+                saga.trigger_local_event(saga_id, event_type, event_data)
+            end
+        end
     end
 end
 
-function nft_escrow_service_local.transfer_funds_to_seller(context)
-    -- Get escrow record to find PaymentId, then get payment record
+function nft_escrow_service_local.transfer_nft_to_buyer(context)
+    print("🔄 TRANSFER_NFT_TO_BUYER: Starting NFT transfer to buyer")
+
+    -- Get escrow record and normalized fields
     local escrow_record = NftEscrowTable[context.EscrowId]
-    if not escrow_record or not escrow_record.PaymentId then
+    local buyer_address = context.BuyerAddress or context.buyer_address
+        or (escrow_record and (escrow_record.buyer_address or escrow_record.BuyerAddress))
+    local nft_contract = context.NftContract or context.nft_contract
+        or (escrow_record and (escrow_record.nft_contract or escrow_record.NftContract))
+    local token_id = context.TokenId or context.token_id
+        or (escrow_record and (escrow_record.token_id or escrow_record.TokenId))
+
+    print("🔄 TRANSFER_NFT_TO_BUYER: Context values:")
+    print("  - EscrowId: " .. tostring(context.EscrowId))
+    print("  - BuyerAddress: " .. tostring(buyer_address))
+    print("  - NftContract: " .. tostring(nft_contract))
+    print("  - TokenId: " .. tostring(token_id))
+    print("  - Current process: " .. tostring(ao.id))
+
+    -- Debug: Check if NFT is actually owned by this process
+    if escrow_record then
+        print("🔄 TRANSFER_NFT_TO_BUYER: Escrow record details:")
+        for k,v in pairs(escrow_record) do
+            print("    " .. k .. " = " .. tostring(v))
+        end
+    end
+
+    if not escrow_record or not buyer_address then
+        print("❌ TRANSFER_NFT_TO_BUYER: Error - Escrow record not found or buyer address not set")
+        print("  Escrow record exists: " .. tostring(escrow_record ~= nil))
+        print("  Buyer address: " .. tostring(buyer_address))
+        error("Escrow record not found or buyer address not set")
+    end
+    if not nft_contract or not token_id then
+        print("❌ TRANSFER_NFT_TO_BUYER: Error - NFT contract or token_id missing")
+        error("NFT contract or token_id missing")
+    end
+
+    -- Check if this process actually owns the NFT before attempting transfer
+    print("🔄 TRANSFER_NFT_TO_BUYER: Checking NFT ownership before transfer...")
+    local ownership_check = Send({
+        Target = nft_contract,
+        Action = "Get-NFT",
+        TokenId = tostring(token_id)
+    })
+    print("🔄 TRANSFER_NFT_TO_BUYER: Ownership check sent, message_id: " .. tostring(ownership_check))
+
+    print("🔄 TRANSFER_NFT_TO_BUYER: Calling nft_transfer_proxy.transfer")
+    local nft_proxy = require("nft_transfer_proxy")
+    local result = nft_proxy.transfer({
+        from = ao.id,
+        to = buyer_address,
+        nft_contract = nft_contract,
+        token_id = token_id,
+        escrow_id = context.EscrowId
+    })
+
+    print("✅ TRANSFER_NFT_TO_BUYER: NFT transfer proxy called, result: " .. tostring(result and result.success))
+    print("✅ TRANSFER_NFT_TO_BUYER: Transfer message sent to NFT contract: " .. tostring(nft_contract))
+    print("✅ TRANSFER_NFT_TO_BUYER: Transfer target buyer: " .. tostring(buyer_address))
+
+    -- Immediately trigger NftTransferredToBuyer event since transfer was initiated
+    -- This avoids waiting for async Debit-Notice confirmation
+    if result and result.success then
+        print("🔄 TRANSFER_NFT_TO_BUYER: Immediately triggering NftTransferredToBuyer event")
+        trigger_waiting_saga_event("NftTransferredToBuyer", context.EscrowId, {
+            escrowId = context.EscrowId,
+            buyerAddress = buyer_address,
+            tokenId = token_id,
+            nftContract = nft_contract,
+            timestamp = os.time()
+        })
+    else
+        print("❌ TRANSFER_NFT_TO_BUYER: Transfer proxy failed, not triggering event")
+    end
+
+    -- Commit placeholder
+    return result, function() end
+end
+
+function nft_escrow_service_local.transfer_funds_to_seller(context)
+    print("🔄 TRANSFER_FUNDS_TO_SELLER: Starting funds transfer to seller")
+
+    local escrow_record = NftEscrowTable[context.EscrowId]
+    local payment_id = escrow_record and (escrow_record.payment_id or escrow_record.PaymentId)
+    print("🔄 TRANSFER_FUNDS_TO_SELLER: EscrowId=" .. tostring(context.EscrowId) .. ", PaymentId=" .. tostring(payment_id))
+
+    if not escrow_record or not payment_id then
+        print("❌ TRANSFER_FUNDS_TO_SELLER: Error - Escrow record not found or payment not linked")
         error("Escrow record not found or payment not linked")
     end
 
-    local escrow_payment = EscrowPaymentTable[escrow_record.PaymentId]
+    local escrow_payment = EscrowPaymentTable[payment_id]
     if not escrow_payment then
+        print("❌ TRANSFER_FUNDS_TO_SELLER: Error - Payment record not found")
         error("Payment record not found")
     end
 
-    -- Call token transfer proxy (simplified implementation)
+    local seller_address = context.SellerAddress or context.seller_address
+        or (escrow_record and (escrow_record.seller_address or escrow_record.SellerAddress))
+    local token_contract = escrow_payment.token_contract or escrow_payment.TokenContract
+    local amount = escrow_payment.amount or escrow_payment.Amount
+
+    print("🔄 TRANSFER_FUNDS_TO_SELLER: Seller=" .. tostring(seller_address) .. ", TokenContract=" .. tostring(token_contract) .. ", Amount=" .. tostring(amount))
+
+    if not seller_address then
+        print("❌ TRANSFER_FUNDS_TO_SELLER: Error - Seller address missing")
+        error("Seller address missing")
+    end
+
+    print("🔄 TRANSFER_FUNDS_TO_SELLER: Calling token_transfer_proxy")
     local token_proxy = require("token_transfer_proxy")
     local result = token_proxy.transfer({
-        token_contract = escrow_payment.TokenContract,
-        recipient = context.SellerAddress,
-        amount = escrow_payment.Amount
+        token_contract = token_contract,
+        recipient = seller_address,
+        amount = amount,
+        escrow_id = context.EscrowId
     })
 
-    -- Return result and commit function
-    return result, function()
-        -- Message sent, waiting for external confirmation
+    print("✅ TRANSFER_FUNDS_TO_SELLER: Token transfer proxy called, result: " .. tostring(result and result.success))
+
+    -- Immediately trigger FundsTransferredToSeller event since transfer was initiated
+    -- This avoids waiting for async Debit-Notice confirmation
+    if result and result.success then
+        print("🔄 TRANSFER_FUNDS_TO_SELLER: Immediately triggering FundsTransferredToSeller event")
+        trigger_waiting_saga_event("FundsTransferredToSeller", context.EscrowId, {
+            escrowId = context.EscrowId,
+            sellerAddress = seller_address,
+            amount = amount,
+            tokenContract = token_contract,
+            timestamp = os.time(),
+            msg = {From = token_contract, Action = "Debit-Notice"} -- Simulate Debit-Notice
+        })
     end
+
+    return result, function() end
 end
 
 -- Callback function for NFT deposit success (similar to inventory_service callbacks)
@@ -78,82 +183,133 @@ end
 
 -- UseEscrowPayment method implementation
 function nft_escrow_service_local.create_nft_escrow_record(context)
-    -- Generate escrow ID (simplified - in real implementation might use proper ID generation)
-    local escrow_id = tostring(math.random(1000000, 9999999)) -- Simplified ID generation
+    local nft_escrow_aggregate = require("nft_escrow_aggregate")
 
-    -- Create escrow record
-    local escrow_record = {
-        EscrowId = escrow_id,
-        SellerAddress = context.SellerAddress,
-        NftContract = context.NftContract,
-        TokenId = context.TokenId,
-        TokenContract = context.TokenContract,
-        Price = context.Price,
-        EscrowTerms = context.EscrowTerms,
-        CreatedAt = context.Timestamp,
-        -- BuyerAddress will be set later when payment is applied
-        -- PaymentId will be set later when payment is applied
+    -- Normalize incoming context fields
+    local cmd = {
+        SellerAddress = context.SellerAddress or context.seller_address,
+        BuyerAddress = nil,
+        NftContract = context.NftContract or context.nft_contract,
+        TokenId = context.TokenId or context.token_id,
+        TokenContract = context.TokenContract or context.token_contract,
+        Price = context.Price or context.price,
+        PaymentId = nil,
+        EscrowTerms = context.EscrowTerms or context.escrow_terms
     }
 
-    -- Store the escrow record
-    NftEscrowTable[escrow_id] = escrow_record
+    local event, commit_fn = nft_escrow_aggregate.create(cmd, context, {})
+    context.EscrowId = event.escrow_id
 
-    -- Return result and commit function
-    local result = { EscrowId = escrow_id }
-
+    local result = { EscrowId = event.escrow_id }
     local commit = function()
-        -- Record is already stored above
-        -- Additional commit logic can be added here if needed
+        commit_fn()
+        -- Mark initial status for easier diagnostics
+        local record = NftEscrowTable[event.escrow_id]
+        if record then
+            record.status = record.status or "PENDING"
+            NftEscrowTable[event.escrow_id] = record
+        end
     end
 
     return result, commit
 end
 
 function nft_escrow_service_local.use_escrow_payment(context)
+    print("🔗 USE_ESCROW_PAYMENT: Starting with EscrowId=" .. tostring(context.EscrowId) .. ", PaymentId=" .. tostring(context.PaymentId))
+
     local escrow_id = context.EscrowId
     local payment_id = context.PaymentId
 
-    -- Get records (simplified - in real implementation would use proper error handling)
     local escrow_payment = EscrowPaymentTable[payment_id]
-    if not escrow_payment or escrow_payment.Status ~= "AVAILABLE" then
-        error("Invalid payment record")
+    local payment_status = escrow_payment and (escrow_payment.status or escrow_payment.Status)
+    print("🔗 USE_ESCROW_PAYMENT: Payment status check - exists: " .. tostring(escrow_payment ~= nil) .. ", status: " .. tostring(payment_status))
+    if not escrow_payment or payment_status ~= "AVAILABLE" then
+        print("❌ USE_ESCROW_PAYMENT: Invalid or unavailable payment record")
+        error("Invalid or unavailable payment record")
     end
 
     local escrow_record = NftEscrowTable[escrow_id]
+    print("🔗 USE_ESCROW_PAYMENT: Escrow record check - exists: " .. tostring(escrow_record ~= nil))
     if not escrow_record then
+        print("❌ USE_ESCROW_PAYMENT: Escrow record not found")
         error("Escrow record not found")
     end
 
-    -- Match payment with escrow conditions
-    if escrow_payment.TokenContract ~= escrow_record.TokenContract or
-        escrow_payment.Amount ~= escrow_record.Price then
+    local payment_token = escrow_payment.token_contract or escrow_payment.TokenContract
+    local payment_amount = escrow_payment.amount or escrow_payment.Amount
+    local escrow_token = escrow_record.token_contract or escrow_record.TokenContract
+    local escrow_price = escrow_record.price or escrow_record.Price
+
+    print("🔗 USE_ESCROW_PAYMENT: Token/Amount validation:")
+    print("  Payment token: " .. tostring(payment_token))
+    print("  Escrow token: " .. tostring(escrow_token))
+    print("  Payment amount: " .. tostring(payment_amount))
+    print("  Escrow price: " .. tostring(escrow_price))
+    print("  Token match: " .. tostring(payment_token == escrow_token))
+    print("  Amount match: " .. tostring(tostring(payment_amount) == tostring(escrow_price)))
+
+    if payment_token ~= escrow_token or tostring(payment_amount) ~= tostring(escrow_price) then
+        print("❌ USE_ESCROW_PAYMENT: Payment does not match escrow conditions")
         error("Payment does not match escrow conditions")
     end
 
-    -- Update records
-    escrow_record.BuyerAddress = escrow_payment.PayerAddress
-    escrow_record.PaymentId = payment_id
-    NftEscrowTable[escrow_id] = escrow_record
+    local buyer_address = escrow_payment.payer_address or escrow_payment.PayerAddress
+    context.BuyerAddress = buyer_address
+    print("🔗 USE_ESCROW_PAYMENT: Buyer address set to: " .. tostring(buyer_address))
 
-    escrow_payment.Status = "USED"
-    escrow_payment.UsedByEscrowId = escrow_id
-    EscrowPaymentTable[payment_id] = escrow_payment
+    local nft_escrow_aggregate = require("nft_escrow_aggregate")
+    local escrow_payment_aggregate = require("escrow_payment_aggregate")
 
-    -- Return success result and commit function
+    print("🔗 USE_ESCROW_PAYMENT: About to call link_payment")
+    local success, result_or_error = pcall(function()
+        return nft_escrow_aggregate.link_payment(
+            escrow_id,
+            buyer_address,
+            payment_id,
+            context,
+            {}
+        )
+    end)
+
+    if not success then
+        print("❌ USE_ESCROW_PAYMENT: link_payment pcall failed with error: " .. tostring(result_or_error))
+        error("link_payment failed: " .. tostring(result_or_error))
+    end
+
+    print("🔗 USE_ESCROW_PAYMENT: link_payment pcall succeeded")
+    local escrow_event, escrow_commit = result_or_error[1], result_or_error[2]
+    print("🔗 USE_ESCROW_PAYMENT: link_payment returned event with buyer_address=" .. tostring(escrow_event and escrow_event.buyer_address))
+
+    local payment_event, payment_commit = escrow_payment_aggregate.mark_as_used(
+        payment_id,
+        escrow_id,
+        context,
+        {}
+    )
+
     local result = {
         escrowId = escrow_id,
-        buyerAddress = escrow_payment.PayerAddress,
+        buyerAddress = buyer_address,
         paymentId = payment_id
     }
 
     local commit = function()
-        -- Records are already updated above
-        -- Trigger event (simplified)
-        local saga_id = escrow_id
-        saga.trigger_local_event(saga_id, "EscrowPaymentUsed", {
+        print("🔗 USE_ESCROW_PAYMENT: Executing commit - calling escrow_commit()")
+        escrow_commit()
+        print("🔗 USE_ESCROW_PAYMENT: escrow_commit() completed")
+
+        payment_commit()
+        print("🔗 USE_ESCROW_PAYMENT: payment_commit() completed")
+
+        -- Check if NftEscrow was updated correctly
+        local updated_escrow = NftEscrowTable[escrow_id]
+        print("🔗 USE_ESCROW_PAYMENT: NftEscrow buyer_address after commit: " .. tostring(updated_escrow and updated_escrow.buyer_address))
+
+        trigger_waiting_saga_event("EscrowPaymentUsed", escrow_id, {
             escrowId = escrow_id,
-            buyerAddress = escrow_payment.PayerAddress
+            buyerAddress = buyer_address,
         })
+        print("🔗 USE_ESCROW_PAYMENT: EscrowPaymentUsed event triggered")
     end
 
     return result, commit
@@ -164,7 +320,8 @@ function nft_escrow_service_local.return_nft_to_seller(context)
     -- Compensation: Return NFT to seller when escrow fails after NFT deposit
     -- Get escrow record to find seller address
     local escrow_record = NftEscrowTable[context.EscrowId]
-    if not escrow_record or not escrow_record.SellerAddress then
+    local seller_address = escrow_record and (escrow_record.seller_address or escrow_record.SellerAddress)
+    if not escrow_record or not seller_address then
         error("Escrow record not found or seller address not set")
     end
 
@@ -172,9 +329,9 @@ function nft_escrow_service_local.return_nft_to_seller(context)
     local nft_proxy = require("nft_transfer_proxy")
     local result = nft_proxy.transfer({
         from = ao.id,
-        to = escrow_record.SellerAddress,
-        nft_contract = context.NftContract,
-        token_id = context.TokenId
+        to = seller_address,
+        nft_contract = context.NftContract or context.nft_contract or escrow_record.nft_contract,
+        token_id = context.TokenId or context.token_id or escrow_record.token_id
     })
 
     -- Return result and commit function
@@ -187,29 +344,30 @@ function nft_escrow_service_local.unlock_escrow_payment(context)
     -- Compensation: Unlock escrow payment when escrow fails after payment is applied
     -- Get escrow record to find PaymentId
     local escrow_record = NftEscrowTable[context.EscrowId]
-    if not escrow_record or not escrow_record.PaymentId then
+    local payment_id = escrow_record and (escrow_record.payment_id or escrow_record.PaymentId)
+    if not escrow_record or not payment_id then
         error("Escrow record not found or payment not linked")
     end
 
     -- Get payment record and unlock it
-    local escrow_payment = EscrowPaymentTable[escrow_record.PaymentId]
+    local escrow_payment = EscrowPaymentTable[payment_id]
     if not escrow_payment then
         error("Payment record not found")
     end
 
     -- Reset payment status to AVAILABLE and clear escrow link
-    escrow_payment.Status = "AVAILABLE"
-    escrow_payment.UsedByEscrowId = nil
-    EscrowPaymentTable[escrow_record.PaymentId] = escrow_payment
+    escrow_payment.status = "AVAILABLE"
+    escrow_payment.used_by_escrow_id = nil
+    EscrowPaymentTable[payment_id] = escrow_payment
 
     -- Also clear payment link from escrow record
-    escrow_record.PaymentId = nil
-    escrow_record.BuyerAddress = nil
+    escrow_record.payment_id = nil
+    escrow_record.buyer_address = nil
     NftEscrowTable[context.EscrowId] = escrow_record
 
     -- Return result and commit function
     local result = {
-        paymentId = escrow_record.PaymentId,
+        paymentId = payment_id,
         escrowId = context.EscrowId
     }
 

@@ -7,3 +7,5 @@ ao-cli-non-repl/node_modules
 .gemini-memory.md
 ao-cli-non-repl/tests/_temp_.txt
 ao-cli-non-repl/tests/_temp_.md
+ao-cli-non-repl/tests/tmp_*.sh
+node_modules
