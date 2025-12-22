@@ -401,4 +401,93 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_funds_transf
     complete_saga_instance_respond_original_requester(saga_instance, completed_result, context)
 end
 
-return nft_escrow_service
+-- Register handlers for service methods
+Handlers.add(
+    "NftEscrowService_ExecuteNftEscrowTransaction",
+    Handlers.utils.hasMatchingTag("Action", "NftEscrowService_ExecuteNftEscrowTransaction"),
+    function(msg, env, response)
+        print("DEBUG: NftEscrowService_ExecuteNftEscrowTransaction handler called")
+        nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
+        print("DEBUG: execute_nft_escrow_transaction completed")
+    end
+)
+
+Handlers.add(
+    "NftEscrowService_UseEscrowPayment",
+    Handlers.utils.hasMatchingTag("Action", "NftEscrowService_UseEscrowPayment"),
+    function(msg, env, response)
+        print("DEBUG: NftEscrowService_UseEscrowPayment handler called with From: " .. tostring(msg.From))
+        nft_escrow_service.use_escrow_payment(msg, env, response)
+    end
+)
+
+-- Register functions globally for direct calling (no return, just set globals)
+execute_nft_escrow_transaction = nft_escrow_service.execute_nft_escrow_transaction
+use_escrow_payment = nft_escrow_service.use_escrow_payment
+
+-- Register event listeners for external contract interactions
+Handlers.add(
+    "nft_transfer_listener",
+    function(msg)
+        return (msg.Action == "Debit-Notice") and (msg.TokenId or msg.Tokenid or (msg.Tags and (msg.Tags.TokenId or msg.Tags.Tokenid)))
+    end,
+    function(msg, env)
+        local token_id = msg.TokenId or msg.Tokenid or (msg.Tags and (msg.Tags.TokenId or msg.Tags.Tokenid))
+        local recipient = msg.Recipient or (msg.Tags and msg.Tags.Recipient) or "unknown"
+
+        -- Find escrow record that matches this token transfer
+        local matching_escrow_id = nil
+        local escrow_record = nil
+        for escrow_id, record in pairs(NftEscrowTable or {}) do
+            if (record.token_id == token_id or record.TokenId == token_id) and (record.status == "PAYMENT_LINKED" or record.status == "PENDING") then
+                matching_escrow_id = escrow_id
+                escrow_record = record
+                break
+            end
+        end
+
+        if matching_escrow_id and escrow_record then
+            -- 验证转移目标是否正确（应该是Buyer地址）
+            local expected_buyer = escrow_record.buyer_address or escrow_record.BuyerAddress
+            if expected_buyer and recipient == expected_buyer then
+                -- 触发NftTransferredToBuyer事件，让等待中的Saga继续
+                trigger_waiting_saga_event("NftTransferredToBuyer", {
+                    escrowId = matching_escrow_id,
+                    tokenId = token_id,
+                    buyer = recipient
+                })
+            end
+        end
+    end
+)
+
+Handlers.add(
+    "token_transfer_listener",
+    function(msg)
+        return (msg.Action == "Debit-Notice") and not (msg.TokenId or msg.Tokenid or (msg.Tags and (msg.Tags.TokenId or msg.Tags.Tokenid)))
+    end,
+    function(msg, env)
+        local recipient = msg.Recipient or (msg.Tags and msg.Tags.Recipient) or "unknown"
+        local quantity = msg.Quantity or (msg.Tags and msg.Tags.Quantity) or "0"
+
+        -- Find escrow record that matches this token transfer
+        -- The recipient should be the seller, and quantity should match the escrow price
+        local matching_escrow_id = nil
+        for escrow_id, escrow_record in pairs(NftEscrowTable or {}) do
+            if escrow_record.price == quantity and
+               (escrow_record.seller_address == recipient or escrow_record.SellerAddress == recipient) then
+                matching_escrow_id = escrow_id
+                break
+            end
+        end
+
+        if matching_escrow_id then
+            -- 触发FundsTransferredToSeller事件，让等待中的Saga继续
+            trigger_waiting_saga_event("FundsTransferredToSeller", {
+                escrowId = matching_escrow_id,
+                seller = recipient,
+                amount = quantity
+            })
+        end
+    end
+)

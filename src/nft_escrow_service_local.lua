@@ -35,6 +35,7 @@ function nft_escrow_service_local.transfer_nft_to_buyer(context)
     print("  - NftContract: " .. tostring(nft_contract))
     print("  - TokenId: " .. tostring(token_id))
     print("  - Current process: " .. tostring(ao.id))
+    print("  - TOKEN_PROCESS_ID should be: " .. tostring(context.TokenContract or "unknown"))
 
     -- Debug: Check if NFT is actually owned by this process
     if escrow_record then
@@ -78,20 +79,8 @@ function nft_escrow_service_local.transfer_nft_to_buyer(context)
     print("✅ TRANSFER_NFT_TO_BUYER: Transfer message sent to NFT contract: " .. tostring(nft_contract))
     print("✅ TRANSFER_NFT_TO_BUYER: Transfer target buyer: " .. tostring(buyer_address))
 
-    -- Immediately trigger NftTransferredToBuyer event since transfer was initiated
-    -- This avoids waiting for async Debit-Notice confirmation
-    if result and result.success then
-        print("🔄 TRANSFER_NFT_TO_BUYER: Immediately triggering NftTransferredToBuyer event")
-        trigger_waiting_saga_event("NftTransferredToBuyer", context.EscrowId, {
-            escrowId = context.EscrowId,
-            buyerAddress = buyer_address,
-            tokenId = token_id,
-            nftContract = nft_contract,
-            timestamp = os.time()
-        })
-    else
-        print("❌ TRANSFER_NFT_TO_BUYER: Transfer proxy failed, not triggering event")
-    end
+    -- Wait for actual Debit-Notice from NFT contract instead of immediately triggering event
+    print("⏳ TRANSFER_NFT_TO_BUYER: Waiting for Debit-Notice from NFT contract to confirm transfer")
 
     -- Commit placeholder
     return result, function() end
@@ -138,19 +127,8 @@ function nft_escrow_service_local.transfer_funds_to_seller(context)
 
     print("✅ TRANSFER_FUNDS_TO_SELLER: Token transfer proxy called, result: " .. tostring(result and result.success))
 
-    -- Immediately trigger FundsTransferredToSeller event since transfer was initiated
-    -- This avoids waiting for async Debit-Notice confirmation
-    if result and result.success then
-        print("🔄 TRANSFER_FUNDS_TO_SELLER: Immediately triggering FundsTransferredToSeller event")
-        trigger_waiting_saga_event("FundsTransferredToSeller", context.EscrowId, {
-            escrowId = context.EscrowId,
-            sellerAddress = seller_address,
-            amount = amount,
-            tokenContract = token_contract,
-            timestamp = os.time(),
-            msg = {From = token_contract, Action = "Debit-Notice"} -- Simulate Debit-Notice
-        })
-    end
+    -- Wait for actual Debit-Notice from token contract instead of immediately triggering event
+    print("⏳ TRANSFER_FUNDS_TO_SELLER: Waiting for Debit-Notice from token contract to confirm transfer")
 
     return result, function() end
 end
@@ -203,10 +181,10 @@ function nft_escrow_service_local.create_nft_escrow_record(context)
     local result = { EscrowId = event.escrow_id }
     local commit = function()
         commit_fn()
-        -- Mark initial status for easier diagnostics
+        -- Mark status as payment linked
         local record = NftEscrowTable[event.escrow_id]
         if record then
-            record.status = record.status or "PENDING"
+            record.status = "PAYMENT_LINKED"
             NftEscrowTable[event.escrow_id] = record
         end
     end

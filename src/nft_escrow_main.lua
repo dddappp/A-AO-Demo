@@ -2,6 +2,7 @@ NftEscrowTable = NftEscrowTable or {}
 EscrowPaymentTable = EscrowPaymentTable or {}
 SagaInstances = SagaInstances or {}
 
+
 local function trigger_waiting_saga_event(event_type, event_data, matcher)
     matcher = matcher or function() return true end
     for saga_id, saga_instance in pairs(SagaInstances) do
@@ -28,7 +29,7 @@ Handlers.add(
         local payment_id = tostring(#EscrowPaymentTable + 1)
         EscrowPaymentTable[payment_id] = {
             id = payment_id,
-            payer = payer,
+            payer_address = payer,
             amount = amount,
             status = "CREATED",
             createdAt = msg.Timestamp or os.time()
@@ -48,85 +49,65 @@ Handlers.add(
         for escrow_id, escrow in pairs(NftEscrowTable) do
             if escrow.nftTokenId == token_id and escrow.status == "CREATED" then
                 escrow.status = "NFT_DEPOSITED"
-                trigger_waiting_saga_event("NftDeposited", {escrowId = escrow_id, tokenId = token_id, depositor = sender})
-                break
-            end
-        end
-    end
-)
 
-Handlers.add(
-    "NftEscrowService_ExecuteNftEscrowTransaction",
-    Handlers.utils.hasMatchingTag("Action", "NftEscrowService_ExecuteNftEscrowTransaction"),
-    function(msg, env)
-        local escrow_id = tostring(#NftEscrowTable + 1)
-        NftEscrowTable[escrow_id] = {
-            id = escrow_id,
-            nftTokenId = msg.Tags.NftTokenId or "1",
-            seller = msg.From,
-            buyerAddress = msg.Tags.BuyerAddress,
-            paymentAmount = msg.Tags.PaymentAmount or "100000000000000",
-            status = "CREATED",
-            createdAt = msg.Timestamp or os.time()
-        }
-        local saga_id = "saga_" .. escrow_id
-        SagaInstances[saga_id] = {
-            id = saga_id,
-            escrowId = escrow_id,
-            current_step = "WaitForNftDeposit",
-            completed = false,
-            context = {
-                EscrowId = escrow_id,
-                NftTokenId = msg.Tags.NftTokenId or "1",
-                BuyerAddress = msg.Tags.BuyerAddress,
-                PaymentAmount = msg.Tags.PaymentAmount or "100000000000000"
-            },
-            waiting_state = {
-                event_type = "NftDeposited",
-                context = {EscrowId = escrow_id},
-                continuation_handler = function(event_data, context)
-                    SagaInstances[saga_id].current_step = "WaitForPayment"
-                    SagaInstances[saga_id].waiting_state = {
+                -- 直接设置Saga等待支付状态（简化实现）
+                SagaInstances = SagaInstances or {}
+                local saga_id = "saga_" .. escrow_id
+                SagaInstances[saga_id] = {
+                    id = saga_id,
+                    escrowId = escrow_id,
+                    current_step = "WaitForPayment",
+                    completed = false,
+                    context = {
+                        EscrowId = escrow_id,
+                        NftContract = escrow.nftContract or escrow.nft_contract,
+                        TokenId = token_id,
+                        TokenContract = escrow.tokenContract or escrow.token_contract,
+                        Price = escrow.price,
+                        SellerAddress = sender
+                    },
+                    waiting_state = {
                         event_type = "EscrowPaymentUsed",
                         context = {EscrowId = escrow_id},
                         continuation_handler = function(event_data, context)
-                            SagaInstances[saga_id].completed = true
+                            -- 执行NFT转移
+                            local nft_proxy = require("nft_transfer_proxy")
+                            local result = nft_proxy.transfer({
+                                from = ao.id,
+                                to = event_data.buyerAddress,
+                                nft_contract = context.NftContract,
+                                token_id = context.TokenId,
+                                escrow_id = context.EscrowId
+                            })
+
+                            SagaInstances[saga_id].current_step = "WaitForNftTransferConfirmation"
+                            SagaInstances[saga_id].waiting_state = {
+                                event_type = "NftTransferredToBuyer",
+                                context = {EscrowId = context.EscrowId},
+                                continuation_handler = function(event_data, context)
+                                    -- 执行资金转移
+                                    local token_proxy = require("token_transfer_proxy")
+                                    local funds_result = token_proxy.transfer({
+                                        token_contract = context.TokenContract,
+                                        recipient = context.SellerAddress,
+                                        amount = context.Price,
+                                        escrow_id = context.EscrowId
+                                    })
+
+                                    SagaInstances[saga_id].completed = true
+                                    SagaInstances[saga_id].current_step = "COMPLETED"
+                                end
+                            }
                         end
                     }
-                end
-            }
-        }
-    end
-)
+                }
 
-Handlers.add(
-    "NftEscrowService_UseEscrowPayment",
-    Handlers.utils.hasMatchingTag("Action", "NftEscrowService_UseEscrowPayment"),
-    function(msg, env)
-        local escrow_id = msg.Tags.EscrowId
-        local payment_id = msg.Tags.PaymentId
-        local escrow = NftEscrowTable[escrow_id]
-        if escrow and escrow.status == "NFT_DEPOSITED" then
-            escrow.buyerAddress = msg.From
-            escrow.status = "PAYMENT_LINKED"
-            local payment = EscrowPaymentTable[payment_id]
-            if payment then
-                payment.status = "USED"
-                payment.usedForEscrow = escrow_id
+                break
             end
-            trigger_waiting_saga_event("EscrowPaymentUsed", {escrowId = escrow_id, paymentId = payment_id})
-        end
+            end
     end
 )
 
-Handlers.add(
-    "Info",
-    Handlers.utils.hasMatchingTag("Action", "Info"),
-    function(msg, env)
-        return {
-            NftEscrowTable = NftEscrowTable,
-            EscrowPaymentTable = EscrowPaymentTable,
-            SagaInstances = SagaInstances
-        }
-    end
-)
+
+
+
