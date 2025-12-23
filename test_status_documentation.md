@@ -1,24 +1,37 @@
 # AO NFT Escrow 测试状态文档
 
-**重要提示**：
-
-碰到问题，不要总是从头运行端到端测试脚本！完整脚本执行可能太耗时了。
-
-你可以在已成功的步骤上，自己“手动”调试/测试失败的步骤**以及之后的每个步骤**，直到所有步骤都通过为止。
-
-你应该注意按照单步调试的结果修改 shell 脚本。要思考：单步调试是如何成功的，那么按理说只要脚本代码按单步调试的逻辑来写，就应该也能成功执行。比如，如果单步调试时候做了等待、重试等操作，那么脚本也应该照着做。
-
-你应该在自信**一切已修改正确**之后，最后再重新运行一次完整的端到端脚本、并注意收集完整日志来做确认。
-
-
 ## 测试目标
-验证NFT Escrow系统的完整交易流程，包括：
+
+使用脚本 `ao-cli-non-repl/tests/run-nft-escrow-tests.sh` 验证NFT Escrow系统的完整交易流程，包括：
 - NFT铸造和转移
 - Token铸造和转移
 - Escrow合约的Credit-Notice监听机制
 - 完整交易的Saga编排
 
-重要参考：[docs/dddml-saga-async-waiting-enhancement-proposal.md](docs/dddml-saga-async-waiting-enhancement-proposal.md)的 `#### 核心洞察` 一节。
+---
+
+应用逻辑以及实现的重要参考：
+- [dddml/nft-escrow.yaml](dddml/nft-escrow.yaml)
+- [docs/dddml-saga-async-waiting-enhancement-proposal.md](docs/dddml-saga-async-waiting-enhancement-proposal.md)的 `#### 核心洞察` 一节。
+
+Saga 的实现代码：
+- Saga 的流程步骤，主要体现在 `src/nft_escrow_service.lua`。
+- 处理外部消息、触发内部事件，应该在 `src/nft_escrow_main.lua`。
+- `src/nft_escrow_service_local.lua` 应该是本地操作的业务逻辑。
+
+---
+
+**重要提示**：
+
+不要再做无谓的“Mock”测试！不要再做无谓的“Mock”测试！不要再做无谓的“Mock”测试！应该验证的 AO 机制都验证过了，足以支持 NFT Escrow 的完整交易流程的实现。从现在开始应该按照“生产标准”实现每个步骤！
+
+NOTE：先使用 LOCAL WAO 测试网络测试！WAO 网络已经启动，请直接测试。
+
+碰到问题，不要总是从头运行端到端测试脚本！完整脚本执行可能太耗时了。你可以在已成功的步骤上，自己“手动”调试/测试失败的步骤**以及之后的每个步骤**，直到所有步骤都通过为止。
+
+你应该注意按照单步调试的结果修改 shell 脚本。要思考：单步调试是如何成功的，那么按理说只要脚本代码按单步调试的逻辑来写，就应该也能成功执行。比如，如果单步调试时候做了等待、重试等操作，那么脚本也应该照着做。
+
+你应该在自信**一切已修改正确**之后，最后再重新运行一次完整的端到端脚本、并注意收集完整日志来做确认。
 
 ## 已确定的结论
 
