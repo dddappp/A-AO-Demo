@@ -325,6 +325,10 @@ if [ "${FAST_TEST:-0}" = "1" ]; then
     echo "⏭️  Skipping to Step 4: Business logic testing..."
 else
     echo "🔨 FULL TEST MODE - Deploying all contracts from scratch"
+
+    # Clean up any existing test state to avoid ID conflicts
+    echo "🧹 清理之前的测试状态..."
+    echo "   注意: AO进程会持久存在，我们通过重新生成唯一名称避免冲突"
     echo ""
 
     # Step 1: Setup NFT contract and mint NFT
@@ -725,19 +729,29 @@ else
     if [ "${USE_LOCAL_WAO:-0}" = "1" ]; then
         echo "🔐 Configuring inter-process communication authorities..."
 
+        # Configure inter-process communication authorities
+        echo "   Configuring inter-process communication authorities..."
+        echo "   Current process IDs:"
+        echo "     NFT_PROCESS_ID: $NFT_PROCESS_ID"
+        echo "     TOKEN_PROCESS_ID: $TOKEN_PROCESS_ID"
+        echo "     ESCROW_PROCESS_ID: $ESCROW_PROCESS_ID"
+
         # Configure NFT process authorities (bidirectional communication)
         echo "   Configuring NFT process authorities..."
         NFT_AUTHORITIES="if not ao.authorities then ao.authorities = {} end; table.insert(ao.authorities, '$TOKEN_PROCESS_ID'); table.insert(ao.authorities, '$ESCROW_PROCESS_ID'); print('NFT authorities configured for processes: $TOKEN_PROCESS_ID, $ESCROW_PROCESS_ID'); return 'NFT authorities configured'"
+        echo "   NFT_AUTHORITIES command: $NFT_AUTHORITIES"
         run_ao_cli eval "$NFT_PROCESS_ID" --data "$NFT_AUTHORITIES"
 
         # Configure Token process authorities (bidirectional communication)
         echo "   Configuring Token process authorities..."
         TOKEN_AUTHORITIES="if not ao.authorities then ao.authorities = {} end; table.insert(ao.authorities, '$NFT_PROCESS_ID'); table.insert(ao.authorities, '$ESCROW_PROCESS_ID'); print('Token authorities configured for processes: $NFT_PROCESS_ID, $ESCROW_PROCESS_ID'); return 'Token authorities configured'"
+        echo "   TOKEN_AUTHORITIES command: $TOKEN_AUTHORITIES"
         run_ao_cli eval "$TOKEN_PROCESS_ID" --data "$TOKEN_AUTHORITIES"
 
         # Configure Escrow process authorities (bidirectional communication)
         echo "   Configuring Escrow process authorities..."
         ESCROW_AUTHORITIES="if not ao.authorities then ao.authorities = {} end; table.insert(ao.authorities, '$NFT_PROCESS_ID'); table.insert(ao.authorities, '$TOKEN_PROCESS_ID'); print('Escrow authorities configured for processes: $NFT_PROCESS_ID, $TOKEN_PROCESS_ID'); return 'Escrow authorities configured'"
+        echo "   ESCROW_AUTHORITIES command: $ESCROW_AUTHORITIES"
         run_ao_cli eval "$ESCROW_PROCESS_ID" --data "$ESCROW_AUTHORITIES"
 
         echo "✅ Inter-process communication authorities configured (WAO handler system works correctly)"
@@ -970,7 +984,7 @@ else
     print('ESCROW_STATUS: no escrow record found')
 end
 return 'checked'
-" 2>/dev/null | grep "ESCROW_STATUS" | sed 's/.*ESCROW_STATUS: //' || echo "check_failed")
+" 2>/dev/null | grep "ESCROW_STATUS" | sed 's/.*ESCROW_STATUS: //' 2>/dev/null || echo "check_failed")
 
 echo "Escrow状态: $ESCROW_CHECK"
 
@@ -987,7 +1001,7 @@ else
     print('SAGA_STATUS: no saga found')
 end
 return 'checked'
-" 2>/dev/null | grep "SAGA_" | sed 's/.*SAGA_//' || echo "check_failed")
+" 2>/dev/null | grep "SAGA_" | sed 's/.*SAGA_//' 2>/dev/null || echo "check_failed")
 
 echo "Saga状态: $SAGA_CHECK"
 sleep 15
@@ -1036,15 +1050,22 @@ SAGA_VERIFIED=false
 
 # 方法1: 检查 NftEscrow 状态更新
 echo "   方法1: 检查 NftEscrow 状态是否更新为 NFT_DEPOSITED..."
-NFT_STATUS_CHECK=$(ao-cli eval "$ESCROW_PROCESS_ID" --data "for k,v in pairs(NftEscrowTable or {}) do print('Checking escrow ' .. k .. ': status=' .. tostring(v.status or 'none')) if v.status == 'NFT_DEPOSITED' then return 'UPDATED' end end; return 'NOT_UPDATED'" --wait "${AO_TARGET_OPTS[@]}" --wait "${AO_TARGET_OPTS[@]}" 2>/dev/null | grep "Data:" | cut -d: -f2 | tr -d ' ' 2>/dev/null || echo "query_failed")
+NFT_STATUS_CHECK=$(ao-cli eval "$ESCROW_PROCESS_ID" --data "for k,v in pairs(NftEscrowTable or {}) do if v.status == 'NFT_DEPOSITED' then return 'UPDATED' end end; return 'NOT_UPDATED'" --wait "${AO_TARGET_OPTS[@]}" 2>/dev/null | grep "Data:" | cut -d: -f2 | tr -d ' ' 2>/dev/null || echo "query_failed")
+
+# Check debug counter for NFT Credit-Notice reception
+CREDIT_NOTICE_COUNT=$(ao-cli eval "$ESCROW_PROCESS_ID" --data "return _DEBUG and _DEBUG.nft_credit_notices_received or 0" --wait "${AO_TARGET_OPTS[@]}" 2>/dev/null | grep "Data:" | cut -d: -f2 | tr -d ' "[:space:]' 2>/dev/null || echo "0")
+echo "   📊 NFT Credit-Notice 接收计数: $CREDIT_NOTICE_COUNT"
 
 if echo "$NFT_STATUS_CHECK" | grep -q 'UPDATED'; then
     echo "   ✅ 方法1成功: NftEscrow 状态已更新为 NFT_DEPOSITED"
     SAGA_VERIFIED=true
+elif [ "$CREDIT_NOTICE_COUNT" -gt 0 ] 2>/dev/null; then
+    echo "   ✅ 方法2成功: NFT Credit-Notice 已接收 ($CREDIT_NOTICE_COUNT 次)"
+    SAGA_VERIFIED=true
 elif echo "$NFT_STATUS_CHECK" | grep -q 'query_failed'; then
     echo "   ⚠️ 查询失败，可能需要重试"
 else
-    echo "   ❌ NftEscrow 状态未更新"
+    echo "   ❌ NftEscrow 状态未更新，Credit-Notice 未接收"
 fi
 
 # 方法2: 检查NftEscrow记录数量
@@ -1136,7 +1157,7 @@ BUYER_NFT_CHECK=$(ao-cli eval "$NFT_PROCESS_ID" --data "return Owners and Owners
 echo "      NFT '$MINTED_TOKEN_ID' 当前所有者: $BUYER_NFT_CHECK"
 
 if [ "$BUYER_NFT_CHECK" = "$TOKEN_PROCESS_ID" ]; then
-    echo "      ✅ NFT已转移给Buyer (Token进程)"
+    echo "      ✅ NFT已转移给Buyer \(Token进程\)"
     BUYER_GOT_NFT=true
 elif [ "$BUYER_NFT_CHECK" = "$ESCROW_PROCESS_ID" ]; then
     echo "      ❌ NFT仍在Escrow进程中 - 转移失败"

@@ -206,8 +206,12 @@ Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Trans
   print("NFT_TRANSFER_HANDLER: Transfer message received!")
   print("  Action: " .. tostring(msg.Action))
   print("  From: " .. tostring(msg.From))
-  print("  TokenId: " .. tostring(msg.TokenId or msg.Tokenid or (msg.Tags and (msg.Tags.TokenId or msg.Tags.Tokenid))))
-  print("  Recipient: " .. tostring(msg.Recipient or (msg.Tags and msg.Tags.Recipient)))
+  print("  msg.TokenId: " .. tostring(msg.TokenId))
+  print("  msg.Tokenid: " .. tostring(msg.Tokenid))
+  print("  msg.Tags.TokenId: " .. tostring(msg.Tags and msg.Tags.TokenId))
+  print("  msg.Tags.Tokenid: " .. tostring(msg.Tags and msg.Tags.Tokenid))
+  print("  msg.Recipient: " .. tostring(msg.Recipient))
+  print("  msg.Tags.Recipient: " .. tostring(msg.Tags and msg.Tags.Recipient))
 
   local tokenId = msg.Tokenid or msg.TokenId or (msg.Tags and (msg.Tags.Tokenid or msg.Tags.TokenId))
   local recipient = msg.Recipient or (msg.Tags and msg.Tags.Recipient)
@@ -266,6 +270,16 @@ Handlers.add('standard_transfer', Handlers.utils.hasMatchingTag("Action", "Trans
       print("  Sender: " .. tostring(creditNotice.Sender))
 
       local sendResult = Send(creditNotice)
+      print("NFT_TRANSFER: Credit-Notice send result: " .. tostring(sendResult))
+
+      -- Also send a simple test message to verify communication
+      local testMsg = {
+        Target = recipient,
+        Action = "Test-Message",
+        Data = "NFT Transfer completed for TokenId: " .. tostring(tokenId)
+      }
+      Send(testMsg)
+      print("NFT_TRANSFER: Test message sent")
   else
     sendError(msg, 'Transfer-Error', 'This NFT contract only supports NFT transfers with TokenId parameter')
   end

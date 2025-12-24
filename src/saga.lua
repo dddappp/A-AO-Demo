@@ -39,7 +39,22 @@ function saga.contains_saga_instance(saga_id)
 end
 
 function saga.create_saga_instance(saga_type, target, tags, context, original_message, local_steps)
-    local saga_id = next_saga_id()
+    -- Generate unique saga ID, avoiding conflicts
+    local saga_id
+    local current = tonumber(saga_id_sequence.current) or 0
+    local attempts = 0
+    repeat
+        current = current + 1
+        saga_id = tostring(current)
+        attempts = attempts + 1
+        -- Safety check to prevent infinite loop (though very unlikely)
+        if attempts > 1000 then
+            error("Failed to generate unique saga ID after 1000 attempts")
+        end
+    until not entity_coll.contains(saga_instances, saga_id)
+
+    -- Update the global sequence to reflect the used ID
+    saga_id_sequence.current = saga_id
     local saga_instance = {
         saga_id = saga_id,
         saga_type = saga_type,

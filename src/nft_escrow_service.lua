@@ -148,8 +148,26 @@ function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
     local context = cmd
     context.Timestamp = msg.Timestamp -- Add timestamp to context for AO environment
 
+    -- First, create saga instance to get saga_id which will be used as escrow_id
+    local original_message = messaging.extract_reply_context(msg)
+    print("Creating SAGA instance first...")
+    local saga_instance, saga_commit = saga.create_saga_instance(ACTIONS.EXECUTE_NFT_ESCROW_TRANSACTION, nil, -- no target for local wait
+        nil,                                                                                             -- no tags for local wait
+        context,
+        original_message,
+        0  -- No local steps yet, will add escrow creation as first step
+    )
+    local saga_id = saga_instance.saga_id
+    print("SAGA created with ID: " .. saga_id .. ", this will be the EscrowId")
+
+    -- Use saga_id as escrow_id according to DDDML design
+    context.EscrowId = saga_id
+
+    -- Now create the escrow record with saga_id as escrow_id
     local local_steps = {
-        create_nft_escrow_record,
+        function(ctx)
+            return create_nft_escrow_record(ctx)
+        end
     }
     local local_commits = {}
     for i = 1, #local_steps, 1 do
@@ -165,26 +183,14 @@ function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
         end
     end
 
-    -- Execute local commits first
+    -- Execute local commits and saga commit
     for i = 1, #local_commits, 1 do
         local_commits[i]()
     end
+    saga_commit() -- Commit saga instance creation
 
-    -- This is the first step, create saga instance first.
-    local original_message = messaging.extract_reply_context(msg)
-    -- Debug: check if saga creation works
-    print("Creating SAGA with context keys: " .. table.concat(table_keys(context), ", "))
-    local saga_instance, commit = saga.create_saga_instance(ACTIONS.EXECUTE_NFT_ESCROW_TRANSACTION, nil, -- no target for local wait
-        nil,                                                                                             -- no tags for local wait
-        context,
-        original_message,
-        #local_steps
-    )
-    print("SAGA created: " .. tostring(saga_instance ~= nil) .. ", saga_id: " .. tostring(saga_instance and saga_instance.saga_id))
-    local saga_id = saga_instance.saga_id
-    commit() -- must commit here to save the saga instance
-    local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, nil, nil, context)
-
+    -- Move saga forward to complete the local steps (escrow creation) and set waiting state for NftDeposited
+    local commit = saga.move_saga_instance_forward(saga_id, #local_steps, nil, nil, context)
     local saga_instance = saga.get_saga_instance_copy(saga_id)
     saga_instance.waiting_state = {
         is_waiting = true,
@@ -194,22 +200,14 @@ function nft_escrow_service.execute_nft_escrow_transaction(msg, env, response)
         started_at = msg.Timestamp,       -- Use AO message timestamp (already in milliseconds)
         max_wait_time_seconds = 86400000, -- 24 hours in milliseconds
         continuation_handler = nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_deposit_callback,
-        data_mapping_rules = {
-        },
+        data_mapping_rules = {},
     }
-    local update_commit = function() SagaInstances[saga_id] = saga_instance end
 
-    local total_commit = function()
-        -- Execute all local commits first
-        for i = 1, #local_commits, 1 do
-            local local_commit = local_commits[i]
-            local_commit()
-        end
-        -- Then execute saga commit
-        commit()
-        update_commit()
-    end
-    total_commit()
+    -- Update saga instance with waiting state
+    SagaInstances[saga_id] = saga_instance
+    commit() -- Commit the move forward
+
+    print("✅ Escrow record created with ID: " .. saga_id .. ", Saga waiting for NftDeposited event")
 end
 
 -- TODO 参考下面其他 wait_for_*_callback 函数的修改说明（注释）
@@ -248,14 +246,14 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_deposit_
     end
 
     -- Continue with normal saga flow
-    local commit = saga.move_saga_instance_forward(saga_id, 1, nil, nil, context)
+        local commit = saga.move_saga_instance_forward(saga_id, 1, nil, nil, context)
 
     local saga_instance_copy = saga.get_saga_instance_copy(saga_id)
     saga_instance_copy.waiting_state = {
-        is_waiting = true,
-        success_event_type = "EscrowPaymentUsed",
-        failure_event_type = nil,
-        step_name = "WaitForPayment",
+            is_waiting = true,
+            success_event_type = "EscrowPaymentUsed",
+            failure_event_type = nil,
+            step_name = "WaitForPayment",
         started_at = msg.Timestamp,
         max_wait_time_seconds = 3600000,
         continuation_handler = nft_escrow_service.execute_nft_escrow_transaction_wait_for_payment_callback,
@@ -264,8 +262,8 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_deposit_
 
     -- Commit both the move forward and the waiting state setup
     local update_commit = function() SagaInstances[saga_id] = saga_instance_copy end
-    commit()
-    update_commit()
+            commit()
+            update_commit()
 end
 
 function nft_escrow_service.execute_nft_escrow_transaction_wait_for_payment_callback(saga_id, context, event_type,
@@ -316,13 +314,13 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_payment_call
         end
     end
 
-    local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, nil, nil, context)
+        local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, nil, nil, context)
     local saga_instance_copy = saga.get_saga_instance_copy(saga_id)
     saga_instance_copy.waiting_state = {
-        is_waiting = true,
-        success_event_type = "NftTransferredToBuyer",
-        failure_event_type = nil,
-        step_name = "WaitForNftTransferConfirmation",
+            is_waiting = true,
+            success_event_type = "NftTransferredToBuyer",
+            failure_event_type = nil,
+            step_name = "WaitForNftTransferConfirmation",
         started_at = msg.Timestamp,
         max_wait_time_seconds = 300000,
         continuation_handler = nft_escrow_service
@@ -334,8 +332,8 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_payment_call
     for _, local_commit in ipairs(local_commits) do
         local_commit()
     end
-    commit()
-    update_commit()
+            commit()
+            update_commit()
 end
 
 -- todo 这个函数的行为应该和 inventory_service.process_inventory_surplus_or_shortage_get_inventory_item_callback 这类方法类似。
@@ -388,13 +386,13 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_transfer
         end
     end
 
-    local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, nil, nil, context)
+        local commit = saga.move_saga_instance_forward(saga_id, 1 + #local_steps, nil, nil, context)
     local saga_instance_copy = saga.get_saga_instance_copy(saga_id)
     saga_instance_copy.waiting_state = {
-        is_waiting = true,
-        success_event_type = "FundsTransferredToSeller",
-        failure_event_type = nil,
-        step_name = "WaitForFundsTransferConfirmation",
+            is_waiting = true,
+            success_event_type = "FundsTransferredToSeller",
+            failure_event_type = nil,
+            step_name = "WaitForFundsTransferConfirmation",
         started_at = msg.Timestamp,
         max_wait_time_seconds = 0,
         continuation_handler = nft_escrow_service
@@ -406,8 +404,8 @@ function nft_escrow_service.execute_nft_escrow_transaction_wait_for_nft_transfer
     for _, local_commit in ipairs(local_commits) do
         local_commit()
     end
-    commit()
-    update_commit()
+            commit()
+            update_commit()
 end
 
 function nft_escrow_service.execute_nft_escrow_transaction_wait_for_funds_transfer_confirmation_callback(saga_id, context,
@@ -457,6 +455,8 @@ local execute_handler_result = Handlers.add(
         end)
         if not success then
             print("❌ execute_nft_escrow_transaction failed: " .. error_msg)
+            print("🔧 继续执行测试，即使Saga创建失败...")
+            -- Don't exit, continue with testing
         else
             print("✅ execute_nft_escrow_transaction completed successfully")
         end

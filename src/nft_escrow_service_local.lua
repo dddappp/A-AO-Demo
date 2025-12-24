@@ -161,32 +161,29 @@ end
 
 -- UseEscrowPayment method implementation
 function nft_escrow_service_local.create_nft_escrow_record(context)
-    local nft_escrow_aggregate = require("nft_escrow_aggregate")
+    -- Create escrow record using the provided EscrowId (which comes from saga_id)
+    NftEscrowTable = NftEscrowTable or {}
+    local escrow_id = context.EscrowId
 
-    -- Normalize incoming context fields
-    local cmd = {
-        SellerAddress = context.SellerAddress or context.seller_address,
-        BuyerAddress = nil,
-        NftContract = context.NftContract or context.nft_contract,
-        TokenId = context.TokenId or context.token_id,
-        TokenContract = context.TokenContract or context.token_contract,
-        Price = context.Price or context.price,
-        PaymentId = nil,
-        EscrowTerms = context.EscrowTerms or context.escrow_terms
+    NftEscrowTable[escrow_id] = {
+        escrow_id = escrow_id,
+        seller_address = context.SellerAddress or context.seller_address,
+        buyer_address = nil,
+        nft_contract = context.NftContract or context.nft_contract,
+        token_id = context.TokenId or context.token_id,
+        token_contract = context.TokenContract or context.token_contract,
+        price = context.Price or context.price,
+        payment_id = nil,
+        escrow_terms = context.EscrowTerms or context.escrow_terms,
+        status = "PENDING",
+        created_at = context.Timestamp or os.time()
     }
 
-    local event, commit_fn = nft_escrow_aggregate.create(cmd, context, {})
-    context.EscrowId = event.escrow_id
+    print("✅ Created NftEscrow record with SagaId as EscrowId: " .. escrow_id)
 
-    local result = { EscrowId = event.escrow_id }
+    local result = { EscrowId = escrow_id }
     local commit = function()
-        commit_fn()
-        -- Mark status as payment linked
-        local record = NftEscrowTable[event.escrow_id]
-        if record then
-            record.status = "PAYMENT_LINKED"
-            NftEscrowTable[event.escrow_id] = record
-        end
+        -- Already committed above - record is directly added to table
     end
 
     return result, commit
@@ -286,6 +283,7 @@ function nft_escrow_service_local.use_escrow_payment(context)
         trigger_waiting_saga_event("EscrowPaymentUsed", escrow_id, {
             escrowId = escrow_id,
             buyerAddress = buyer_address,
+            msg = { Timestamp = os.time() * 1000 }  -- Provide timestamp since we don't have the original message
         })
         print("🔗 USE_ESCROW_PAYMENT: EscrowPaymentUsed event triggered")
     end
