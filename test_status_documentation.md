@@ -29,6 +29,8 @@ Saga 的实现代码：
 - **先使用 LOCAL WAO 测试网络测试**！WAO 网络已经启动，请直接测试。**不要在脚本中自己尝试启动 WAO 本地测试网络**。
 - LOCAL WAO 测试网络的消息处理机制**没有问题**。除了可能需要在接受消息的进程中设置 authorities，加入**发送消息**的进程ID或钱包地址，而在 AO Legacynet 中可能不需要这么做。
 - 执行 `ao-cli` 命令并使用 `--wait` 选项时，**只能**看到向 ao 网络“发送的第一条消息”的 outcome（其中包含该消息匹配的 handler 的 print 输出），但不能看到该消息之后的所有消息的 outcome。比如使用 `ao-cli` 执行 `eval Send()` 时，只能看到 `eval` 消息的 outcome，甚至**不能**看到 `Send()` 函数所发送的消息的 outcome。
+- 如果想要修改 [ao-legacy-token-blueprint.lua](ao-cli-non-repl/tests/ao-legacy-token-blueprint.lua) ，你需要非常谨慎！它们之前使用脚本 [run-legacy-token-tests.sh](ao-cli-non-repl/tests/run-legacy-token-tests.sh) 测试通过！
+- 如果想要修改 [ao-legacy-nft-blueprint.lua](ao-cli-non-repl/tests/ao-legacy-nft-blueprint.lua) ，你需要非常谨慎！它们之前使用脚本 [run-legacy-nft-tests.sh](ao-cli-non-repl/tests/run-legacy-nft-tests.sh) 测试通过！
 
 ---
 
@@ -326,6 +328,7 @@ Send({
 - **精简版本**: 408行, 13KB (减少55%)
 - **优化内容**: 移除注释和print语句，保留完整功能
 - **文件位置**: `ao-legacy-nft-blueprint-minimal.lua`
+- 该 Lua 代码文件通过脚本 `ao-cli-non-repl/tests/create_minimal_nft_blueprint.sh` 移除注释和print语句创建。
 
 **对NFT Escrow测试的影响**:
 - ✅ **可以正常使用handler机制**
