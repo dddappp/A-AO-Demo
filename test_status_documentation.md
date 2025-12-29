@@ -27,6 +27,7 @@ Saga 的实现代码：
 - 脚本**不应该**“编写”任何业务逻辑代码以推进 Saga 流程（“绕过”没有测试成功的步骤）；但是为了检测/调试 load 一些**只读**的 Lua 代码是可接受的。
 - 脚本不要硬编码进程ID或钱包地址，最少在“完整”执行模型下必须如此。
 - **先使用 LOCAL WAO 测试网络测试**！WAO 网络已经启动，请直接测试。**不要在脚本中自己尝试启动 WAO 本地测试网络**。
+- LOCAL WAO 测试网络的消息处理机制**没有问题**。除了可能需要在接受消息的进程中设置 authorities，加入**发送消息**的进程ID或钱包地址，而在 AO Legacynet 中可能不需要这么做。
 - 执行 `ao-cli` 命令并使用 `--wait` 选项时，**只能**看到向 ao 网络“发送的第一条消息”的 outcome（其中包含该消息匹配的 handler 的 print 输出），但不能看到该消息之后的所有消息的 outcome。比如使用 `ao-cli` 执行 `eval Send()` 时，只能看到 `eval` 消息的 outcome，甚至**不能**看到 `Send()` 函数所发送的消息的 outcome。
 
 ---
@@ -80,6 +81,75 @@ if payment_count_after > payment_count_before then
 end
 ```
 
+### LOCAL WAO 测试环境的消息通信机制正常
+
+测试记录如下：
+
+```
+ao-cli % pwd                          
+/Users/yangjiefeng/Documents/dddappp/ao-cli
+ao-cli % ./tests/test-wao-ping-pong.sh
+=== WAO 本地测试网络 Ping/Pong 验证脚本 ===
+WAO 基准端口: 4000
+网关: http://localhost:4000
+消息单元: http://localhost:4002
+计算单元: http://localhost:4004
+调度单元: http://localhost:4003
+
+✅ 钱包地址: HrhlqAg1Tz3VfrFPozfcb2MV8uGfYlOSYO4qraRqKl4
+🚀 开始 WAO Ping/Pong 测试...
+
+🔍 检查 WAO 服务状态...
+✅ Gateway (http://localhost:4000) - 运行中
+✅ MU (http://localhost:4002) - 运行中
+✅ CU (http://localhost:4004) - 运行中
+✅ SU (http://localhost:4003) - 运行中
+✅ 所有 WAO 服务运行正常
+
+=== 步骤 1: 创建 Ping 进程 ===
+✅ Ping 进程创建成功: m107oP-MSP3buYXdn1-Vcmt_N7_sh5g69rXhjUcDeP0
+📝 加载 Ping 进程代码...
+✅ Ping 进程代码加载成功
+🔐 配置 Ping 进程 authorities...
+✅ Ping 进程 authorities 配置成功
+
+=== 步骤 2: 创建 Pong 进程 ===
+✅ Pong 进程创建成功: wAZ5MPEXCOk5kczw3ozZt-Ra8UuHjPpb5R91PoIdXG4
+📝 加载 Pong 进程代码...
+✅ Pong 进程代码加载成功
+🔐 配置 Pong 进程 authorities...
+✅ Pong 进程 authorities 配置成功
+🔗 配置进程间信任关系...
+✅ 进程间信任关系配置完成
+
+=== 步骤 3: 执行 Ping/Pong 测试 ===
+🏓 发送第一个 Ping...
+✅ Ping 发送成功
+⏳ 等待 Pong 回复...
+📊 检查 Ping 进程状态...
+📊 检查 Pong 进程状态...
+
+📈 测试结果统计:
+   Ping 进程 (m107oP-MSP3buYXdn1-Vcmt_N7_sh5g69rXhjUcDeP0):
+     📤 发送的 Ping: 1
+     📥 收到的 Pong: 1
+   Pong 进程 (wAZ5MPEXCOk5kczw3ozZt-Ra8UuHjPpb5R91PoIdXG4):
+     📥 收到的 Ping: 1
+     📤 发送的 Pong: 1
+
+🎉 WAO Ping/Pong 测试成功！
+✅ 进程间通信正常工作
+✅ 消息传递和处理正常
+✅ Authorities 配置正确
+
+💡 测试验证了以下功能：
+   • WAO 本地网络进程间通信
+   • 动态配置 ao.authorities
+   • 消息发送和接收
+   • Handler 处理机制
+   • 跨进程状态同步
+ao-cli % 
+```
 
 ### 常用命令示例
 
