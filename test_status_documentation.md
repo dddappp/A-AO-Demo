@@ -27,6 +27,7 @@ Saga 的实现代码：
 - 脚本**不应该**“编写”任何业务逻辑代码以推进 Saga 流程（“绕过”没有测试成功的步骤）；但是为了检测/调试 load 一些**只读**的 Lua 代码是可接受的。
 - 脚本不要硬编码进程ID或钱包地址，最少在“完整”执行模型下必须如此。
 - **先使用 LOCAL WAO 测试网络测试**！WAO 网络已经启动，请直接测试。**不要在脚本中自己尝试启动 WAO 本地测试网络**。
+- 你**不知道**如何安装和启动 LOCAL WAO 网络！因为我没有告诉你正确的方式。所以你不要自作聪明（杀死和试图安装、配置和启动 LOCAL WAO 网络）！你只管使用它。（一般来说它已经启动。）
 - LOCAL WAO 测试网络的消息处理机制**没有问题**。除了可能需要在接受消息的进程中设置 authorities，加入**发送消息**的进程ID或钱包地址，而在 AO Legacynet 中可能不需要这么做。
 - 执行 `ao-cli` 命令并使用 `--wait` 选项时，**只能**看到向 ao 网络“发送的第一条消息”的 outcome（其中包含该消息匹配的 handler 的 print 输出），但不能看到该消息之后的所有消息的 outcome。比如使用 `ao-cli` 执行 `eval Send()` 时，只能看到 `eval` 消息的 outcome，甚至**不能**看到 `Send()` 函数所发送的消息的 outcome。
 - 如果想要修改 [ao-legacy-token-blueprint.lua](ao-cli-non-repl/tests/ao-legacy-token-blueprint.lua) ，你需要非常谨慎！它们之前使用脚本 [run-legacy-token-tests.sh](ao-cli-non-repl/tests/run-legacy-token-tests.sh) 测试通过！
