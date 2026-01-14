@@ -37,13 +37,28 @@
 
 ## 🏗️ 技术架构
 
+### 架构模式
+
+#### React SPA + Spring Boot 单体模式
+- **前端**: React SPA应用，编译为静态文件
+- **后端**: Spring Boot提供API和静态文件服务
+- **部署**: 前端静态文件集成到Spring Boot应用中
+- **优势**: 简单部署，统一管理，无跨域问题
+
 ### 核心技术栈
 - **Spring Boot 3.3.4** - 主框架（最新稳定版）
 - **Spring Security 6.1.13** - 安全框架（修复安全漏洞）
 - **Spring OAuth2 Client** - OAuth2客户端支持
 - **JWT (JJWT)** - Token处理
-- **Thymeleaf** - 模板引擎
 - **Maven** - 依赖管理
+
+### 前端技术栈
+- **React 18** - UI框架
+- **TypeScript** - 类型安全
+- **Vite** - 构建工具
+- **Tailwind CSS** - 样式框架
+- **Axios** - HTTP客户端
+- **React Router** - 路由管理
 
 ### 关键依赖
 ```xml
@@ -334,7 +349,8 @@ fetch('/api/validate-token', {
 ### 环境准备
 1. Java 17+
 2. Maven 3.6+
-3. Google Cloud Console OAuth2凭据
+3. Node.js 16+ (可选，用于React前端构建)
+4. Google Cloud Console OAuth2凭据
 
 ### Google Cloud Console配置详细步骤
 
@@ -356,6 +372,35 @@ fetch('/api/validate-token', {
    - 设置应用名称
    - 在"授权重定向 URI"中添加：`https://api.u2511175.nyat.app:55139/oauth2/callback`
    - 创建完成后，记录下 **Client ID** 和 **Client Secret**
+
+### 前端类型切换
+
+本项目支持两种前端实现：
+
+#### 1. Thymeleaf模式（默认）
+- **前端**: Spring Boot服务端渲染
+- **优势**: 无需额外构建，立即可用
+- **配置**: `app.frontend.type: thymeleaf`
+
+#### 2. React模式
+- **前端**: 完整的React SPA应用
+- **功能**: 支持登录、用户信息显示、Token验证
+- **路由**: 所有路径都由React Router处理
+- **优势**: 现代化前端，完全不依赖Thymeleaf
+- **配置**: `app.frontend.type: react`
+- **标识**: 页面顶部显示红色"🚀 当前使用：React 前端实现"标识
+
+**切换方法**:
+修改 `application.yml` 中的配置项：
+```yaml
+app:
+  frontend:
+    type: react  # 或 thymeleaf
+```
+
+**视觉标识**:
+- **Thymeleaf模式**: 绿色标识条显示"📄 当前使用：Thymeleaf 前端实现"
+- **React模式**: 红色标识条显示"🚀 当前使用：React 前端实现"
 
 ### 启动步骤
 
@@ -435,6 +480,49 @@ fetch('/api/validate-token', {
 3. **访问应用**
    - 本地访问: `http://localhost:8081`
    - 外部访问: `https://api.u2511175.nyat.app:55139`
+
+## 🚀 一键启动（推荐）
+
+使用内置脚本一键启动（包含前端构建）：
+
+```bash
+cd google-oauth2-demo
+./start-with-frontend.sh
+```
+
+脚本会自动：
+1. 构建React前端为静态文件
+2. 复制到Spring Boot静态资源目录
+3. 启动Spring Boot应用
+4. 在 `http://localhost:8081` 提供完整服务
+
+## 🔧 手动部署步骤
+
+### 前端构建
+```bash
+cd google-oauth2-demo
+./build-frontend.sh
+```
+
+### 启动应用
+```bash
+cd google-oauth2-demo
+./start.sh
+```
+
+## 📡 API接口文档
+
+#### 认证相关
+- `GET /api/user` - 获取当前用户信息
+- `POST /api/logout` - 用户登出
+- `POST /api/validate-google-token` - 验证Google Token
+- `POST /api/validate-github-token` - 验证GitHub Token
+- `POST /api/validate-twitter-token` - 验证Twitter Token
+
+#### OAuth2流程
+- `GET /oauth2/authorization/google` - Google登录
+- `GET /oauth2/authorization/github` - GitHub登录
+- `GET /oauth2/authorization/twitter` - Twitter登录
 
 ## 🎯 功能测试
 
@@ -841,4 +929,6 @@ headers.set("Authorization", "Bearer " + accessToken);
 ---
 
 **最后更新时间**: 2025-01-14
-**项目状态**: 支持Google、GitHub和Twitter三家OAuth2提供商，生产就绪
+**项目状态**: ✅ 支持Google、GitHub和Twitter三家OAuth2提供商
+               ✅ 双前端实现：Thymeleaf + React SPA
+               ✅ 完整功能测试通过，生产就绪

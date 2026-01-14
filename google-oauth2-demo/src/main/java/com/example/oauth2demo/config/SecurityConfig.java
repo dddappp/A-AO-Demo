@@ -31,6 +31,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -41,6 +42,9 @@ import java.util.Map;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    @Value("${app.frontend.type:thymeleaf}")
+    private String frontendType;
 
     @Bean
     public RestTemplate restTemplate() {
@@ -156,9 +160,10 @@ public class SecurityConfig {
              */
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringRequestMatchers("/api/logout", "/api/validate-google-token", "/api/validate-github-token", "/api/validate-twitter-token")
             )
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/", "/login/**", "/oauth2/**", "/css/**", "/js/**", "/images/**", "/static/**", "/error").permitAll()
+                .requestMatchers("/", "/login/**", "/oauth2/**", "/css/**", "/js/**", "/images/**", "/static/**", "/index.html", "/assets/**", "/favicon.ico", "/error", "/api/user").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
@@ -228,11 +233,11 @@ public class SecurityConfig {
         HttpEntity<?> entity = new HttpEntity<>(headers);
 
         // 调用Twitter API v2
-        ResponseEntity<Map> response = restTemplate().exchange(
+        ResponseEntity<Map<String, Object>> response = restTemplate().exchange(
             "https://api.x.com/2/users/me?user.fields=created_at,description,entities,id,location,name,pinned_tweet_id,profile_image_url,protected,public_metrics,url,username,verified,verified_type,withheld",
             HttpMethod.GET,
             entity,
-            Map.class
+            new ParameterizedTypeReference<Map<String, Object>>() {}
         );
 
         if (response.getBody() != null && response.getBody().containsKey("data")) {
@@ -318,6 +323,7 @@ public class SecurityConfig {
         return oauth2User;
     }
 
+
     // 创建OAuth2授权请求解析器 - 支持PKCE和强制账户选择
     @Bean
     public OAuth2AuthorizationRequestResolver authorizationRequestResolver(ClientRegistrationRepository clientRegistrationRepository) {
@@ -331,18 +337,5 @@ public class SecurityConfig {
         return resolver;
     }
 
-    private OAuth2User processTwitterUser(OAuth2User oauth2User) {
-        Map<String, Object> attributes = new HashMap<>(oauth2User.getAttributes());
-
-        // Twitter API v2 返回的用户信息字段映射
-        // Twitter的username是@开头的用户名，name是显示名称
-        // 我们需要确保字段名称与前端期望的一致
-
-        return new DefaultOAuth2User(
-            oauth2User.getAuthorities(),
-            attributes,
-            "username"  // Twitter的用户名字段是"username"
-        );
-    }
 
 }

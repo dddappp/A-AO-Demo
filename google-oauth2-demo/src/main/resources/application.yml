@@ -1,6 +1,10 @@
 server:
   port: 8081
 
+app:
+  frontend:
+    type: react  # 可选值: thymeleaf（传统模板）, react（现代SPA）
+
 spring:
   application:
     name: google-oauth2-demo
@@ -54,6 +58,13 @@ spring:
     cache: false
     prefix: classpath:/templates/
     suffix: .html
+
+  web:
+    resources:
+      static-locations: classpath:/static/, classpath:/public/, classpath:/resources/, classpath:/META-INF/resources/
+      cache:
+        period: 0  # 开发环境禁用缓存
+      # 静态资源服务配置会根据app.frontend.type动态决定
 
 logging:
   level:

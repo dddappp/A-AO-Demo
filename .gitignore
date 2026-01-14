@@ -9,3 +9,6 @@ ao-cli-non-repl/tests/_temp_.txt
 ao-cli-non-repl/tests/_temp_.md
 ao-cli-non-repl/tests/tmp_*.sh
 node_modules
+google-oauth2-demo/src/main/resources/static/assets/index-*.js
+google-oauth2-demo/src/main/resources/static/assets/index-*.css
+google-oauth2-demo/src/main/resources/static/index.html

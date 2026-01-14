@@ -4,6 +4,7 @@ import com.example.oauth2demo.service.JwtValidationService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -11,6 +12,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -21,47 +23,56 @@ import java.util.Map;
 @Controller
 public class AuthController {
 
+    @Value("${app.frontend.type:thymeleaf}")
+    private String frontendType;
+
+    /**
+     * 前端路由处理 - 将所有非API请求重定向到index.html
+     * 支持React Router的客户端路由（仅在React模式下启用）
+     */
+    @GetMapping(value = "/{path:[^\\.]*}")
+    public String forwardToIndex(@PathVariable String path) {
+        // 如果不是React模式，不启用前端路由
+        if (!"react".equals(frontendType)) {
+            return null;
+        }
+
+        // 如果是API请求、OAuth2请求或静态资源，让Spring Boot正常处理
+        if (path.startsWith("api") || path.startsWith("oauth2") || path.startsWith("static") ||
+            path.startsWith("css") || path.startsWith("js") || path.startsWith("images") ||
+            path.equals("favicon.ico") || path.matches(".*\\.(css|js|png|jpg|jpeg|gif|ico|svg)$")) {
+            return null; // 返回null让Spring Boot继续处理
+        }
+        // 其他所有请求都返回index.html，让React Router处理
+        return "forward:/index.html";
+    }
+
     @Autowired
     private JwtValidationService jwtValidationService;
 
     @GetMapping("/")
     public String home() {
+        // 在React模式下，让前端路由处理所有路径
+        if ("react".equals(frontendType)) {
+            return "forward:/index.html";
+        }
         return "home";
     }
 
     @GetMapping("/login")
     public String login() {
+        // 在React模式下，让前端路由处理所有路径
+        if ("react".equals(frontendType)) {
+            return "forward:/index.html";
+        }
         return "login";
     }
 
     @GetMapping("/test")
-    public String test(@AuthenticationPrincipal OAuth2User oauth2User, Model model) {
-        if (oauth2User != null) {
-            // 增强用户信息显示，支持多提供商
-            String provider = getProviderFromUser(oauth2User);
-            model.addAttribute("provider", provider);
-            model.addAttribute("userName", getUserName(oauth2User, provider));
-            model.addAttribute("userEmail", getUserEmail(oauth2User, provider));
-            model.addAttribute("userId", getUserId(oauth2User, provider));
-            model.addAttribute("userAvatar", getUserAvatar(oauth2User, provider));
-
-            // GitHub特定属性
-            if ("github".equals(provider)) {
-                model.addAttribute("userHtmlUrl", getUserHtmlUrl(oauth2User, provider));
-                model.addAttribute("userPublicRepos", getUserPublicRepos(oauth2User, provider));
-                model.addAttribute("userFollowers", getUserFollowers(oauth2User, provider));
-            }
-
-            // Twitter特定属性
-            if ("twitter".equals(provider)) {
-                model.addAttribute("userLocation", getUserLocation(oauth2User, provider));
-                model.addAttribute("userVerified", getUserVerified(oauth2User, provider));
-                model.addAttribute("userDescription", getUserDescription(oauth2User, provider));
-            }
-
-            model.addAttribute("isLoggedIn", true);
-        } else {
-            model.addAttribute("isLoggedIn", false);
+    public String test() {
+        // 在React模式下，让前端路由处理所有路径
+        if ("react".equals(frontendType)) {
+            return "forward:/index.html";
         }
         return "test";
     }
@@ -147,101 +158,7 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    // 新增：GitHub令牌验证端点
-    @PostMapping("/api/validate-github-token")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> validateGitHubToken(HttpServletRequest request) {
-        Map<String, Object> response = new HashMap<>();
 
-        try {
-            // 从Cookie中获取GitHub访问令牌（自动获取，不需要用户输入）
-            String accessToken = null;
-            if (request.getCookies() != null) {
-                for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
-                    if ("github_access_token".equals(cookie.getName())) {
-                        accessToken = cookie.getValue();
-                        break;
-                    }
-                }
-            }
-
-            if (accessToken == null || accessToken.trim().isEmpty()) {
-                response.put("success", false);
-                response.put("message", "未找到GitHub访问令牌，请重新登录");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            System.out.println("=== GitHub Token Validation Request ===");
-            System.out.println("Access Token found in cookie: " + accessToken.substring(0, Math.min(20, accessToken.length())) + "...");
-
-            // 验证GitHub访问令牌
-            Map<String, Object> validationResult = jwtValidationService.validateGitHubToken(accessToken);
-
-            response.put("success", true);
-            response.put("validation", validationResult);
-            response.put("message", "GitHub 访问令牌验证成功");
-
-            System.out.println("GitHub token validation successful");
-
-        } catch (Exception e) {
-            System.err.println("GitHub token validation failed: " + e.getMessage());
-            e.printStackTrace();
-
-            response.put("success", false);
-            response.put("message", "GitHub 访问令牌验证失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
-
-        return ResponseEntity.ok(response);
-    }
-
-    // 新增：Twitter令牌验证端点
-    @PostMapping("/api/validate-twitter-token")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> validateTwitterToken(HttpServletRequest request) {
-        Map<String, Object> response = new HashMap<>();
-
-        try {
-            // 从Cookie中获取Twitter访问令牌（自动获取，不需要用户输入）
-            String accessToken = null;
-            if (request.getCookies() != null) {
-                for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
-                    if ("twitter_access_token".equals(cookie.getName())) {
-                        accessToken = cookie.getValue();
-                        break;
-                    }
-                }
-            }
-
-            if (accessToken == null || accessToken.trim().isEmpty()) {
-                response.put("success", false);
-                response.put("message", "未找到Twitter访问令牌，请重新登录");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            System.out.println("=== Twitter Token Validation Request ===");
-            System.out.println("Access Token found in cookie: " + accessToken.substring(0, Math.min(20, accessToken.length())) + "...");
-
-            // 验证Twitter访问令牌
-            Map<String, Object> validationResult = jwtValidationService.validateTwitterToken(accessToken);
-
-            response.put("success", true);
-            response.put("validation", validationResult);
-            response.put("message", "Twitter 访问令牌验证成功");
-
-            System.out.println("Twitter token validation successful");
-
-        } catch (Exception e) {
-            System.err.println("Twitter token validation failed: " + e.getMessage());
-            e.printStackTrace();
-
-            response.put("success", false);
-            response.put("message", "Twitter 访问令牌验证失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
-
-        return ResponseEntity.ok(response);
-    }
 
     // 新增：从用户对象中提取提供商信息
     private String getProviderFromUser(OAuth2User user) {
