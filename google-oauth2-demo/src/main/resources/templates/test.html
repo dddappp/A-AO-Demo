@@ -167,12 +167,21 @@
                 <p><strong>公开仓库数：</strong><span th:text="${userPublicRepos}">未知</span></p>
                 <p><strong>粉丝数：</strong><span th:text="${userFollowers}">未知</span></p>
             </div>
+
+            <!-- Twitter特定信息 -->
+            <div th:if="${provider == 'twitter'}" class="github-info" style="border-left-color: #1da1f2;">
+                <p><strong>X主页：</strong><a th:href="'https://x.com/' + ${userId}" th:text="'@' + ${userId}" target="_blank">查看X</a></p>
+                <p><strong>位置：</strong><span th:text="${userLocation != null ? userLocation : '未设置'}">未知</span></p>
+                <p><strong>是否已验证：</strong><span th:text="${userVerified ? '是' : '否'}">未知</span></p>
+                <p><strong>个人简介：</strong><span th:text="${userDescription != null ? userDescription : '暂无简介'}">暂无简介</span></p>
+            </div>
         </div>
 
         <div class="actions">
             <!-- 根据提供商显示不同的验证按钮 -->
             <button id="validateBtn" th:if="${provider == 'google'}" class="button">验证 Google ID Token</button>
             <button id="validateGitHubBtn" th:if="${provider == 'github'}" class="button">验证 GitHub 访问令牌</button>
+            <button id="validateTwitterBtn" th:if="${provider == 'twitter'}" class="button">验证 Twitter 访问令牌</button>
             <a href="/logout" class="logout-link">登出</a>
         </div>
 
@@ -266,6 +275,66 @@
                     });
                 } else {
                     console.log('GitHub验证按钮不存在，可能用户不是通过GitHub登录的');
+                }
+
+                // 在DOM加载完成后重新检查Twitter按钮
+                console.log('延迟检查Twitter按钮...');
+                const twitterBtn = document.getElementById('validateTwitterBtn');
+                console.log('延迟检查 - Twitter按钮元素:', twitterBtn);
+                if (twitterBtn) {
+                    console.log('延迟绑定 - Twitter验证按钮已找到，添加事件监听器');
+                    twitterBtn.addEventListener('click', function() {
+                        console.log('Twitter验证按钮被点击 (延迟绑定)');
+                        const resultContainer = document.getElementById('resultContainer');
+                        const resultDiv = document.getElementById('result');
+
+                        // 显示加载状态
+                        resultContainer.style.display = 'block';
+                        resultDiv.className = 'result loading';
+                        resultDiv.textContent = '正在验证 Twitter 访问令牌...';
+
+                        // Twitter访问令牌现在自动存储在HttpOnly Cookie中
+                        // 后端会从cookie中安全获取令牌进行验证
+                        // 这样既安全又方便用户使用
+
+                        console.log('准备验证Twitter访问令牌（从cookie自动获取）');
+
+                        // 发送验证请求
+                        const headers = {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        };
+                        headers[getCsrfHeader()] = getCsrfToken();
+
+                        console.log('发送Twitter验证请求到 /api/validate-twitter-token (延迟绑定)');
+                        console.log('CSRF Header:', getCsrfHeader());
+                        console.log('CSRF Token:', getCsrfToken() ? '已设置' : '未设置');
+
+                        fetch('/api/validate-twitter-token', {
+                            method: 'POST',
+                            headers: headers
+                        })
+                        .then(response => {
+                            console.log('收到响应，状态码:', response.status);
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('响应数据:', data);
+                            if (data.success) {
+                                resultDiv.className = 'result success';
+                                resultDiv.textContent = '✅ Twitter验证成功!\n\n' + JSON.stringify(data.validation, null, 2);
+                            } else {
+                                resultDiv.className = 'result error';
+                                resultDiv.textContent = '❌ Twitter验证失败: ' + data.message;
+                            }
+                        })
+                        .catch(error => {
+                            resultDiv.className = 'result error';
+                            resultDiv.textContent = '❌ 请求失败: ' + error.message;
+                            console.error('Error:', error);
+                        });
+                    });
+                } else {
+                    console.log('Twitter验证按钮不存在，可能用户不是通过Twitter登录的');
                 }
             }, 100); // 短暂延迟确保Thymeleaf条件渲染完成
         });
@@ -363,6 +432,7 @@
                 console.error('Error:', error);
             });
         });
+
 
 
         // 提交手动验证

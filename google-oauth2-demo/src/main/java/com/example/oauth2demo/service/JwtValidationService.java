@@ -159,6 +159,81 @@ public class JwtValidationService {
         return result;
     }
 
+    // 新增：验证Twitter访问令牌的方法
+    public Map<String, Object> validateTwitterToken(String accessToken) throws Exception {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // 使用访问令牌调用Twitter用户信息API进行验证
+            String authorizationHeader = "Bearer " + accessToken;
+
+            // 创建HTTP请求头
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("Authorization", authorizationHeader);
+
+            org.springframework.http.HttpEntity<?> entity = new org.springframework.http.HttpEntity<>(headers);
+
+            // 调用Twitter API v2
+            org.springframework.http.ResponseEntity<Map> response = restTemplate.exchange(
+                "https://api.x.com/2/users/me?user.fields=created_at,description,entities,id,location,name,pinned_tweet_id,profile_image_url,protected,public_metrics,url,username,verified,verified_type,withheld",
+                org.springframework.http.HttpMethod.GET,
+                entity,
+                Map.class
+            );
+
+            if (response.getStatusCode() == org.springframework.http.HttpStatus.OK && response.getBody() != null) {
+                Map<String, Object> userData = response.getBody();
+                Map<String, Object> userInfo = (Map<String, Object>) userData.get("data");
+
+                if (userInfo != null) {
+                    result.put("valid", true);
+                    result.put("id", userInfo.get("id"));
+                    result.put("username", userInfo.get("username"));
+                    result.put("name", userInfo.get("name"));
+                    result.put("description", userInfo.get("description"));
+                    result.put("profile_image_url", userInfo.get("profile_image_url"));
+                    result.put("location", userInfo.get("location"));
+                    result.put("url", userInfo.get("url"));
+                    result.put("verified", userInfo.get("verified"));
+                    result.put("protected", userInfo.get("protected"));
+
+                    // 提取公开统计信息
+                    Map<String, Object> publicMetrics = (Map<String, Object>) userInfo.get("public_metrics");
+                    if (publicMetrics != null) {
+                        result.put("followers_count", publicMetrics.get("followers_count"));
+                        result.put("following_count", publicMetrics.get("following_count"));
+                        result.put("tweet_count", publicMetrics.get("tweet_count"));
+                    }
+
+                    result.put("verified", true); // 如果API调用成功，说明令牌有效
+
+                    System.out.println("Twitter token validation successful for user: @" + userInfo.get("username"));
+                } else {
+                    result.put("valid", false);
+                    result.put("error", "Invalid user data structure");
+                }
+            } else {
+                result.put("valid", false);
+                result.put("error", "Invalid access token");
+            }
+
+        } catch (org.springframework.web.client.HttpClientErrorException.Unauthorized e) {
+            result.put("valid", false);
+            result.put("error", "Access token unauthorized");
+            throw new Exception("Twitter access token is invalid or expired");
+        } catch (org.springframework.web.client.HttpClientErrorException.Forbidden e) {
+            result.put("valid", false);
+            result.put("error", "Access token forbidden - insufficient scopes");
+            throw new Exception("Twitter access token lacks required permissions");
+        } catch (Exception e) {
+            result.put("valid", false);
+            result.put("error", e.getMessage());
+            throw e;
+        }
+
+        return result;
+    }
+
     private PublicKey getGooglePublicKey(String keyId) throws Exception {
         System.out.println("Fetching Google JWKS from: " + GOOGLE_JWKS_URL);
 

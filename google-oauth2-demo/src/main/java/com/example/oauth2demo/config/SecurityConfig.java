@@ -22,6 +22,11 @@ import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -44,6 +49,9 @@ public class SecurityConfig {
 
     @Autowired
     private OAuth2AuthorizedClientService authorizedClientService;
+
+    @Autowired
+    private ClientRegistrationRepository clientRegistrationRepository;
 
     @Bean
     public AuthenticationSuccessHandler oauth2SuccessHandler() {
@@ -73,12 +81,15 @@ public class SecurityConfig {
                 }
                 // 处理GitHub用户（OAuth2）
                 else if (authentication.getPrincipal() instanceof OAuth2User oauth2User) {
-                    // 获取OAuth2AuthorizedClient来访问访问令牌
-                    OAuth2AuthorizedClient authorizedClient = authorizedClientService
+                    // 尝试获取OAuth2AuthorizedClient来判断提供商类型
+                    OAuth2AuthorizedClient githubClient = authorizedClientService
                         .loadAuthorizedClient("github", authentication.getName());
+                    OAuth2AuthorizedClient twitterClient = authorizedClientService
+                        .loadAuthorizedClient("twitter", authentication.getName());
 
-                    if (authorizedClient != null && authorizedClient.getAccessToken() != null) {
-                        String accessToken = authorizedClient.getAccessToken().getTokenValue();
+                    // 处理GitHub用户
+                    if (githubClient != null && githubClient.getAccessToken() != null) {
+                        String accessToken = githubClient.getAccessToken().getTokenValue();
 
                         // 创建HTTP Only Cookie存储GitHub访问令牌
                         Cookie accessTokenCookie = new Cookie("github_access_token", accessToken);
@@ -93,6 +104,24 @@ public class SecurityConfig {
                         System.out.println("User: " + oauth2User.getAttribute("login"));
                         System.out.println("Name: " + oauth2User.getAttribute("name"));
                         System.out.println("GitHub access token stored in cookie");
+                    }
+                    // 处理Twitter用户
+                    else if (twitterClient != null && twitterClient.getAccessToken() != null) {
+                        String accessToken = twitterClient.getAccessToken().getTokenValue();
+
+                        // 创建HTTP Only Cookie存储Twitter访问令牌
+                        Cookie accessTokenCookie = new Cookie("twitter_access_token", accessToken);
+                        accessTokenCookie.setHttpOnly(true);
+                        accessTokenCookie.setSecure(true); // HTTPS环境下设置为true
+                        accessTokenCookie.setPath("/");
+                        accessTokenCookie.setMaxAge(3600); // 1小时过期
+
+                        response.addCookie(accessTokenCookie);
+
+                        System.out.println("Provider: Twitter");
+                        System.out.println("User: " + oauth2User.getAttribute("username"));
+                        System.out.println("Name: " + oauth2User.getAttribute("name"));
+                        System.out.println("Twitter access token stored in cookie");
                     }
                 }
 
@@ -135,6 +164,9 @@ public class SecurityConfig {
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
                 .successHandler(oauth2SuccessHandler())
+                .authorizationEndpoint(authz -> authz
+                    .authorizationRequestResolver(pkceAuthorizationRequestResolver())
+                )
                 .userInfoEndpoint(userInfo -> userInfo
                     .userService(oauth2UserService())
                 )
@@ -150,7 +182,7 @@ public class SecurityConfig {
                 .logoutSuccessUrl("/")
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
-                .deleteCookies("id_token", "github_access_token", "JSESSIONID")
+                .deleteCookies("id_token", "github_access_token", "twitter_access_token", "JSESSIONID")
                 .permitAll()
             );
 
@@ -160,21 +192,70 @@ public class SecurityConfig {
     // 新增：自定义OAuth2用户服务
     @Bean
     public OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2UserService() {
-        DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
-
         return userRequest -> {
-            OAuth2User oauth2User = delegate.loadUser(userRequest);
-
-            // 根据提供商类型处理用户信息
             String registrationId = userRequest.getClientRegistration().getRegistrationId();
-            if ("github".equals(registrationId)) {
-                return processGitHubUser(oauth2User, userRequest.getAccessToken());
-            } else if ("google".equals(registrationId)) {
-                return processGoogleUser(oauth2User);
+
+            if ("twitter".equals(registrationId)) {
+                // 自定义Twitter用户信息获取
+                try {
+                    return loadTwitterUser(userRequest);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to load Twitter user", e);
+                }
+            } else {
+                // 对于其他提供商使用默认服务
+                DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
+                OAuth2User oauth2User = delegate.loadUser(userRequest);
+
+                if ("github".equals(registrationId)) {
+                    return processGitHubUser(oauth2User, userRequest.getAccessToken());
+                } else if ("google".equals(registrationId)) {
+                    return processGoogleUser(oauth2User);
+                }
+
+                return oauth2User;
+            }
+        };
+    }
+
+    private OAuth2User loadTwitterUser(OAuth2UserRequest userRequest) throws Exception {
+        // 手动调用Twitter API获取用户信息
+        String authorizationHeader = "Bearer " + userRequest.getAccessToken().getTokenValue();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", authorizationHeader);
+
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+
+        // 调用Twitter API v2
+        ResponseEntity<Map> response = restTemplate().exchange(
+            "https://api.x.com/2/users/me?user.fields=created_at,description,entities,id,location,name,pinned_tweet_id,profile_image_url,protected,public_metrics,url,username,verified,verified_type,withheld",
+            HttpMethod.GET,
+            entity,
+            Map.class
+        );
+
+        if (response.getBody() != null && response.getBody().containsKey("data")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> userData = (Map<String, Object>) response.getBody().get("data");
+
+            // 创建扁平化的属性映射
+            Map<String, Object> attributes = new HashMap<>();
+            attributes.putAll(userData);
+
+            // 确保username属性存在
+            if (!attributes.containsKey("username")) {
+                throw new IllegalArgumentException("Twitter API response missing 'username' field");
             }
 
-            return oauth2User;
-        };
+            return new DefaultOAuth2User(
+                Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")),
+                attributes,
+                "username"  // 使用username作为name属性
+            );
+        } else {
+            throw new IllegalArgumentException("Invalid Twitter API response structure");
+        }
     }
 
     private OAuth2User processGitHubUser(OAuth2User oauth2User, OAuth2AccessToken accessToken) {
@@ -235,6 +316,34 @@ public class SecurityConfig {
     private OAuth2User processGoogleUser(OAuth2User oauth2User) {
         // Google用户处理保持现有逻辑
         return oauth2User;
+    }
+
+    // 创建支持PKCE的OAuth2授权请求解析器 (X平台强制要求)
+    @Bean
+    public OAuth2AuthorizationRequestResolver pkceAuthorizationRequestResolver() {
+        DefaultOAuth2AuthorizationRequestResolver resolver =
+            new DefaultOAuth2AuthorizationRequestResolver(
+                clientRegistrationRepository, "/oauth2/authorization");
+
+        // 强制启用PKCE - 使用正确的Spring Security API
+        resolver.setAuthorizationRequestCustomizer(
+            OAuth2AuthorizationRequestCustomizers.withPkce());
+
+        return resolver;
+    }
+
+    private OAuth2User processTwitterUser(OAuth2User oauth2User) {
+        Map<String, Object> attributes = new HashMap<>(oauth2User.getAttributes());
+
+        // Twitter API v2 返回的用户信息字段映射
+        // Twitter的username是@开头的用户名，name是显示名称
+        // 我们需要确保字段名称与前端期望的一致
+
+        return new DefaultOAuth2User(
+            oauth2User.getAuthorities(),
+            attributes,
+            "username"  // Twitter的用户名字段是"username"
+        );
     }
 
 }

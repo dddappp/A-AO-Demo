@@ -2,9 +2,9 @@
 
 ## 📋 项目概述
 
-这是一个使用Spring Boot和多OAuth2提供商（Google & GitHub）实现的完整登录演示应用。本项目演示了现代Web应用中OAuth2/OpenID Connect集成的完整流程，包括用户认证、Token处理、安全验证和受保护页面访问控制。
+这是一个使用Spring Boot和多OAuth2提供商（Google、GitHub & Twitter）实现的完整登录演示应用。本项目演示了现代Web应用中OAuth2/OpenID Connect集成的完整流程，包括用户认证、Token处理、安全验证和受保护页面访问控制。
 
-**✨ 新增功能**: 现在同时支持Google和GitHub账户登录！
+**✨ 新增功能**: 现在同时支持Google、GitHub和Twitter账户登录！
 
 ## 🎯 项目功能
 
@@ -17,6 +17,7 @@
 ✅ **多提供商登录支持**
 - **Google OAuth2**: JWT ID Token验证，支持OpenID Connect
 - **GitHub OAuth2**: 访问令牌API验证，支持完整用户信息获取
+- **Twitter OAuth2**: 访问令牌API验证，支持Twitter v2 API用户信息获取
 - 智能提供商识别和用户信息处理
 - 统一的登录界面和用户体验
 
@@ -25,11 +26,13 @@
 - 根据登录提供商显示相应的验证功能
 - 完整的Token验证和用户信息展示
 - GitHub特定信息展示（仓库数、粉丝数等）
+- Twitter特定信息展示（位置、验证状态、个人简介等）
 
 ✅ **安全特性**
 - 使用HTTP Only Cookie安全存储敏感Token
 - 使用Google JWKS验证JWT签名和完整性
 - 使用GitHub API在线验证访问令牌
+- 使用Twitter API v2在线验证访问令牌
 - 支持手动Token验证功能
 
 ## 🏗️ 技术架构
@@ -362,6 +365,41 @@ fetch('/api/validate-token', {
    export GOOGLE_CLIENT_SECRET="your-client-secret"
    ```
 
+### X Developer账户配置详细步骤
+
+1. **访问X Developer平台**
+   - 登录 [X Developer](https://developer.x.com/)
+   - 如果没有开发者账户，需要先申请加入X Developer平台
+
+2. **创建新的X应用**
+   - 点击 "Projects & Apps" → "Create App"
+   - 选择 "Create a new project" 或选择现有项目
+   - 填写应用信息：
+     - **Project name**: `OAuth2 Demo`
+     - **Project description**: `Spring Boot OAuth2 demo application`
+     - **Use case**: 选择最适合的用例（例如 "Building tools for X"）
+
+3. **配置应用设置**
+   - 在应用设置中，找到 "App permissions"
+   - 选择 "Read" 权限（因为我们只需要读取用户信息）
+
+4. **配置OAuth 2.0设置**
+   - 在 "Authentication settings" 部分启用OAuth 2.0
+   - 设置回调URL：`https://api.u2511175.nyat.app:55139/oauth2/callback`
+   - 启用 "Request email from users" 如果需要获取用户邮箱
+
+5. **获取应用凭据**
+   - 保存OAuth2配置会弹出：
+     - **Client ID** (Client ID)
+     - **Client Secret** (Client Secret)
+   - **重要**: 这些凭据只显示一次，请立即保存
+
+6. **配置环境变量**
+   ```bash
+   export TWITTER_CLIENT_ID="your-twitter-client-id"
+   export TWITTER_CLIENT_SECRET="your-twitter-client-secret"
+   ```
+
 ### GitHub OAuth App配置详细步骤
 
 1. **访问GitHub开发者设置**
@@ -425,6 +463,18 @@ fetch('/api/validate-token', {
    - 点击"验证 GitHub 访问令牌"按钮
    - 查看详细的API验证结果
 
+#### X登录测试
+1. **访问首页**: 点击"开始登录测试"
+2. **受保护页面重定向**: 自动重定向到登录页面
+3. **选择登录方式**: 点击"使用Twitter账户登录"
+4. **X OAuth2认证**: 完成X账户认证流程
+5. **认证成功返回**: 登录成功后回到测试页面
+6. **验证受保护功能**:
+   - 页面显示用户信息（用户名、显示名称、用户ID、头像）
+   - 显示X特定信息（X主页链接、位置、验证状态、个人简介）
+   - 点击"验证 Twitter 访问令牌"按钮
+   - 查看详细的API验证结果
+
 ### 预期结果
 
 #### Google登录成功后，测试页面应显示：
@@ -438,6 +488,13 @@ fetch('/api/validate-token', {
 - ✅ 用户基本信息（用户名、邮箱、用户ID、头像）
 - ✅ GitHub特定信息（主页链接、公开仓库数、粉丝数）
 - ✅ "验证 GitHub 访问令牌"按钮
+- ✅ 点击验证按钮后显示完整的API验证信息
+
+#### X登录成功后，测试页面应显示：
+- ✅ 当前登录提供商：Twitter
+- ✅ 用户基本信息（用户名、显示名称、用户ID、头像）
+- ✅ X特定信息（X主页链接、位置、验证状态、个人简介）
+- ✅ "验证 Twitter 访问令牌"按钮
 - ✅ 点击验证按钮后显示完整的API验证信息
 
 ## 🛠️ 故障排除
@@ -468,6 +525,18 @@ fetch('/api/validate-token', {
    - 检查GitHub API是否可访问
    - 验证访问令牌是否有效且具有足够权限
    - 查看应用日志中的详细错误信息
+
+6. **X OAuth App配置错误**
+   - 检查X Developer账户中的回调URL是否正确
+   - 确保应用权限设置为"Read"或"Read and Write"
+   - 验证Client ID和Client Secret配置正确
+   - 检查X应用是否已获得生产访问权限（某些功能需要）
+
+7. **X用户信息获取失败**
+   - 检查X API v2是否可访问
+   - 验证访问令牌是否有效且具有足够权限范围
+   - 查看应用日志中的详细错误信息
+   - 确认X应用有足够的API调用配额
 
 6. **提供商识别错误**
    - 确保OAuth2UserService正确处理不同提供商的用户属性
@@ -516,6 +585,7 @@ fetch('/api/validate-token', {
 **多提供商用户属性差异**：
 - **Google**: 使用`sub`作为用户ID，`name`作为显示名称
 - **GitHub**: 使用`login`作为用户ID，`name`作为显示名称
+- **Twitter**: 使用`username`作为用户ID（不含@符号），`name`作为显示名称
 - **统一处理**: 通过OAuth2UserService根据registrationId进行属性映射
 
 ### JWT验证安全要点
@@ -529,8 +599,10 @@ fetch('/api/validate-token', {
 ### 核心技术栈
 
 - **Spring Security OAuth2**: 基于最新6.x版本的OAuth2客户端实现
-- **OpenID Connect**: 身份认证标准协议
+- **OpenID Connect**: Google身份认证标准协议
+- **OAuth2**: GitHub和Twitter身份认证协议
 - **JWT Token**: 使用Google JWKS进行离线验证
+- **REST API**: GitHub和Twitter API进行在线令牌验证
 - **Cookie安全**: HTTP Only Cookie防止XSS攻击
 
 ## 🔄 部署考虑
@@ -733,7 +805,40 @@ for (Cookie cookie : request.getCookies()) {
 - 自动过期机制
 - HTTPS传输保护
 
+### X 访问令牌验证说明
+
+**自动验证机制**：
+- ✅ Twitter访问令牌自动存储在HttpOnly Cookie中（安全存储）
+- ✅ 验证按钮点击后自动从Cookie获取令牌进行验证
+- ✅ 使用Twitter API v2进行令牌验证，无需用户手动输入
+
+**令牌存储安全**：
+- Twitter访问令牌存储在 `twitter_access_token` HttpOnly Cookie中
+- Cookie设置为 `secure=true`（HTTPS）和 `httpOnly=true`（防止XSS）
+- 过期时间为1小时，与会话保持一致
+- 登出时自动清除令牌Cookie
+
+**API调用特点**：
+- 使用Twitter API v2 `/users/me` 端点验证令牌
+- 请求包含完整的用户信息字段（profile_image_url, location, verified, description等）
+- 通过 `user.fields` 参数获取丰富的用户信息
+- Bearer Token认证方式
+
+**技术实现**：
+```java
+// 登录成功后自动存储
+Cookie accessTokenCookie = new Cookie("twitter_access_token", accessToken);
+accessTokenCookie.setHttpOnly(true);
+accessTokenCookie.setSecure(true);
+accessTokenCookie.setMaxAge(3600);
+
+// API验证调用
+String url = "https://api.x.com/2/users/me?user.fields=created_at,description,entities,id,location,name,pinned_tweet_id,profile_image_url,protected,public_metrics,url,username,verified,verified_type,withheld";
+HttpHeaders headers = new HttpHeaders();
+headers.set("Authorization", "Bearer " + accessToken);
+```
+
 ---
 
-**最后更新时间**: 2025-10-06
-**项目状态**: 所有功能正常工作，生产就绪
+**最后更新时间**: 2025-01-14
+**项目状态**: 支持Google、GitHub和Twitter三家OAuth2提供商，生产就绪
