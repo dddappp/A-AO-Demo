@@ -69,11 +69,36 @@ public class AuthController {
     }
 
     @GetMapping("/test")
-    public String test() {
+    public String test(Model model, @AuthenticationPrincipal OAuth2User oauth2User) {
         // 在React模式下，让前端路由处理所有路径
         if ("react".equals(frontendType)) {
             return "forward:/index.html";
         }
+
+        // 为Thymeleaf模板设置用户信息
+        if (oauth2User != null) {
+            String provider = getProviderFromUser(oauth2User);
+            model.addAttribute("provider", provider);
+            model.addAttribute("userName", getUserName(oauth2User, provider));
+            model.addAttribute("userEmail", getUserEmail(oauth2User, provider));
+            model.addAttribute("userId", getUserId(oauth2User, provider));
+            model.addAttribute("userAvatar", getUserAvatar(oauth2User, provider));
+
+            // GitHub特定信息
+            if ("github".equals(provider)) {
+                model.addAttribute("userHtmlUrl", getUserHtmlUrl(oauth2User, provider));
+                model.addAttribute("userPublicRepos", getUserPublicRepos(oauth2User, provider));
+                model.addAttribute("userFollowers", getUserFollowers(oauth2User, provider));
+            }
+
+            // Twitter特定信息
+            if ("twitter".equals(provider)) {
+                model.addAttribute("userLocation", getUserLocation(oauth2User, provider));
+                model.addAttribute("userVerified", getUserVerified(oauth2User, provider));
+                model.addAttribute("userDescription", getUserDescription(oauth2User, provider));
+            }
+        }
+
         return "test";
     }
 

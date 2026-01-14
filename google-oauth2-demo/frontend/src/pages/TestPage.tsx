@@ -290,11 +290,27 @@ export default function TestPage() {
                   backgroundColor: googleTokenResult.valid ? '#d4edda' : '#f8d7da',
                   color: googleTokenResult.valid ? '#155724' : '#721c24'
                 }}>
-                  <strong>{googleTokenResult.valid ? '✓ Token 有效' : '✗ Token 无效'}</strong>
-                  {googleTokenResult.error && (
-                    <div style={{ marginTop: '5px', fontSize: '14px' }}>
-                      {googleTokenResult.error}
-                    </div>
+                  <strong>{googleTokenResult.valid ? '✅ Google验证成功!' : '❌ Google验证失败'}</strong>
+                  {googleTokenResult.valid ? (
+                    <pre style={{
+                      marginTop: '10px',
+                      backgroundColor: '#f8f9fa',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      overflow: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                      textAlign: 'left'
+                    }}>
+                      {JSON.stringify(googleTokenResult, null, 2)}
+                    </pre>
+                  ) : (
+                    googleTokenResult.error && (
+                      <div style={{ marginTop: '5px', fontSize: '14px' }}>
+                        {googleTokenResult.error}
+                      </div>
+                    )
                   )}
                 </div>
               )}
@@ -338,11 +354,27 @@ export default function TestPage() {
                   backgroundColor: githubTokenResult.valid ? '#d4edda' : '#f8d7da',
                   color: githubTokenResult.valid ? '#155724' : '#721c24'
                 }}>
-                  <strong>{githubTokenResult.valid ? '✓ Token 有效' : '✗ Token 无效'}</strong>
-                  {githubTokenResult.error && (
-                    <div style={{ marginTop: '5px', fontSize: '14px' }}>
-                      {githubTokenResult.error}
-                    </div>
+                  <strong>{githubTokenResult.valid ? '✅ GitHub验证成功!' : '❌ GitHub验证失败'}</strong>
+                  {githubTokenResult.valid ? (
+                    <pre style={{
+                      marginTop: '10px',
+                      backgroundColor: '#f8f9fa',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      overflow: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                      textAlign: 'left'
+                    }}>
+                      {JSON.stringify(githubTokenResult, null, 2)}
+                    </pre>
+                  ) : (
+                    githubTokenResult.error && (
+                      <div style={{ marginTop: '5px', fontSize: '14px' }}>
+                        {githubTokenResult.error}
+                      </div>
+                    )
                   )}
                 </div>
               )}
@@ -386,11 +418,27 @@ export default function TestPage() {
                   backgroundColor: twitterTokenResult.valid ? '#d4edda' : '#f8d7da',
                   color: twitterTokenResult.valid ? '#155724' : '#721c24'
                 }}>
-                  <strong>{twitterTokenResult.valid ? '✓ Token 有效' : '✗ Token 无效'}</strong>
-                  {twitterTokenResult.error && (
-                    <div style={{ marginTop: '5px', fontSize: '14px' }}>
-                      {twitterTokenResult.error}
-                    </div>
+                  <strong>{twitterTokenResult.valid ? '✅ Twitter验证成功!' : '❌ Twitter验证失败'}</strong>
+                  {twitterTokenResult.valid ? (
+                    <pre style={{
+                      marginTop: '10px',
+                      backgroundColor: '#f8f9fa',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      overflow: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                      textAlign: 'left'
+                    }}>
+                      {JSON.stringify(twitterTokenResult, null, 2)}
+                    </pre>
+                  ) : (
+                    twitterTokenResult.error && (
+                      <div style={{ marginTop: '5px', fontSize: '14px' }}>
+                        {twitterTokenResult.error}
+                      </div>
+                    )
                   )}
                 </div>
               )}
