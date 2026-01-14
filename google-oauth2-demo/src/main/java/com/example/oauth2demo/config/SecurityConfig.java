@@ -165,7 +165,7 @@ public class SecurityConfig {
                 .loginPage("/login")
                 .successHandler(oauth2SuccessHandler())
                 .authorizationEndpoint(authz -> authz
-                    .authorizationRequestResolver(pkceAuthorizationRequestResolver())
+                    .authorizationRequestResolver(authorizationRequestResolver(clientRegistrationRepository))
                 )
                 .userInfoEndpoint(userInfo -> userInfo
                     .userService(oauth2UserService())
@@ -318,16 +318,15 @@ public class SecurityConfig {
         return oauth2User;
     }
 
-    // 创建支持PKCE的OAuth2授权请求解析器 (X平台强制要求)
+    // 创建OAuth2授权请求解析器 - 支持PKCE和强制账户选择
     @Bean
-    public OAuth2AuthorizationRequestResolver pkceAuthorizationRequestResolver() {
+    public OAuth2AuthorizationRequestResolver authorizationRequestResolver(ClientRegistrationRepository clientRegistrationRepository) {
         DefaultOAuth2AuthorizationRequestResolver resolver =
             new DefaultOAuth2AuthorizationRequestResolver(
                 clientRegistrationRepository, "/oauth2/authorization");
 
-        // 强制启用PKCE - 使用正确的Spring Security API
-        resolver.setAuthorizationRequestCustomizer(
-            OAuth2AuthorizationRequestCustomizers.withPkce());
+        // 配置自定义的授权请求参数 - 先启用PKCE
+        resolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
 
         return resolver;
     }

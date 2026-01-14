@@ -32,18 +32,15 @@ spring:
               - tweet.read
               - users.read
             redirect-uri: https://api.u2511175.nyat.app:55139/oauth2/callback
-            # 强制启用PKCE (X平台强制要求)
-            authentication-method: post
-            client-authentication-method: client_secret_basic
         provider:
           google:
-            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth?prompt=select_account
             token-uri: https://oauth2.googleapis.com/token
             user-info-uri: https://openidconnect.googleapis.com/v1/userinfo
             user-name-attribute: sub
             jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
           github:
-            authorization-uri: https://github.com/login/oauth/authorize
+            authorization-uri: https://github.com/login/oauth/authorize?prompt=consent
             token-uri: https://github.com/login/oauth/access_token
             user-info-uri: https://api.github.com/user
             user-name-attribute: login
