@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -65,6 +64,16 @@ public class AuthController {
         if ("react".equals(frontendType)) {
             return "forward:/index.html";
         }
+        /*
+        forward: 是 Spring 的特殊关键字，表示服务器端转发（不是重定向）。
+        转发意味着：请求直接转到服务器内部的另一个资源，浏览器地址栏不变，用户看不到跳转。
+        具体行为：用户访问 http://yourapp.com/login，但实际上加载的是 http://yourapp.com/index.html 的内容。
+        为什么这样做？
+        React 是单页应用（SPA - Single Page Application）框架。它的工作原理是：
+        浏览器加载一个 HTML 主文件（index.html）；
+        JavaScript 代码在浏览器中运行，根据 URL 路径动态渲染不同的页面；
+        React Router 库负责处理所有 URL 路由（包括 /login、/dashboard 等）。
+         */
         return "login";
     }
 
