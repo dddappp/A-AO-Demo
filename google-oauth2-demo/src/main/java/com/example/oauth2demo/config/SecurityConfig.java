@@ -1,17 +1,18 @@
 package com.example.oauth2demo.config;
 
+import com.example.oauth2demo.entity.UserEntity;
+import com.example.oauth2demo.service.UserService;
+import com.example.oauth2demo.dto.UserDto;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -27,24 +28,34 @@ import org.springframework.security.oauth2.client.web.DefaultOAuth2Authorization
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.client.RestTemplate;
+import com.example.oauth2demo.service.JwtTokenService;
+import org.springframework.http.*;
+import org.springframework.core.ParameterizedTypeReference;
+import java.util.List;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${app.frontend.type:thymeleaf}")
+    @Value("${app.frontend.type:react}")
     private String frontendType;
+
+    @Autowired
+    private UserService userService;
 
     @Bean
     public RestTemplate restTemplate() {
@@ -57,6 +68,30 @@ public class SecurityConfig {
     @Autowired
     private ClientRegistrationRepository clientRegistrationRepository;
 
+    @Autowired
+    private UserDetailsService userDetailsService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtTokenService jwtTokenService;
+
+    /**
+     * 配置AuthenticationManager用于本地用户认证
+     */
+    @Bean
+    public AuthenticationManager authenticationManager() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder);
+        return new ProviderManager(authProvider);
+    }
+
+    /**
+     * OAuth2登录成功处理器
+     * 处理用户认证成功后的逻辑
+     */
     @Bean
     public AuthenticationSuccessHandler oauth2SuccessHandler() {
         return new AuthenticationSuccessHandler() {
@@ -65,107 +100,112 @@ public class SecurityConfig {
                                               Authentication authentication) throws IOException {
                 System.out.println("=== OAuth2 Authentication Success ===");
 
-                // 处理Google用户（OpenID Connect）
-                if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
-                    String idToken = oidcUser.getIdToken().getTokenValue();
+                try {
+                    UserDto userDto = null;
 
-                    // 创建HTTP Only Cookie存储Google ID Token
-                    Cookie idTokenCookie = new Cookie("id_token", idToken);
-                    idTokenCookie.setHttpOnly(true);
-                    idTokenCookie.setSecure(true); // HTTPS环境下设置为true
-                    idTokenCookie.setPath("/");
-                    idTokenCookie.setMaxAge(3600); // 1小时过期
+                    // 处理Google用户（OpenID Connect）
+                    if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
+                        String providerUserId = oidcUser.getSubject();
+                        String email = oidcUser.getEmail();
+                        String name = oidcUser.getFullName();
+                        String picture = oidcUser.getPicture();
 
-                    response.addCookie(idTokenCookie);
+                        // 获取或创建用户
+                        userDto = userService.getOrCreateOAuthUser(UserEntity.AuthProvider.GOOGLE,
+                                                                  providerUserId, email, name, picture);
 
-                    System.out.println("Provider: Google");
-                    System.out.println("User: " + oidcUser.getFullName());
-                    System.out.println("Email: " + oidcUser.getEmail());
-                    System.out.println("ID Token stored in cookie");
-                }
-                // 处理GitHub用户（OAuth2）
-                else if (authentication.getPrincipal() instanceof OAuth2User oauth2User) {
-                    // 尝试获取OAuth2AuthorizedClient来判断提供商类型
-                    OAuth2AuthorizedClient githubClient = authorizedClientService
-                        .loadAuthorizedClient("github", authentication.getName());
-                    OAuth2AuthorizedClient twitterClient = authorizedClientService
-                        .loadAuthorizedClient("twitter", authentication.getName());
+                        System.out.println("Provider: Google");
+                        System.out.println("User: " + name);
+                        System.out.println("Email: " + email);
+                    }
+                    // 处理GitHub和Twitter用户（OAuth2）
+                    else if (authentication.getPrincipal() instanceof OAuth2User oauth2User) {
+                        String provider = determineProvider(oauth2User);
+                        String providerUserId = getProviderUserId(oauth2User, provider);
+                        String email = getProviderEmail(oauth2User, provider);
+                        String name = getProviderName(oauth2User, provider);
+                        String picture = getProviderPicture(oauth2User, provider);
 
-                    // 处理GitHub用户
-                    if (githubClient != null && githubClient.getAccessToken() != null) {
-                        String accessToken = githubClient.getAccessToken().getTokenValue();
+                        // 获取或创建用户
+                        UserEntity.AuthProvider authProvider = UserEntity.AuthProvider.valueOf(provider.toUpperCase());
+                        userDto = userService.getOrCreateOAuthUser(authProvider, providerUserId, email, name, picture);
 
-                        // 创建HTTP Only Cookie存储GitHub访问令牌
-                        Cookie accessTokenCookie = new Cookie("github_access_token", accessToken);
+                        System.out.println("Provider: " + provider);
+                        System.out.println("User: " + name);
+                        System.out.println("Email: " + email);
+                    }
+
+                    // 生成我们自己的JWT Token并存储在HttpOnly Cookie中
+                    if (userDto != null) {
+                        String accessToken = jwtTokenService.generateAccessToken(
+                            userDto.getUsername(),
+                            userDto.getEmail(),
+                            userDto.getId()
+                        );
+
+                        String refreshToken = jwtTokenService.generateRefreshToken(
+                            userDto.getUsername(),
+                            userDto.getId()
+                        );
+
+                        // 存储Access Token到HttpOnly Cookie
+                        Cookie accessTokenCookie = new Cookie("accessToken", accessToken);
                         accessTokenCookie.setHttpOnly(true);
-                        accessTokenCookie.setSecure(true); // HTTPS环境下设置为true
                         accessTokenCookie.setPath("/");
-                        accessTokenCookie.setMaxAge(3600); // 1小时过期
-
+                        accessTokenCookie.setMaxAge(3600); // 1小时
+                        accessTokenCookie.setSecure(false); // 开发环境设为false
+                        accessTokenCookie.setAttribute("SameSite", "Lax");
                         response.addCookie(accessTokenCookie);
 
-                        System.out.println("Provider: GitHub");
-                        System.out.println("User: " + oauth2User.getAttribute("login"));
-                        System.out.println("Name: " + oauth2User.getAttribute("name"));
-                        System.out.println("GitHub access token stored in cookie");
+                        // 存储Refresh Token到HttpOnly Cookie
+                        Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
+                        refreshTokenCookie.setHttpOnly(true);
+                        refreshTokenCookie.setPath("/");
+                        refreshTokenCookie.setMaxAge(604800); // 7天
+                        refreshTokenCookie.setSecure(false); // 开发环境设为false
+                        refreshTokenCookie.setAttribute("SameSite", "Lax");
+                        response.addCookie(refreshTokenCookie);
                     }
-                    // 处理Twitter用户
-                    else if (twitterClient != null && twitterClient.getAccessToken() != null) {
-                        String accessToken = twitterClient.getAccessToken().getTokenValue();
 
-                        // 创建HTTP Only Cookie存储Twitter访问令牌
-                        Cookie accessTokenCookie = new Cookie("twitter_access_token", accessToken);
-                        accessTokenCookie.setHttpOnly(true);
-                        accessTokenCookie.setSecure(true); // HTTPS环境下设置为true
-                        accessTokenCookie.setPath("/");
-                        accessTokenCookie.setMaxAge(3600); // 1小时过期
-
-                        response.addCookie(accessTokenCookie);
-
-                        System.out.println("Provider: Twitter");
-                        System.out.println("User: " + oauth2User.getAttribute("username"));
-                        System.out.println("Name: " + oauth2User.getAttribute("name"));
-                        System.out.println("Twitter access token stored in cookie");
+                    // 根据前端类型重定向
+                    if ("react".equals(frontendType)) {
+                        response.sendRedirect("/");  // React SPA
+                    } else {
+                        response.sendRedirect("/test");  // Thymeleaf页面
                     }
+
+                } catch (Exception e) {
+                    System.err.println("Error processing OAuth2 login: " + e.getMessage());
+                    e.printStackTrace();
+                    response.sendRedirect("/login?error=oauth2_processing_failed");
                 }
-
-                // 重定向到测试页面
-                response.sendRedirect("/test");
             }
         };
     }
 
+    /**
+     * 主安全过滤器链
+     * 处理Web页面和OAuth2登录
+     */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    @Order(3)
+    public SecurityFilterChain webSecurityFilterChain(HttpSecurity http,
+                                                     ClientRegistrationRepository clientRegistrationRepository) throws Exception {
         http
-            /*
-             * === CSRF（跨站请求伪造）保护配置 ===
-             * 
-             * 什么是CSRF攻击？
-             * - CSRF (Cross-Site Request Forgery) 是一种恶意攻击方式
-             * - 攻击者诱导用户在已登录的网站上执行非预期的操作
-             * - 例如：用户登录了银行网站，然后访问了恶意网站，恶意网站可能会
-             *   发送转账请求到银行网站，由于用户已登录，请求会被执行
-             * 
-             * CSRF保护原理：
-             * 1. 服务器为每个用户会话生成一个随机的CSRF Token
-             * 2. 用户发送POST请求时，必须携带这个Token
-             * 3. 服务器验证Token是否正确，不正确则拒绝请求
-             * 4. 恶意网站无法获取到用户的CSRF Token，因此无法伪造请求
-             * 
-             * CookieCsrfTokenRepository.withHttpOnlyFalse() 配置说明：
-             * - 将CSRF Token存储在Cookie中
-             * - withHttpOnlyFalse() 允许JavaScript读取Cookie中的CSRF Token
-             * - 这样前端JavaScript可以获取Token并在AJAX请求中使用
-             */
+            // CSRF保护
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .ignoringRequestMatchers("/api/logout", "/api/validate-google-token", "/api/validate-github-token", "/api/validate-twitter-token")
+                .ignoringRequestMatchers("/oauth2/**", "/api/auth/**", "/api/logout")
             )
+            // 授权规则
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/", "/login/**", "/oauth2/**", "/css/**", "/js/**", "/images/**", "/static/**", "/index.html", "/assets/**", "/favicon.ico", "/error", "/api/user").permitAll()
+                .requestMatchers("/", "/login/**", "/oauth2/**", "/css/**", "/js/**",
+                               "/images/**", "/static/**", "/index.html", "/assets/**",
+                               "/favicon.ico", "/error").permitAll()
+                .requestMatchers("/api/auth/**").permitAll()  // 认证API公开
                 .anyRequest().authenticated()
             )
+            // OAuth2登录配置
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
                 .successHandler(oauth2SuccessHandler())
@@ -179,15 +219,13 @@ public class SecurityConfig {
                     .baseUri("/oauth2/callback")
                 )
             )
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-            )
+            // 登出配置
             .logout(logout -> logout
-                .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))
-                .logoutSuccessUrl("/")
+                .logoutSuccessUrl("/login")
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
-                .deleteCookies("id_token", "github_access_token", "twitter_access_token", "JSESSIONID")
+                .deleteCookies("id_token", "github_access_token", "twitter_access_token",
+                             "JSESSIONID", "accessToken", "refreshToken")
                 .permitAll()
             );
 
@@ -200,10 +238,16 @@ public class SecurityConfig {
         return userRequest -> {
             String registrationId = userRequest.getClientRegistration().getRegistrationId();
 
-            if ("twitter".equals(registrationId)) {
+            if ("x".equals(registrationId)) {  // ✅ X API v2：检查 'x' 而不是 'twitter'
                 // 自定义Twitter用户信息获取
                 try {
-                    return loadTwitterUser(userRequest);
+                    OAuth2User xUser = loadXUser(userRequest);  // ✅ X API v2：变量名和方法名更新
+
+                    // 为Twitter手动存储access token到authorizedClientService
+                    // 注意：这里无法直接存储，因为没有Authentication对象
+                    // Twitter token验证暂时无法工作，除非使用其他方法
+
+                    return xUser;
                 } catch (Exception e) {
                     throw new RuntimeException("Failed to load Twitter user", e);
                 }
@@ -223,7 +267,7 @@ public class SecurityConfig {
         };
     }
 
-    private OAuth2User loadTwitterUser(OAuth2UserRequest userRequest) throws Exception {
+    private OAuth2User loadXUser(OAuth2UserRequest userRequest) throws Exception {  // ✅ X API v2：方法名更新
         // 手动调用Twitter API获取用户信息
         String authorizationHeader = "Bearer " + userRequest.getAccessToken().getTokenValue();
 
@@ -337,5 +381,60 @@ public class SecurityConfig {
         return resolver;
     }
 
+    /**
+     * 辅助方法：确定OAuth2提供商
+     */
+    private String determineProvider(OAuth2User oauth2User) {
+        if (oauth2User.getAttribute("login") != null) {
+            return "github";
+        } else if (oauth2User.getAttribute("username") != null) {
+            return "twitter";
+        }
+        return "unknown";
+    }
+
+    /**
+     * 辅助方法：获取提供商用户ID
+     */
+    private String getProviderUserId(OAuth2User oauth2User, String provider) {
+        switch (provider) {
+            case "github": return oauth2User.getAttribute("id").toString();
+            case "twitter": return oauth2User.getAttribute("id");
+            default: return null;
+        }
+    }
+
+    /**
+     * 辅助方法：获取提供商邮箱
+     */
+    private String getProviderEmail(OAuth2User oauth2User, String provider) {
+        switch (provider) {
+            case "github": return oauth2User.getAttribute("email");
+            case "twitter": return null; // Twitter不提供邮箱
+            default: return null;
+        }
+    }
+
+    /**
+     * 辅助方法：获取提供商用户名
+     */
+    private String getProviderName(OAuth2User oauth2User, String provider) {
+        switch (provider) {
+            case "github": return (String) oauth2User.getAttribute("login");
+            case "twitter": return (String) oauth2User.getAttribute("username");
+            default: return oauth2User.getName();
+        }
+    }
+
+    /**
+     * 辅助方法：获取提供商头像
+     */
+    private String getProviderPicture(OAuth2User oauth2User, String provider) {
+        switch (provider) {
+            case "github": return (String) oauth2User.getAttribute("avatar_url");
+            case "twitter": return (String) oauth2User.getAttribute("profile_image_url");
+            default: return null;
+        }
+    }
 
 }

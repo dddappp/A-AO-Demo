@@ -318,11 +318,11 @@
                         };
                         headers[getCsrfHeader()] = getCsrfToken();
 
-                        console.log('发送Twitter验证请求到 /api/validate-twitter-token (延迟绑定)');
+                        console.log('发送X验证请求到 /api/validate-x-token (延迟绑定)');
                         console.log('CSRF Header:', getCsrfHeader());
                         console.log('CSRF Token:', getCsrfToken() ? '已设置' : '未设置');
 
-                        fetch('/api/validate-twitter-token', {
+                        fetch('/api/validate-x-token', {
                             method: 'POST',
                             headers: headers
                         })

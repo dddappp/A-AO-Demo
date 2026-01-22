@@ -16,7 +16,7 @@ function AppContent() {
         <Route path="/test" element={<TestPage />} />
 
         {/* OAuth2回调路由 */}
-        <Route path="/auth/callback" element={
+        <Route path="/oauth2/callback" element={
           <div style={{
             display: 'flex',
             justifyContent: 'center',

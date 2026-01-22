@@ -29,40 +29,61 @@ public class ApiAuthController {
      * GET /api/user
      */
     @GetMapping("/user")
-    public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal OAuth2User oauth2User) {
-        if (oauth2User == null) {
+    public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal Object principal) {
+        if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
         }
 
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("authenticated", true);
 
-        // 基础用户信息
-        String provider = getProviderFromUser(oauth2User);
-        userInfo.put("provider", provider);
-        userInfo.put("userName", getUserName(oauth2User, provider));
-        userInfo.put("userEmail", getUserEmail(oauth2User, provider));
-        userInfo.put("userId", getUserId(oauth2User, provider));
-        userInfo.put("userAvatar", getUserAvatar(oauth2User, provider));
+        // 处理OAuth2用户（第三方登录）
+        if (principal instanceof OAuth2User oauth2User) {
+            // 基础用户信息
+            String provider = getProviderFromUser(oauth2User);
+            userInfo.put("provider", provider);
+            userInfo.put("userName", getUserName(oauth2User, provider));
+            userInfo.put("userEmail", getUserEmail(oauth2User, provider));
+            userInfo.put("userId", getUserId(oauth2User, provider));
+            userInfo.put("userAvatar", getUserAvatar(oauth2User, provider));
 
-        // 提供商特定信息
-        Map<String, Object> providerInfo = new HashMap<>();
-        switch (provider) {
-            case "google":
-                providerInfo.put("sub", oauth2User.getAttribute("sub"));
-                break;
-            case "github":
-                providerInfo.put("htmlUrl", getUserHtmlUrl(oauth2User, provider));
-                providerInfo.put("publicRepos", oauth2User.getAttribute("public_repos"));
-                providerInfo.put("followers", oauth2User.getAttribute("followers"));
-                break;
-            case "twitter":
-                providerInfo.put("location", getUserLocation(oauth2User));
-                providerInfo.put("verified", getUserVerified(oauth2User));
-                providerInfo.put("description", getUserDescription(oauth2User));
-                break;
+            // 提供商特定信息
+            Map<String, Object> providerInfo = new HashMap<>();
+            switch (provider) {
+                case "google":
+                    providerInfo.put("sub", oauth2User.getAttribute("sub"));
+                    break;
+                case "github":
+                    providerInfo.put("htmlUrl", getUserHtmlUrl(oauth2User, provider));
+                    providerInfo.put("publicRepos", oauth2User.getAttribute("public_repos"));
+                    providerInfo.put("followers", oauth2User.getAttribute("followers"));
+                    break;
+                case "twitter":
+                    providerInfo.put("location", getUserLocation(oauth2User));
+                    providerInfo.put("verified", getUserVerified(oauth2User));
+                    providerInfo.put("description", getUserDescription(oauth2User));
+                    break;
+            }
+            userInfo.put("providerInfo", providerInfo);
         }
-        userInfo.put("providerInfo", providerInfo);
+        // 处理JWT用户（本地登录）
+        else if (principal instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
+            userInfo.put("provider", "local");
+            userInfo.put("userId", jwt.getClaim("userId"));
+            userInfo.put("userName", jwt.getSubject());
+            userInfo.put("userEmail", jwt.getClaim("email"));
+            userInfo.put("userAvatar", null);
+            userInfo.put("providerInfo", new HashMap<>());
+        }
+        // 处理其他类型的认证主体
+        else {
+            userInfo.put("provider", "unknown");
+            userInfo.put("userName", principal.toString());
+            userInfo.put("userEmail", null);
+            userInfo.put("userId", null);
+            userInfo.put("userAvatar", null);
+            userInfo.put("providerInfo", new HashMap<>());
+        }
 
         return ResponseEntity.ok(userInfo);
     }
@@ -162,10 +183,10 @@ public class ApiAuthController {
     }
 
     /**
-     * 验证Twitter Access Token
-     * POST /api/validate-twitter-token
+     * 验证X Access Token
+     * POST /api/validate-x-token
      */
-    @PostMapping("/validate-twitter-token")
+    @PostMapping("/validate-x-token")
     public ResponseEntity<?> validateTwitterToken(HttpServletRequest request) {
         try {
             // 从cookie中获取Twitter Access Token
@@ -270,6 +291,8 @@ public class ApiAuthController {
         // 清除所有认证相关的cookies
         String[] cookieNames = {
             "JSESSIONID",
+            "accessToken",      // JWT access token
+            "refreshToken",     // JWT refresh token
             "google_access_token",
             "github_access_token",
             "twitter_access_token"

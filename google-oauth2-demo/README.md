@@ -498,16 +498,23 @@ cd google-oauth2-demo
 
 ## 🔧 手动部署步骤
 
-### 前端构建
+### 前端构建和启动（一体化）
 ```bash
 cd google-oauth2-demo
-./build-frontend.sh
+./start-with-frontend.sh  # 自动构建前端并启动Spring Boot
 ```
 
-### 启动应用
+### 手动构建和启动
 ```bash
+# 1. 构建前端（自动集成到Spring Boot）
 cd google-oauth2-demo
-./start.sh
+./build-frontend.sh
+
+# 2. 启动Spring Boot应用
+mvn spring-boot:run
+
+# 如果使用环境变量文件，可以使用以下命令：
+# export $(cat .env | xargs) && mvn spring-boot:run
 ```
 
 ## 📡 API接口文档

@@ -1,13 +1,18 @@
 // TypeScript类型定义
 
 export interface User {
-  authenticated: boolean;
-  provider: 'google' | 'github' | 'twitter' | 'unknown';
-  userName: string;
+  id?: number;
+  username?: string;
+  email?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  provider: 'google' | 'github' | 'x' | 'local' | 'unknown';  // ✅ X API v2：提供者名改为 'x'
+  authenticated?: boolean;
+  userName?: string;
   userEmail?: string;
-  userId: string;
+  userId?: string;
   userAvatar?: string;
-  providerInfo: {
+  providerInfo?: {
     // Google特有
     sub?: string;
     // GitHub特有
@@ -33,7 +38,7 @@ export interface TokenValidationResult {
 }
 
 export interface LoginProvider {
-  name: 'google' | 'github' | 'twitter';
+  name: 'google' | 'github' | 'x';  // ✅ X API v2：提供者名改为 'x'
   displayName: string;
   color: string;
   icon: string;

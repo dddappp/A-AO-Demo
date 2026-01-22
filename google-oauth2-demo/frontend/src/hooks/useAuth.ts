@@ -6,14 +6,32 @@ import { AuthService } from '../services/authService';
  * 认证状态管理Hook
  */
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  // 从localStorage初始化用户状态
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem('auth_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 当用户状态改变时，保存到localStorage
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('auth_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('auth_user');
+    }
+  }, [user]);
+
   // 检查认证状态
   const checkAuth = useCallback(async () => {
-    // 避免重复检查
-    if (!loading) return;
+    // 总是检查认证状态，确保与后端同步
+
+    // 在登录页面时，不自动检查认证状态
+    if (window.location.pathname.includes('/login')) {
+      setLoading(false);
+      return;
+    }
 
     try {
       setError(null);
@@ -25,73 +43,125 @@ export function useAuth() {
       console.log('Authentication check failed:', err);
       setUser(null);
       setError(err instanceof Error ? err.message : 'Authentication check failed');
+      // 如果在受保护页面且认证失败，重定向到登录页面
+      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/')) {
+        console.log('Redirecting to login due to authentication failure');
+        window.location.href = '/login';
+      }
     } finally {
       setLoading(false);
     }
   }, [loading]);
 
-  // 登录
-  const login = (provider: 'google' | 'github' | 'twitter') => {
+  // OAuth2登录
+  const oauthLogin = (provider: 'google' | 'github' | 'x') => {  // ✅ X API v2：提供者名改为 'x'
     const loginUrl = AuthService.getLoginUrl(provider);
     // 重定向到OAuth2提供商
     window.location.href = loginUrl;
   };
 
+  // 本地用户登录
+  const localLogin = async (username: string, password: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('Starting local login...');
+      const response = await AuthService.login(username, password);
+      console.log('Local login successful:', response);
+
+      // 本地用户登录成功后，直接设置用户信息状态
+      // 注意：生产环境中应该使用JWT token，这里暂时使用session存储
+      setUser({
+        id: response.user.id,
+        username: response.user.username,
+        email: response.user.email,
+        displayName: response.user.displayName,
+        avatarUrl: response.user.avatarUrl,
+        provider: 'local'
+      });
+      setError(null);
+
+      return response;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Local login failed';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 用户注册
+  const register = async (data: {
+    username: string;
+    email: string;
+    password: string;
+    displayName: string;
+  }) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('Starting registration...');
+      const response = await AuthService.register(data);
+      console.log('Registration successful:', response);
+
+      // 注册成功后可以自动登录
+      await localLogin(data.username, data.password);
+
+      return response;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Registration failed';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 登出
   const logout = async () => {
+    console.log('Starting logout process...');
+
     try {
-      console.log('Starting logout process...');
       await AuthService.logout();
       console.log('Logout API call successful');
-      setUser(null);
-      setError(null);
-      // 强制刷新页面以清除所有缓存和状态
-      window.location.reload();
     } catch (err) {
       console.error('Logout failed:', err);
-      // 即使登出失败，也清除本地状态并刷新页面
-      setUser(null);
-      window.location.reload();
     }
+
+    // 立即清除前端用户状态
+    setUser(null);
+    setError(null);
+
+    // 清除所有可能的用户状态存储
+    localStorage.removeItem('auth_user');
+    localStorage.clear(); // 清除所有localStorage
+
+    // 清除所有cookies
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+
+    console.log('All storage cleared, navigating to login...');
+
+    // 直接导航到登录页面，避免页面刷新可能带来的缓存问题
+    window.location.href = '/login';
   };
 
   // 组件挂载时检查认证状态
   useEffect(() => {
-    let mounted = true;
-
-    const initAuth = async () => {
-      try {
-        console.log('Checking authentication status...');
-        const userData = await AuthService.getCurrentUser();
-        console.log('User authenticated:', userData);
-        if (mounted) {
-          setUser(userData);
-        }
-      } catch (err) {
-        console.log('Authentication check failed:', err);
-        if (mounted) {
-          setUser(null);
-          setError(err instanceof Error ? err.message : 'Authentication check failed');
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initAuth();
-
-    return () => {
-      mounted = false;
-    };
+    checkAuth();
   }, []); // 空依赖数组，确保只执行一次
 
   return {
     user,
     loading,
     error,
-    login,
+    oauthLogin,
+    localLogin,
+    register,
     logout,
     checkAuth,
     isAuthenticated: !!user

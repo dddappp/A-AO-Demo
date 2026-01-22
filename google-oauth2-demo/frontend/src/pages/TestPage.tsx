@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AuthService } from '../services/authService';
-import { User } from '../types';
+import { useAuth } from '../hooks/useAuth';
 
 interface TokenValidationResult {
   valid: boolean;
@@ -9,49 +9,21 @@ interface TokenValidationResult {
 }
 
 export default function TestPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const { user, logout: authLogout } = useAuth();
   const [tokenValidationLoading, setTokenValidationLoading] = useState<string | null>(null);
 
-  // 暂时保留authLoading以备将来使用
-  console.log(authLoading);
-
-  // 检查认证状态
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const userData = await AuthService.getCurrentUser();
-        setUser(userData);
-      } catch (err) {
-        setUser(null);
-        // 如果未认证，重定向到登录页面
-        window.location.href = '/login';
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
+  // 认证检查由useAuth hook处理，这里不需要额外的检查
 
   const logout = async () => {
-    try {
-      setAuthLoading(true);
-      await AuthService.logout();
-      setUser(null);
-      window.location.href = '/login';
-    } catch (err) {
-      console.error('Logout failed:', err);
-    } finally {
-      setAuthLoading(false);
-    }
+    // 使用 useAuth hook 的 logout 方法，它会正确处理状态清除
+    await authLogout();
   };
   const [googleTokenResult, setGoogleTokenResult] = useState<TokenValidationResult | null>(null);
   const [githubTokenResult, setGithubTokenResult] = useState<TokenValidationResult | null>(null);
-  const [twitterTokenResult, setTwitterTokenResult] = useState<TokenValidationResult | null>(null);
+  const [xTokenResult, setXTokenResult] = useState<TokenValidationResult | null>(null);  // ✅ X API v2：变量名更新
   // Token验证加载状态已在上方声明
 
-  const validateToken = async (provider: 'google' | 'github' | 'twitter') => {
+  const validateToken = async (provider: 'google' | 'github' | 'x') => {  // ✅ X API v2：提供者名改为 'x'
     if (!user) return;
 
     setTokenValidationLoading(provider);
@@ -65,8 +37,8 @@ export default function TestPage() {
         case 'github':
           result = await AuthService.validateGithubToken();
           break;
-        case 'twitter':
-          result = await AuthService.validateTwitterToken();
+        case 'x':  // ✅ X API v2：提供者名改为 'x'
+          result = await AuthService.validateXToken();
           break;
         default:
           result = { valid: false, error: '不支持的提供商' };
@@ -75,7 +47,7 @@ export default function TestPage() {
       switch (provider) {
         case 'google': setGoogleTokenResult(result); break;
         case 'github': setGithubTokenResult(result); break;
-        case 'twitter': setTwitterTokenResult(result); break;
+        case 'x': setXTokenResult(result); break;
       }
     } catch (error) {
       const result = {
@@ -86,7 +58,7 @@ export default function TestPage() {
       switch (provider) {
         case 'google': setGoogleTokenResult(result); break;
         case 'github': setGithubTokenResult(result); break;
-        case 'twitter': setTwitterTokenResult(result); break;
+        case 'x': setXTokenResult(result); break;
       }
     } finally {
       setTokenValidationLoading(null);
@@ -176,7 +148,7 @@ export default function TestPage() {
         </div>
 
         {/* 提供商特定信息 */}
-        {user.provider === 'github' && user.providerInfo.htmlUrl && (
+        {user.provider === 'github' && user.providerInfo?.htmlUrl && (
           <div style={{
             marginTop: '20px',
             padding: '15px',
@@ -191,16 +163,16 @@ export default function TestPage() {
             }}>
               <div>
                 <strong>公开仓库：</strong>
-                {user.providerInfo.publicRepos || 0}
+                {user.providerInfo?.publicRepos || 0}
               </div>
               <div>
                 <strong>粉丝数：</strong>
-                {user.providerInfo.followers || 0}
+                {user.providerInfo?.followers || 0}
               </div>
               <div>
                 <strong>GitHub主页：</strong>
                 <a
-                  href={user.providerInfo.htmlUrl}
+                  href={user.providerInfo?.htmlUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: '#007bff' }}
@@ -212,7 +184,7 @@ export default function TestPage() {
           </div>
         )}
 
-        {user.provider === 'twitter' && (
+        {user.provider === 'x' && (
           <div style={{
             marginTop: '20px',
             padding: '15px',
@@ -227,15 +199,15 @@ export default function TestPage() {
             }}>
               <div>
                 <strong>位置：</strong>
-                {user.providerInfo.location || '未设置'}
+                {user.providerInfo?.location || '未设置'}
               </div>
               <div>
                 <strong>验证状态：</strong>
-                {user.providerInfo.verified ? '已验证' : '未验证'}
+                {user.providerInfo?.verified ? '已验证' : '未验证'}
               </div>
               <div>
                 <strong>个人简介：</strong>
-                {user.providerInfo.description || '未设置'}
+                {user.providerInfo?.description || '未设置'}
               </div>
             </div>
           </div>
@@ -382,7 +354,7 @@ export default function TestPage() {
           )}
 
           {/* Twitter Token验证 */}
-          {user.provider === 'twitter' && (
+          {user.provider === 'x' && (
             <div style={{
               padding: '15px',
               border: '1px solid #ddd',
@@ -394,32 +366,32 @@ export default function TestPage() {
                 alignItems: 'center',
                 marginBottom: '10px'
               }}>
-                <h3 style={{ margin: 0, color: '#333' }}>Twitter Access Token 验证</h3>
+                <h3 style={{ margin: 0, color: '#333' }}>X Access Token 验证</h3>
                 <button
-                  onClick={() => validateToken('twitter')}
-                  disabled={tokenValidationLoading === 'twitter'}
+                  onClick={() => validateToken('x')}
+                  disabled={tokenValidationLoading === 'x'}
                   style={{
                     backgroundColor: '#1da1f2',
                     color: 'white',
                     border: 'none',
                     padding: '8px 16px',
                     borderRadius: '4px',
-                    cursor: tokenValidationLoading === 'twitter' ? 'not-allowed' : 'pointer',
-                    opacity: tokenValidationLoading === 'twitter' ? 0.6 : 1
+                    cursor: tokenValidationLoading === 'x' ? 'not-allowed' : 'pointer',
+                    opacity: tokenValidationLoading === 'x' ? 0.6 : 1
                   }}
                 >
-                  {tokenValidationLoading === 'twitter' ? '验证中...' : '验证'}
+                  {tokenValidationLoading === 'x' ? '验证中...' : '验证'}
                 </button>
               </div>
-              {twitterTokenResult && (
+              {xTokenResult && (
                 <div style={{
                   padding: '10px',
                   borderRadius: '4px',
-                  backgroundColor: twitterTokenResult.valid ? '#d4edda' : '#f8d7da',
-                  color: twitterTokenResult.valid ? '#155724' : '#721c24'
+                  backgroundColor: xTokenResult.valid ? '#d4edda' : '#f8d7da',
+                  color: xTokenResult.valid ? '#155724' : '#721c24'
                 }}>
-                  <strong>{twitterTokenResult.valid ? '✅ Twitter验证成功!' : '❌ Twitter验证失败'}</strong>
-                  {twitterTokenResult.valid ? (
+                  <strong>{xTokenResult.valid ? '✅ X验证成功!' : '❌ X验证失败'}</strong>
+                  {xTokenResult.valid ? (
                     <pre style={{
                       marginTop: '10px',
                       backgroundColor: '#f8f9fa',
@@ -431,12 +403,12 @@ export default function TestPage() {
                       wordBreak: 'break-all',
                       textAlign: 'left'
                     }}>
-                      {JSON.stringify(twitterTokenResult, null, 2)}
+                      {JSON.stringify(xTokenResult, null, 2)}
                     </pre>
                   ) : (
-                    twitterTokenResult.error && (
+                    xTokenResult.error && (
                       <div style={{ marginTop: '5px', fontSize: '14px' }}>
-                        {twitterTokenResult.error}
+                        {xTokenResult.error}
                       </div>
                     )
                   )}

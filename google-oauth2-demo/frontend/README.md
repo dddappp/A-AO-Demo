@@ -171,9 +171,35 @@ try {
 
 ### 开发环境
 
+**当前主要做法（前后端一体化开发模式）**：
+
+1. **前端构建集成**：使用 `npm run build` 将前端构建并自动复制到 Spring Boot 静态资源目录
+2. **一体化启动**：Spring Boot 应用同时提供前端页面和后端API服务
+3. **开发流程**：
+   ```bash
+   cd frontend
+   npm run build  # 构建并自动复制到 ../src/main/resources/static/
+   cd ..
+   mvn spring-boot:run  # 启动一体化应用
+   ```
+4. **访问地址**：前端和后端都在 `http://localhost:8081`
+
+**传统分离开发模式**（可选）：
+
 前端运行在 `http://localhost:5173`，后端运行在 `http://localhost:8080`。
+- 前端：`npm run dev`
+- 后端：`mvn spring-boot:run`
 
 ### 生产环境
+
+**推荐的一体化部署**：
+
+1. 构建前端：`npm run build`（自动集成到Spring Boot）
+2. 构建Spring Boot应用：`mvn clean package`
+3. 部署单个JAR文件：`java -jar target/*.jar`
+4. 设置环境变量和外部配置
+
+**传统分离部署**：
 
 1. 构建前端：`npm run build`
 2. 将 `dist/` 目录部署到静态文件服务器

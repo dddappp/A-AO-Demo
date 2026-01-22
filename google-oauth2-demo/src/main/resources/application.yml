@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: 8081  # 隧道暴露端口
 
 app:
   frontend:
@@ -8,6 +8,28 @@ app:
 spring:
   application:
     name: google-oauth2-demo
+  profiles:
+    active: dev  # 默认激活dev环境
+
+  # 数据库配置 (H2)
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: none  # 不自动创建表，由schema.sql处理
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: true
+
+  sql:
+    init:
+      mode: always  # 总是执行初始化脚本
 
   security:
     oauth2:
@@ -28,13 +50,16 @@ spring:
               - user:email
               - read:user
             redirect-uri: https://api.u2511175.nyat.app:55139/oauth2/callback
-          twitter:
+          x:  # ✅ X API v2：提供者名改为 'x'
             client-id: ${TWITTER_CLIENT_ID:your-twitter-client-id}
             client-secret: ${TWITTER_CLIENT_SECRET:your-twitter-client-secret}
             authorization-grant-type: authorization_code
             scope:
               - tweet.read
               - users.read
+              - follows.read
+              - like.read
+              - offline.access
             redirect-uri: https://api.u2511175.nyat.app:55139/oauth2/callback
         provider:
           google:
@@ -48,11 +73,12 @@ spring:
             token-uri: https://github.com/login/oauth/access_token
             user-info-uri: https://api.github.com/user
             user-name-attribute: login
-          twitter:
+          x:  # ✅ X API v2：提供者名改为 'x'
             authorization-uri: https://x.com/i/oauth2/authorize
             token-uri: https://api.x.com/2/oauth2/token
             user-info-uri: https://api.x.com/2/users/me
-            user-name-attribute: username
+            user-name-attribute: data.username  # ✅ 响应格式改变：包装在data字段中
+            jwk-set-uri: https://x.com/i/oauth2/jwks
 
   thymeleaf:
     cache: false
