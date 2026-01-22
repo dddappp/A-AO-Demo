@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AuthService } from '../services/authService';
 import { useAuth } from '../hooks/useAuth';
+import { TokenRefreshResult } from '../types';
 
 interface TokenValidationResult {
   valid: boolean;
@@ -9,14 +10,31 @@ interface TokenValidationResult {
 }
 
 export default function TestPage() {
-  const { user, logout: authLogout } = useAuth();
+  const { user, logout: authLogout, refreshToken } = useAuth();
   const [tokenValidationLoading, setTokenValidationLoading] = useState<string | null>(null);
+  const [tokenRefreshResult, setTokenRefreshResult] = useState<TokenRefreshResult | null>(null);
 
   // 认证检查由useAuth hook处理，这里不需要额外的检查
 
   const logout = async () => {
     // 使用 useAuth hook 的 logout 方法，它会正确处理状态清除
     await authLogout();
+  };
+
+  const handleTokenRefresh = async () => {
+    try {
+      setTokenValidationLoading('refresh');
+      const result = await refreshToken();
+      setTokenRefreshResult(result);
+    } catch (error) {
+      setTokenRefreshResult({
+        message: 'Token refresh failed',
+        accessTokenExpiresIn: 0,
+        refreshTokenExpiresIn: 0
+      });
+    } finally {
+      setTokenValidationLoading(null);
+    }
   };
   const [googleTokenResult, setGoogleTokenResult] = useState<TokenValidationResult | null>(null);
   const [githubTokenResult, setGithubTokenResult] = useState<TokenValidationResult | null>(null);
@@ -419,31 +437,94 @@ export default function TestPage() {
         </div>
       </div>
 
-      {/* 登出按钮 */}
-      <div style={{ textAlign: 'center' }}>
-        <button
-          onClick={logout}
-          style={{
-            backgroundColor: '#dc3545',
-            color: 'white',
-            border: 'none',
-            padding: '12px 30px',
-            borderRadius: '5px',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            transition: 'background-color 0.3s'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.backgroundColor = '#c82333';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.backgroundColor = '#dc3545';
-          }}
-        >
-          登出
-        </button>
-      </div>
+        {/* Token刷新测试 */}
+        <div style={{
+          background: 'white',
+          padding: '20px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          marginBottom: '20px'
+        }}>
+          <h2 style={{ color: '#333', marginBottom: '15px' }}>Token 刷新测试</h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <div style={{
+              padding: '15px',
+              border: '1px solid #ddd',
+              borderRadius: '5px'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px'
+              }}>
+                <h3 style={{ margin: 0, color: '#333' }}>JWT Token 刷新</h3>
+                <button
+                  onClick={handleTokenRefresh}
+                  disabled={tokenValidationLoading === 'refresh'}
+                  style={{
+                    backgroundColor: '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    cursor: tokenValidationLoading === 'refresh' ? 'not-allowed' : 'pointer',
+                    opacity: tokenValidationLoading === 'refresh' ? 0.6 : 1
+                  }}
+                >
+                  {tokenValidationLoading === 'refresh' ? '刷新中...' : '刷新Token'}
+                </button>
+              </div>
+              <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                测试JWT Token自动刷新功能。正常情况下应该成功获取新的access token。
+              </p>
+              {tokenRefreshResult && (
+                <div style={{
+                  padding: '10px',
+                  borderRadius: '4px',
+                  backgroundColor: tokenRefreshResult.message.includes('success') ? '#d4edda' : '#f8d7da',
+                  color: tokenRefreshResult.message.includes('success') ? '#155724' : '#721c24',
+                  marginTop: '10px'
+                }}>
+                  <strong>{tokenRefreshResult.message}</strong>
+                  {tokenRefreshResult.accessTokenExpiresIn > 0 && (
+                    <div style={{ marginTop: '5px', fontSize: '14px' }}>
+                      Access Token有效期: {Math.floor(tokenRefreshResult.accessTokenExpiresIn / 60)}分钟<br/>
+                      Refresh Token有效期: {Math.floor(tokenRefreshResult.refreshTokenExpiresIn / 86400)}天
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 登出按钮 */}
+        <div style={{ textAlign: 'center' }}>
+          <button
+            onClick={logout}
+            style={{
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              padding: '12px 30px',
+              borderRadius: '5px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'background-color 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#c82333';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#dc3545';
+            }}
+          >
+            登出
+          </button>
+        </div>
     </div>
   );
 }

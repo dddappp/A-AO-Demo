@@ -43,3 +43,9 @@ export interface LoginProvider {
   color: string;
   icon: string;
 }
+
+export interface TokenRefreshResult {
+  message: string;
+  accessTokenExpiresIn: number;
+  refreshTokenExpiresIn: number;
+}

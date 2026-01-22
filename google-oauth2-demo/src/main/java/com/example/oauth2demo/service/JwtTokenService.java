@@ -83,4 +83,46 @@ public class JwtTokenService {
             return false;
         }
     }
+
+    /**
+     * 验证Refresh Token（检查类型和过期时间）
+     */
+    public boolean validateRefreshToken(String token) {
+        try {
+            var claims = Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+            // 检查token类型
+            String tokenType = claims.get("type", String.class);
+            if (!"refresh".equals(tokenType)) {
+                return false;
+            }
+
+            // 检查是否过期
+            return !claims.getExpiration().before(new Date());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 从Token中提取用户ID
+     */
+    public Long getUserIdFromToken(String token) {
+        try {
+            var claims = Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+            Integer userId = claims.get("userId", Integer.class);
+            return userId != null ? userId.longValue() : null;
+        } catch (Exception e) {
+            throw new RuntimeException("无法从token中提取用户ID", e);
+        }
+    }
 }

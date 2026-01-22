@@ -12,3 +12,6 @@ node_modules
 google-oauth2-demo/src/main/resources/static/assets/index-*.js
 google-oauth2-demo/src/main/resources/static/assets/index-*.css
 google-oauth2-demo/src/main/resources/static/index.html
+google-oauth2-demo/frontend/cookies*.txt
+google-oauth2-demo/auth-dev.db
+google-oauth2-demo/cookies*.txt

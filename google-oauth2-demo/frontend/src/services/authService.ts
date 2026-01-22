@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { TokenRefreshResult } from '../types';
 import { User, TokenValidationResult } from '../types';
 
 // API基础URL - 使用相对路径，Vite代理会处理开发环境
@@ -55,6 +56,20 @@ export class AuthService {
       },
       params: {
         _t: Date.now() // 添加时间戳参数避免缓存
+      }
+    });
+    return response.data;
+  }
+
+  /**
+   * 刷新JWT Token
+   */
+  static async refreshToken(): Promise<TokenRefreshResult> {
+    const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {}, {
+      withCredentials: true,
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
       }
     });
     return response.data;

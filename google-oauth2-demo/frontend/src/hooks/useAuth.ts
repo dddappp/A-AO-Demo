@@ -120,8 +120,23 @@ export function useAuth() {
     }
   };
 
+  // 刷新Token
+  const refreshToken = useCallback(async () => {
+    try {
+      console.log('Starting token refresh...');
+      const result = await AuthService.refreshToken();
+      console.log('Token refresh successful:', result);
+      return result;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // 如果刷新失败，说明refresh token也过期了，需要重新登录
+      logout();
+      throw error;
+    }
+  }, []);
+
   // 登出
-  const logout = async () => {
+  const logout = useCallback(async () => {
     console.log('Starting logout process...');
 
     try {
@@ -148,7 +163,7 @@ export function useAuth() {
 
     // 直接导航到登录页面，避免页面刷新可能带来的缓存问题
     window.location.href = '/login';
-  };
+  }, []);
 
   // 组件挂载时检查认证状态
   useEffect(() => {
@@ -163,6 +178,7 @@ export function useAuth() {
     localLogin,
     register,
     logout,
+    refreshToken,
     checkAuth,
     isAuthenticated: !!user
   };
