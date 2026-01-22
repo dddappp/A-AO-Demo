@@ -15,3 +15,5 @@ google-oauth2-demo/src/main/resources/static/index.html
 google-oauth2-demo/frontend/cookies*.txt
 google-oauth2-demo/auth-dev.db
 google-oauth2-demo/cookies*.txt
+google-oauth2-demo/dev-database.db
+google-oauth2-demo/*.db

@@ -1,39 +1,39 @@
--- H2数据库表结构定义
+-- SQLite数据库表结构定义
 
 -- 用户表
 CREATE TABLE IF NOT EXISTS users (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255),
-    display_name VARCHAR(255),
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT,
+    display_name TEXT,
     avatar_url TEXT,
-    email_verified BOOLEAN DEFAULT FALSE,
-    auth_provider VARCHAR(50) DEFAULT 'LOCAL',
-    provider_user_id VARCHAR(255),
-    enabled BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login_at TIMESTAMP
+    email_verified INTEGER DEFAULT 0,
+    auth_provider TEXT DEFAULT 'LOCAL',
+    provider_user_id TEXT,
+    enabled INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_login_at DATETIME
 );
 
 -- 用户权限关联表
 CREATE TABLE IF NOT EXISTS user_authorities (
-    user_id BIGINT NOT NULL,
-    authority VARCHAR(50) NOT NULL,
+    user_id INTEGER NOT NULL,
+    authority TEXT NOT NULL,
     PRIMARY KEY (user_id, authority),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Token黑名单表
 CREATE TABLE IF NOT EXISTS token_blacklist (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    jti VARCHAR(255) UNIQUE NOT NULL,
-    token_type VARCHAR(50),
-    user_id BIGINT,
-    expires_at TIMESTAMP NOT NULL,
-    blacklisted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    reason VARCHAR(255)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    jti TEXT UNIQUE NOT NULL,
+    token_type TEXT,
+    user_id INTEGER,
+    expires_at DATETIME NOT NULL,
+    blacklisted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reason TEXT
 );
 
 -- 创建索引
