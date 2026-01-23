@@ -1,5 +1,7 @@
 package com.example.oauth2demo.controller;
 
+import com.example.oauth2demo.entity.UserEntity;
+import com.example.oauth2demo.repository.UserRepository;
 import com.example.oauth2demo.service.JwtValidationService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +25,9 @@ public class ApiAuthController {
 
     @Autowired
     private JwtValidationService jwtValidationService;
+
+    @Autowired
+    private UserRepository userRepository;
 
     /**
      * 获取当前用户信息
@@ -66,13 +71,22 @@ public class ApiAuthController {
             }
             userInfo.put("providerInfo", providerInfo);
         }
-        // 处理JWT用户（本地登录）
+        // 处理JWT用户（本地登录或OAuth2登录后的JWT认证）
         else if (principal instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
-            userInfo.put("provider", "local");
-            userInfo.put("userId", jwt.getClaim("userId"));
+            Long userId = jwt.getClaim("userId");
+
+            // 从数据库查询用户的真实认证提供商
+            UserEntity user = userRepository.findById(userId).orElse(null);
+            String actualProvider = "local"; // 默认值
+            if (user != null) {
+                actualProvider = user.getAuthProvider().name().toLowerCase();
+            }
+
+            userInfo.put("provider", actualProvider);
+            userInfo.put("userId", userId);
             userInfo.put("userName", jwt.getSubject());
             userInfo.put("userEmail", jwt.getClaim("email"));
-            userInfo.put("userAvatar", null);
+            userInfo.put("userAvatar", user != null ? user.getAvatarUrl() : null);
             userInfo.put("providerInfo", new HashMap<>());
         }
         // 处理其他类型的认证主体
