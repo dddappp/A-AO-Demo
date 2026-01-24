@@ -64,10 +64,11 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- PostgreSQL 数据库 (生产环境) -->
+        <!-- PostgreSQL 数据库 (生产环境) -->            
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
+            <version>42.7.4</version>
             <scope>runtime</scope>
         </dependency>
 

@@ -513,6 +513,9 @@ cd google-oauth2-demo
 # 2. 启动Spring Boot应用
 mvn spring-boot:run
 
+# 如果服务已经在运行，可以杀死 8081 端口上的服务
+# lsof -i :8081 | grep LISTEN | awk '{print $2}' | xargs kill -9
+
 # 如果使用环境变量文件，可以使用以下命令：
 # export $(cat .env | xargs) && mvn spring-boot:run
 ```
