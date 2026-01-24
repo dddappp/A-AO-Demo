@@ -17,17 +17,22 @@
 - [ ] 添加了 JWT 相关依赖（jjwt-api, jjwt-impl, jjwt-jackson）
 - [ ] 添加了 `spring-security-oauth2-authorization-server` （可选）
 - [ ] 添加了 `spring-boot-starter-oauth2-client` （可选）
+- [ ] 添加了 `org.springframework.session:spring-session-jdbc` （可选但推荐，用于 session 持久化）
 
 ## 🗄️ 数据库
 
 - [ ] PostgreSQL 已安装并运行
 - [ ] 创建了数据库：`your_project_db`
 - [ ] 执行了 `schema-postgresql.sql` 脚本创建表
-- [ ] 验证了以下表已创建：
+- [ ] 验证了以下认证相关的表已创建：
   - [ ] `users`
   - [ ] `user_login_methods`
   - [ ] `user_authorities`
   - [ ] `token_blacklist`
+
+- [ ] （可选）验证了 Spring Session JDBC 表已创建（如果启用了 session 持久化）：
+  - [ ] `SPRING_SESSION` - 存储 session 信息
+  - [ ] `SPRING_SESSION_ATTRIBUTES` - 存储 session 属性值
 
 ## ⚙️ 配置文件
 
@@ -37,6 +42,8 @@
   - [ ] `spring.datasource.password` - 数据库密码
   - [ ] `spring.jpa.hibernate.ddl-auto` - 设置为 `validate` 或 `update`
   - [ ] `spring.jpa.database-platform` - 设置为 `org.hibernate.dialect.PostgreSQLDialect`
+  - [ ] （可选）`spring.session.store-type: jdbc` - 启用 JDBC session 持久化
+  - [ ] （可选）`spring.session.jdbc.initialize-schema: always` - 自动创建 session 表
 
 - [ ] 如果需要 OAuth2，配置了：
   - [ ] `spring.security.oauth2.client.registration.google` （Google）
@@ -49,6 +56,7 @@
 - [ ] 日志中没有关键的 Bean 初始化错误
 - [ ] 数据库连接成功
 - [ ] 所有 Repository 成功加载
+- [ ] （可选）Spring Session JDBC 初始化成功，SPRING_SESSION 表已创建
 
 ## 🧪 功能测试
 
@@ -181,6 +189,16 @@
 - [ ] 添加了两因素认证（2FA，可选）
 - [ ] 配置了密码重置流程
 - [ ] 实现了账户锁定机制（多次失败后）
+
+## 🔄 Session 持久化与多服务器支持
+
+- [ ] 已启用 Spring Session JDBC（可选）
+- [ ] 验证了 SPRING_SESSION 表自动创建
+- [ ] 验证了 session 在数据库中持久化
+- [ ] 测试了应用重启后 session 仍然有效
+- [ ] （可选）测试了多服务器实例共享 session
+- [ ] （如果使用多服务器）配置了所有实例指向同一数据库
+- [ ] 监控了 SPRING_SESSION 表的大小和性能
 
 ---
 

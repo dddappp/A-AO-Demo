@@ -24,6 +24,14 @@ spring:
       data-locations: classpath:data-sqlite.sql
       schema-locations: classpath:schema-sqlite.sql
 
+  # Spring Session JDBC 配置 - 在 dev 环境也使用 JDBC 持久化
+  # 这样即使重启应用，session 也会保留在数据库中
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    timeout: 1800
+
 logging:
   level:
     com.example.oauth2demo: DEBUG

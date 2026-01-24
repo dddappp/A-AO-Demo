@@ -9,9 +9,7 @@ spring:
   application:
     name: google-oauth2-demo
   profiles:
-    active: dev  # 默认激活dev环境（SQLite）
-    # 可选：激活test环境（PostgreSQL）
-    # active: test
+    active: test
 
   # 数据库配置由环境特定的配置文件（application-{profile}.yml）接管
   # - application-dev.yml: SQLite配置
@@ -20,6 +18,18 @@ spring:
 
   jpa:
     # JPA配置由环境特定的配置文件提供
+
+  # Spring Session JDBC 配置 - Session 持久化到数据库
+  session:
+    store-type: jdbc                # 使用 JDBC 存储 session（而不是内存）
+    jdbc:
+      initialize-schema: always     # 应用启动时自动创建 SPRING_SESSION 表
+    timeout: 1800                   # Session 超时时间：30分钟（单位：秒）
+    cookie:
+      name: JSESSIONID              # Session Cookie 名称
+      http-only: true               # HttpOnly，防止 XSS 攻击
+      path: /                        # Cookie 路径
+      same-site: Lax                # SameSite 属性，防止 CSRF 攻击
 
   security:
     oauth2:
@@ -88,3 +98,5 @@ logging:
     org.springframework.security: DEBUG
     org.springframework.web: DEBUG
     org.springframework.security.oauth2: DEBUG
+    org.springframework.session: DEBUG                    # 显示 Session 操作日志
+    org.springframework.session.jdbc.JdbcOperationsSessionRepository: DEBUG  # 显示 JDBC Session 详细操作

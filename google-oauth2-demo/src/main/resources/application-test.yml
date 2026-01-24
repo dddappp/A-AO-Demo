@@ -31,6 +31,14 @@ spring:
       # 注意：测试数据不再由SQL脚本提供，而是由TestEnvironmentInitializer动态创建
       # 这确保密码哈希正确匹配当前的PasswordEncoder
 
+  # Spring Session JDBC 配置 - 在 test 环境使用 PostgreSQL 持久化
+  # 演示多个 test 实例共享同一个 session 存储
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    timeout: 1800
+
 logging:
   level:
     com.example.oauth2demo: INFO

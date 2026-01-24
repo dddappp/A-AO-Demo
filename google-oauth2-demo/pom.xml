@@ -110,6 +110,12 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Spring Session JDBC - Session 持久化到数据库 -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-jdbc</artifactId>
+        </dependency>
+
         <!-- HTTP Client for JWKS (removed explicit spring-web as it's included in starter) -->
 
         <!-- JSON Processing -->

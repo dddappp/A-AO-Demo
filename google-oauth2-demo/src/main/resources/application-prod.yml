@@ -33,6 +33,18 @@ spring:
     init:
       mode: never  # 生产环境不自动执行初始化脚本
 
+  # Spring Session JDBC 配置 - 生产环境支持大规模多服务器部署
+  # 注意：SPRING_SESSION 表需要在生产数据库初始化时手动创建
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never  # 生产环境由 DBA 手动初始化表
+    timeout: 1800
+    cookie:
+      secure: true              # 生产环境强制 HTTPS
+      http-only: true
+      same-site: Strict         # 生产环境使用 Strict CSRF 防护
+
 logging:
   level:
     com.example.oauth2demo: WARN

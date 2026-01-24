@@ -187,6 +187,12 @@ grep -r "@ComponentScan\|@EntityScan\|@EnableJpaRepositories" src/
         <scope>runtime</scope>
     </dependency>
 
+    <!-- Spring Session JDBC（可选但推荐，用于 session 持久化和多服务器共享） -->
+    <dependency>
+        <groupId>org.springframework.session</groupId>
+        <artifactId>spring-session-jdbc</artifactId>
+    </dependency>
+
     <!-- Lombok（可选，但推荐） -->
     <dependency>
         <groupId>org.projectlombok</groupId>
@@ -212,12 +218,25 @@ CREATE DATABASE your_project_db;
 
 ### 4.2 表结构说明
 
+#### 认证相关表
+
 | 表名 | 用途 | 关键字段 |
 |-----|------|---------|
 | `users` | 用户账户 | `id`, `username`, `email`, `enabled` |
 | `user_login_methods` | 登录方式（本地/SSO） | `auth_provider`, `local_password_hash`, `provider_user_id` |
 | `user_authorities` | 用户权限 | `authority` （ROLE_USER, ROLE_ADMIN 等） |
 | `token_blacklist` | Token 黑名单（登出） | `token`, `blacklist_reason` |
+
+#### Session 持久化表（Spring Session JDBC）
+
+如果启用 Spring Session JDBC（可选但推荐），还会自动创建以下表：
+
+| 表名 | 用途 | 说明 |
+|-----|------|------|
+| `SPRING_SESSION` | 存储 session 信息 | 包含 session ID、创建时间、过期时间等 |
+| `SPRING_SESSION_ATTRIBUTES` | 存储 session 属性 | 存储 session 中的属性值（序列化） |
+
+**这些表会在应用启动时自动创建**（如果配置了 `initialize-schema: always`）。
 
 ### 4.3 初始化测试数据（可选）
 
@@ -230,7 +249,7 @@ CREATE DATABASE your_project_db;
 
 ## ⚙️ 第五步：配置 Spring Boot 应用
 
-### 5.1 在主应用类中启用 JPA 扫描
+### 5.1 在主应用类中启用 JPA 和 Spring Session
 
 ```java
 package com.yourcompany.yourproject;
@@ -239,6 +258,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.session.config.annotation.web.http.EnableSpringHttpSession;
 
 @SpringBootApplication
 @EnableJpaRepositories(
@@ -247,12 +267,19 @@ import org.springframework.context.annotation.ComponentScan;
 @ComponentScan(
     basePackages = {"com.yourcompany.yourproject"}
 )
+@EnableSpringHttpSession  // ← 启用 Spring Session JDBC（可选但推荐）
 public class YourProjectApplication {
     public static void main(String[] args) {
         SpringApplication.run(YourProjectApplication.class, args);
     }
 }
 ```
+
+**说明**：
+- `@EnableSpringHttpSession` 注解启用 Spring Session JDBC
+- 将 HttpSession 持久化到数据库（而不是内存）
+- 支持多服务器部署时 session 自动共享
+- 应用重启后 session 仍然保留
 
 ### 5.2 创建 `application.yml` 配置
 
@@ -279,6 +306,16 @@ spring:
       hibernate:
         format_sql: true
         use_sql_comments: true
+
+  # Spring Session JDBC 配置（可选但推荐）- Session 持久化到数据库
+  session:
+    store-type: jdbc                # 使用 JDBC 存储 session
+    jdbc:
+      initialize-schema: always     # 自动创建 SPRING_SESSION 表
+    timeout: 1800                   # 30分钟超时
+    cookie:
+      http-only: true               # 防止 XSS
+      same-site: Lax                # 防止 CSRF
 
   # OAuth2 配置（可选，跳过此步骤则仅支持本地登录）
   security:
