@@ -17,3 +17,4 @@ google-oauth2-demo/auth-dev.db
 google-oauth2-demo/cookies*.txt
 google-oauth2-demo/dev-database.db
 google-oauth2-demo/*.db
+google-oauth2-demo/jwt-secret.key
