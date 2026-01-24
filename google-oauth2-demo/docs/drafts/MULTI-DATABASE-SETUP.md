@@ -272,9 +272,9 @@ src/main/resources/
 ├── application-dev.yml               # 📱 Dev环境：SQLite
 ├── application-test.yml              # 🧪 Test环境：PostgreSQL
 ├── application-prod.yml              # 🏢 Prod环境：PostgreSQL
-├── schema.sql                        # SQLite表结构
+├── schema-sqlite.sql                 # SQLite表结构
 ├── schema-postgresql.sql             # PostgreSQL表结构
-├── data.sql                          # SQLite测试数据
+├── data-sqlite.sql                   # SQLite测试数据
 └── data-postgresql.sql               # PostgreSQL测试数据
 ```
 

@@ -10,6 +10,8 @@ spring:
     name: google-oauth2-demo
   profiles:
     active: dev  # 默认激活dev环境（SQLite）
+    # 可选：激活test环境（PostgreSQL）
+    # active: test
 
   # 数据库配置由环境特定的配置文件（application-{profile}.yml）接管
   # - application-dev.yml: SQLite配置

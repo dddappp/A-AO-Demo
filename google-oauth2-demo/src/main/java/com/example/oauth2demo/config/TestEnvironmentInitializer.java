@@ -17,9 +17,13 @@ import java.util.Set;
 /**
  * Test环境初始化器 - PostgreSQL环境的测试设置
  * 
- * Test环境使用PostgreSQL数据库，但初始化逻辑与dev环境相似
- * 注意：SQL初始化脚本（data-postgresql.sql）会在应用启动时自动执行
- * 这个类主要用于额外的代码级初始化（如果需要的话）
+ * Test环境使用PostgreSQL数据库，初始化逻辑与dev环境相同
+ * 在每次应用启动时创建三个预定义的测试账户
+ * 
+ * 这样可以快速进行各种测试场景：
+ * - 本地登录 → 绑定SSO
+ * - SSO登录 → 绑定本地密码
+ * - 多方式登录验证
  */
 @Component
 @Profile("test")
@@ -41,8 +45,7 @@ public class TestEnvironmentInitializer implements CommandLineRunner {
     /**
      * Test环境设置
      * 
-     * 注意：SQL脚本已通过application-test.yml的spring.sql.init配置自动执行
-     * 这个方法主要用于输出环境信息和验证数据库连接
+     * 与Dev环境类似，创建三个测试账户，确保密码哈希正确匹配
      */
     private void setupTestEnvironment() {
         try {
@@ -50,16 +53,14 @@ public class TestEnvironmentInitializer implements CommandLineRunner {
             log.info("🧪 Test环境初始化开始 (PostgreSQL)");
             log.info("========================================");
 
-            // 验证数据库连接和数据
-            long userCount = userRepository.count();
-            long loginMethodCount = loginMethodRepository.count();
+            // 1. 清空数据库（确保干净的测试环境）
+            clearDatabase();
+
+            // 2. 创建测试账户
+            createTestAccounts();
 
             log.info("✅ Test环境初始化完成");
             log.info("========================================");
-            log.info("");
-            log.info("📊 数据库状态:");
-            log.info("  用户总数: {}", userCount);
-            log.info("  登录方式总数: {}", loginMethodCount);
             log.info("");
             log.info("📋 可用的测试账户：");
             log.info("");
@@ -87,5 +88,157 @@ public class TestEnvironmentInitializer implements CommandLineRunner {
             log.error("❌ Test环境初始化失败", e);
             throw new RuntimeException("Failed to initialize test environment", e);
         }
+    }
+
+    /**
+     * 清空数据库中的所有用户和登录方式
+     */
+    private void clearDatabase() {
+        log.info("清空数据库...");
+        loginMethodRepository.deleteAll();
+        userRepository.deleteAll();
+        log.info("✅ 数据库已清空");
+    }
+
+    /**
+     * 创建测试账户
+     */
+    private void createTestAccounts() {
+        log.info("创建测试账户...");
+
+        // 账户1: testlocal - 仅本地登录（用于测试本地 → SSO绑定）
+        createLocalOnlyUser(
+            "testlocal",
+            "testlocal@example.com",
+            "Test Local User"
+        );
+
+        // 账户2: testsso - 仅SSO登录（用于测试SSO → 本地绑定）
+        createSSOOnlyUser(
+            "testsso",
+            "testsso@example.com",
+            "Test SSO User"
+        );
+
+        // 账户3: testboth - 本地和SSO都有（用于测试多方式登录）
+        createMixedUser(
+            "testboth",
+            "testboth@example.com",
+            "Test Both User"
+        );
+
+        log.info("✅ 测试账户创建完成");
+    }
+
+    /**
+     * 创建仅有本地登录方式的用户
+     */
+    private void createLocalOnlyUser(String username, String email, String displayName) {
+        UserEntity user = new UserEntity();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setDisplayName(displayName);
+        Set<String> authorities = new HashSet<>();
+        authorities.add("ROLE_USER");
+        user.setAuthorities(authorities);
+        user.setEnabled(true);
+        user.setEmailVerified(true);
+
+        userRepository.save(user);
+
+        // 创建本地登录方式
+        UserLoginMethod loginMethod = UserLoginMethod.builder()
+            .user(user)
+            .authProvider(UserLoginMethod.AuthProvider.LOCAL)
+            .localUsername(username)
+            .localPasswordHash(passwordEncoder.encode(PASSWORD))
+            .isPrimary(true)
+            .isVerified(true)
+            .build();
+
+        user.addLoginMethod(loginMethod);
+        userRepository.save(user);
+
+        log.info("  ✅ 创建用户: {} (仅本地登录)", username);
+    }
+
+    /**
+     * 创建仅有SSO登录方式的用户
+     */
+    private void createSSOOnlyUser(String username, String email, String displayName) {
+        UserEntity user = new UserEntity();
+        user.setUsername(email); // SSO用户使用邮箱作为用户名
+        user.setEmail(email);
+        user.setDisplayName(displayName);
+        Set<String> authorities = new HashSet<>();
+        authorities.add("ROLE_USER");
+        user.setAuthorities(authorities);
+        user.setEnabled(true);
+        user.setEmailVerified(true);
+
+        userRepository.save(user);
+
+        // 创建Google登录方式（模拟Google OAuth2登录）
+        UserLoginMethod googleMethod = UserLoginMethod.builder()
+            .user(user)
+            .authProvider(UserLoginMethod.AuthProvider.GOOGLE)
+            .providerUserId("mock_google_" + username)
+            .providerEmail(email)
+            .providerUsername(displayName)
+            .isPrimary(true)
+            .isVerified(true)
+            .linkedAt(LocalDateTime.now())
+            .build();
+
+        user.addLoginMethod(googleMethod);
+        userRepository.save(user);
+
+        log.info("  ✅ 创建用户: {} (仅SSO登录 - Google)", username);
+    }
+
+    /**
+     * 创建既有本地登录又有SSO登录的用户
+     */
+    private void createMixedUser(String username, String email, String displayName) {
+        UserEntity user = new UserEntity();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setDisplayName(displayName);
+        Set<String> authorities = new HashSet<>();
+        authorities.add("ROLE_USER");
+        user.setAuthorities(authorities);
+        user.setEnabled(true);
+        user.setEmailVerified(true);
+
+        userRepository.save(user);
+
+        // 1. 创建本地登录方式（主登录方式）
+        UserLoginMethod localMethod = UserLoginMethod.builder()
+            .user(user)
+            .authProvider(UserLoginMethod.AuthProvider.LOCAL)
+            .localUsername(username)
+            .localPasswordHash(passwordEncoder.encode(PASSWORD))
+            .isPrimary(true)
+            .isVerified(true)
+            .build();
+
+        user.addLoginMethod(localMethod);
+
+        // 2. 创建Google登录方式
+        UserLoginMethod googleMethod = UserLoginMethod.builder()
+            .user(user)
+            .authProvider(UserLoginMethod.AuthProvider.GOOGLE)
+            .providerUserId("mock_google_" + username)
+            .providerEmail(email)
+            .providerUsername(displayName)
+            .isPrimary(false)
+            .isVerified(true)
+            .linkedAt(LocalDateTime.now())
+            .build();
+
+        user.addLoginMethod(googleMethod);
+        userRepository.save(user);
+
+        log.info("  ✅ 创建用户: {} (本地 + Google登录)", username);
     }
 }

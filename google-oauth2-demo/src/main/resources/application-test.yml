@@ -27,8 +27,9 @@ spring:
   sql:
     init:
       mode: always  # 总是执行初始化脚本
-      data-locations: classpath:data-postgresql.sql
       schema-locations: classpath:schema-postgresql.sql
+      # 注意：测试数据不再由SQL脚本提供，而是由TestEnvironmentInitializer动态创建
+      # 这确保密码哈希正确匹配当前的PasswordEncoder
 
 logging:
   level:

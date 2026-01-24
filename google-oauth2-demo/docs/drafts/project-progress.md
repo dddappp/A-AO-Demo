@@ -1920,3 +1920,29 @@ jobs:
 4. 扩展更多认证提供商
 
 **🎉 OAuth2 Demo项目 - 任务100%完成！**
+
+---
+
+## 📅 最新进展 (2026-01-24)
+
+### 🔧 数据库初始化架构优化
+
+**问题修复**：
+- ❌ Test环境登录返回401错误 → ✅ 已解决
+- ❌ SQL脚本中密码哈希不匹配 → ✅ 使用PasswordEncoder动态创建
+
+**架构改进**：
+- SQL层职责明确：schema脚本创建表结构，data脚本为空/通用数据
+- 环境隔离：环境相关测试数据由Initializer类动态创建
+- 文件规范化：data.sql/schema.sql 按环境后缀命名（-sqlite/-postgresql）
+
+**具体变更**：
+- ✅ 重构 `TestEnvironmentInitializer.java` - 动态创建三个测试场景账户
+- ✅ 软删除SQL脚本中的环境相关数据（注释保留）
+- ✅ 更新配置文件指向正确的SQL脚本
+- ✅ 通过Test环境验证（testlocal/password123登录正常）
+
+**文件更新**：
+- `data-sqlite.sql` / `data-postgresql.sql` - 规范化与注释调整
+- `TestEnvironmentInitializer.java` - 关键修复
+- `application-dev.yml` / `application-test.yml` - 配置更新
