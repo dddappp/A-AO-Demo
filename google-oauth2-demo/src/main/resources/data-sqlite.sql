@@ -8,6 +8,10 @@
 --    - Dev环境: DevEnvironmentInitializer.java
 --    - Test环境: TestEnvironmentInitializer.java (使用 PostgreSQL)
 --
+-- 必要的占位符语句（确保脚本不为空）
+-- 在 Spring Boot 自动创建 SPRING_SESSION 表后，这个占位符不会有任何实际影响
+SELECT 1 WHERE 0;  -- 这是一个无效的占位符，不会改变任何数据
+--
 -- === 以下为开发环境的测试数据初始化（由DevEnvironmentInitializer.java动态创建）===
 -- 注意：密码使用BCrypt加密，密码都是 'password123'
 --
