@@ -1,0 +1,41 @@
+# Production Environment Configuration
+# 使用PostgreSQL数据库用于生产环境
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}
+    driver-class-name: org.postgresql.Driver
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate  # 生产环境不自动修改表，只验证
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc:
+          batch_size: 50
+          fetch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  sql:
+    init:
+      mode: never  # 生产环境不自动执行初始化脚本
+
+logging:
+  level:
+    com.example.oauth2demo: WARN
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    root: WARN

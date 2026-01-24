@@ -1,0 +1,32 @@
+# Development Environment Configuration
+# 使用SQLite数据库进行快速开发和测试
+
+spring:
+  datasource:
+    url: jdbc:sqlite:./dev-database.db
+    driver-class-name: org.sqlite.JDBC
+    username:
+    password:
+
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: none  # 不自动创建表，由schema.sql处理
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+        format_sql: true
+
+  sql:
+    init:
+      mode: always  # 总是执行初始化脚本
+      data-locations: classpath:data.sql
+      schema-locations: classpath:schema.sql
+
+logging:
+  level:
+    com.example.oauth2demo: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security.oauth2: DEBUG

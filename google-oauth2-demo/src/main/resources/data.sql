@@ -1,4 +1,6 @@
--- 初始化测试数据 (SQLite数据库)
+-- SQLite初始化测试数据 (开发环境)
+-- 此文件用于 dev 环境
+-- 生产环境请使用 data-postgresql.sql
 -- 注意：密码使用BCrypt加密，密码都是 'password123'
 
 -- 插入测试用户

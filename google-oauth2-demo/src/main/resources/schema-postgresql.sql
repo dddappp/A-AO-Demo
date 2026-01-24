@@ -1,36 +1,33 @@
--- SQLite数据库表结构定义 (开发环境)
--- 此文件用于 dev 环境
--- 生产环境请使用 schema-postgresql.sql
+-- PostgreSQL数据库表结构定义
 
 -- 用户表
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id BIGSERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     display_name TEXT,
     avatar_url TEXT,
-    email_verified INTEGER DEFAULT 0,
-    enabled INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_login_at DATETIME
+    email_verified BOOLEAN DEFAULT FALSE,
+    enabled BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMP
 );
 
 -- 用户登录方式表
 CREATE TABLE IF NOT EXISTS user_login_methods (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     auth_provider TEXT NOT NULL,
     provider_user_id TEXT,
     provider_email TEXT,
     provider_username TEXT,
     local_username TEXT,
     local_password_hash TEXT,
-    is_primary INTEGER DEFAULT 0,
-    is_verified INTEGER DEFAULT 0,
-    linked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_used_at DATETIME,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    is_primary BOOLEAN DEFAULT FALSE,
+    is_verified BOOLEAN DEFAULT FALSE,
+    linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP
 );
 
 -- 用户登录方式的唯一性约束
@@ -57,20 +54,19 @@ CREATE INDEX IF NOT EXISTS idx_login_methods_primary
 
 -- 用户权限关联表
 CREATE TABLE IF NOT EXISTS user_authorities (
-    user_id INTEGER NOT NULL,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     authority TEXT NOT NULL,
-    PRIMARY KEY (user_id, authority),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    PRIMARY KEY (user_id, authority)
 );
 
 -- Token黑名单表
 CREATE TABLE IF NOT EXISTS token_blacklist (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id BIGSERIAL PRIMARY KEY,
     jti TEXT UNIQUE NOT NULL,
     token_type TEXT,
-    user_id INTEGER,
-    expires_at DATETIME NOT NULL,
-    blacklisted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    user_id BIGINT,
+    expires_at TIMESTAMP NOT NULL,
+    blacklisted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reason TEXT
 );
 

@@ -9,28 +9,15 @@ spring:
   application:
     name: google-oauth2-demo
   profiles:
-    active: dev  # 默认激活dev环境
+    active: dev  # 默认激活dev环境（SQLite）
 
-  # 数据库配置 (SQLite)
-  datasource:
-    url: jdbc:sqlite:./dev-database.db  # 持久化到文件，便于观察
-    driver-class-name: org.sqlite.JDBC
-    username:
-    password:
+  # 数据库配置由环境特定的配置文件（application-{profile}.yml）接管
+  # - application-dev.yml: SQLite配置
+  # - application-test.yml: PostgreSQL配置
+  # - application-prod.yml: PostgreSQL生产配置
 
   jpa:
-    database-platform: org.hibernate.community.dialect.SQLiteDialect
-    hibernate:
-      ddl-auto: none  # 不自动创建表，由schema.sql处理
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.community.dialect.SQLiteDialect
-        format_sql: true
-
-  sql:
-    init:
-      mode: always  # 总是执行初始化脚本
+    # JPA配置由环境特定的配置文件提供
 
   security:
     oauth2:

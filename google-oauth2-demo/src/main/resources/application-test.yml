@@ -1,0 +1,38 @@
+# Test Environment Configuration
+# 使用PostgreSQL数据库进行集成测试
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:google_oauth2_demo}
+    driver-class-name: org.postgresql.Driver
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:password}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: none  # 由schema-postgresql.sql处理
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+
+  sql:
+    init:
+      mode: always  # 总是执行初始化脚本
+      data-locations: classpath:data-postgresql.sql
+      schema-locations: classpath:schema-postgresql.sql
+
+logging:
+  level:
+    com.example.oauth2demo: INFO
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
