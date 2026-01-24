@@ -33,7 +33,7 @@ public class TokenRefreshService {
 
             // 2. 从refresh token中提取用户信息
             String username = jwtTokenService.extractUsername(refreshTokenValue);
-            Long userId = jwtTokenService.getUserIdFromToken(refreshTokenValue);
+            String userId = jwtTokenService.getUserIdFromToken(refreshTokenValue);
 
             // 3. 验证用户存在
             UserEntity user = userRepository.findById(userId)

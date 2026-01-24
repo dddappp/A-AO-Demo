@@ -7,10 +7,13 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * 用户实体类
  * 支持本地用户和OAuth2用户
+ * 
+ * 注意：ID 改为 UUID String，由应用层（Java代码）生成，而不是数据库自动生成
  */
 @Entity
 @Table(name = "users")
@@ -20,8 +23,8 @@ import java.util.Set;
 public class UserEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(length = 36)  // UUID 字符串长度为 36（包括连字符）
+    private String id;  // UUID 字符串格式：xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
     @Column(unique = true, nullable = false, length = 255)
     private String username;
@@ -68,7 +71,7 @@ public class UserEntity {
     }
 
     public static class UserEntityBuilder {
-        private Long id;
+        private String id;
         private String username;
         private String email;
         private String displayName;
@@ -81,7 +84,7 @@ public class UserEntity {
         private LocalDateTime lastLoginAt;
         private Set<UserLoginMethod> loginMethods = new HashSet<>();
 
-        public UserEntityBuilder id(Long id) { this.id = id; return this; }
+        public UserEntityBuilder id(String id) { this.id = id; return this; }
         public UserEntityBuilder username(String username) { this.username = username; return this; }
         public UserEntityBuilder email(String email) { this.email = email; return this; }
         public UserEntityBuilder displayName(String displayName) { this.displayName = displayName; return this; }
@@ -114,6 +117,10 @@ public class UserEntity {
 
     @PrePersist
     protected void onCreate() {
+        // 如果ID未设置，生成UUID（后备机制，正常情况下应该由应用层设置）
+        if (id == null || id.trim().isEmpty()) {
+            id = UUID.randomUUID().toString();
+        }
         if (authorities.isEmpty()) {
             authorities.add("ROLE_USER");
         }

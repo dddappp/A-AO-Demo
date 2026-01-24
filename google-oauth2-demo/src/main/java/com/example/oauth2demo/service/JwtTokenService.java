@@ -28,7 +28,7 @@ public class JwtTokenService {
     /**
      * 生成Access Token
      */
-    public String generateAccessToken(String username, String email, Long userId) {
+    public String generateAccessToken(String username, String email, String userId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("email", email);
@@ -46,7 +46,7 @@ public class JwtTokenService {
     /**
      * 生成Refresh Token
      */
-    public String generateRefreshToken(String username, Long userId) {
+    public String generateRefreshToken(String username, String userId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("type", "refresh");
@@ -111,7 +111,7 @@ public class JwtTokenService {
     /**
      * 从Token中提取用户ID
      */
-    public Long getUserIdFromToken(String token) {
+    public String getUserIdFromToken(String token) {
         try {
             var claims = Jwts.parserBuilder()
                 .setSigningKey(secretKey)
@@ -119,8 +119,7 @@ public class JwtTokenService {
                 .parseClaimsJws(token)
                 .getBody();
 
-            Integer userId = claims.get("userId", Integer.class);
-            return userId != null ? userId.longValue() : null;
+            return claims.get("userId", String.class);
         } catch (Exception e) {
             throw new RuntimeException("无法从token中提取用户ID", e);
         }

@@ -4,10 +4,13 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * 用户登录方式实体
  * 用于支持一个用户绑定多种登录方式
+ * 
+ * 注意：ID 改为 UUID String，由应用层（Java代码）生成
  */
 @Entity
 @Table(name = "user_login_methods")
@@ -19,8 +22,8 @@ import java.time.LocalDateTime;
 public class UserLoginMethod {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(length = 36)  // UUID 字符串长度为 36
+    private String id;  // UUID 字符串格式
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -89,5 +92,15 @@ public class UserLoginMethod {
      */
     public boolean isLocalMethod() {
         return authProvider == AuthProvider.LOCAL;
+    }
+
+    /**
+     * 在持久化前生成UUID（后备机制，正常情况下应该由应用层设置）
+     */
+    @PrePersist
+    protected void onCreate() {
+        if (id == null || id.trim().isEmpty()) {
+            id = UUID.randomUUID().toString();
+        }
     }
 }

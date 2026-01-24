@@ -32,7 +32,7 @@ public class LoginMethodController {
     @GetMapping
     public ResponseEntity<?> getLoginMethods(@AuthenticationPrincipal Jwt jwt) {
         try {
-            Long userId = jwt.getClaim("userId");
+            String userId = jwt.getClaim("userId");
             
             List<UserLoginMethod> methods = loginMethodService.getUserLoginMethods(userId);
             
@@ -59,10 +59,10 @@ public class LoginMethodController {
      */
     @DeleteMapping("/{methodId}")
     public ResponseEntity<?> removeLoginMethod(
-            @PathVariable Long methodId,
+            @PathVariable String methodId,
             @AuthenticationPrincipal Jwt jwt) {
         try {
-            Long userId = jwt.getClaim("userId");
+            String userId = jwt.getClaim("userId");
             
             loginMethodService.removeLoginMethod(userId, methodId);
             
@@ -89,10 +89,10 @@ public class LoginMethodController {
      */
     @PutMapping("/{methodId}/primary")
     public ResponseEntity<?> setPrimaryLoginMethod(
-            @PathVariable Long methodId,
+            @PathVariable String methodId,
             @AuthenticationPrincipal Jwt jwt) {
         try {
-            Long userId = jwt.getClaim("userId");
+            String userId = jwt.getClaim("userId");
             
             loginMethodService.setPrimaryLoginMethod(userId, methodId);
             
@@ -129,7 +129,7 @@ public class LoginMethodController {
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal Jwt jwt) {
         try {
-            Long userId = jwt.getClaim("userId");
+            String userId = jwt.getClaim("userId");
             
             String username = request.get("username");
             String password = request.get("password");

@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * 用户业务逻辑服务
@@ -40,6 +41,7 @@ public class UserService {
 
         // 创建新用户实体
         UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID().toString());  // 生成 UUID
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
         user.setDisplayName(request.getDisplayName());
@@ -53,6 +55,7 @@ public class UserService {
 
         // 创建本地登录方式
         UserLoginMethod loginMethod = UserLoginMethod.builder()
+            .id(UUID.randomUUID().toString())  // 生成 UUID
             .user(user)
             .authProvider(UserLoginMethod.AuthProvider.LOCAL)
             .localUsername(request.getUsername())
@@ -102,7 +105,7 @@ public class UserService {
             String name,
             String picture,
             boolean isBinding,
-            Long existingUserId) {
+            String existingUserId) {
         
         // 1. 查找是否已存在该OAuth2登录方式
         UserLoginMethod existingMethod = loginMethodService.findByOAuth2Provider(
@@ -149,6 +152,7 @@ public class UserService {
             
             // 创建用户
             UserEntity newUser = new UserEntity();
+            newUser.setId(UUID.randomUUID().toString());  // 生成 UUID
             newUser.setEmail(email);
             newUser.setUsername(email);
             newUser.setDisplayName(name);
@@ -163,6 +167,7 @@ public class UserService {
             
             // 创建OAuth2登录方式
             UserLoginMethod loginMethod = UserLoginMethod.builder()
+                .id(UUID.randomUUID().toString())  // 生成 UUID
                 .user(newUser)
                 .authProvider(UserLoginMethod.AuthProvider.valueOf(provider.toUpperCase()))
                 .providerUserId(providerUserId)

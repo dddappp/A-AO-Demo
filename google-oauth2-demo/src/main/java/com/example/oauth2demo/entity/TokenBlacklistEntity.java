@@ -4,10 +4,13 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Token黑名单实体类
  * 用于撤销access token和refresh token
+ * 
+ * 注意：ID 和 userId 均改为 UUID String，由应用层（Java代码）生成
  */
 @Entity
 @Table(name = "token_blacklist", indexes = {
@@ -21,8 +24,8 @@ import java.time.LocalDateTime;
 public class TokenBlacklistEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(length = 36)  // UUID 字符串长度为 36
+    private String id;  // UUID 字符串格式
 
     @Column(nullable = false, unique = true, length = 255)
     private String jti;  // JWT ID
@@ -31,8 +34,8 @@ public class TokenBlacklistEntity {
     @Column(nullable = false)
     private TokenType tokenType;
 
-    @Column
-    private Long userId;
+    @Column(length = 36)  // UUID 字符串
+    private String userId;  // 关联用户的 UUID，允许 NULL（非认证用户的 token）
 
     @Column(nullable = false)
     private LocalDateTime expiresAt;
@@ -46,5 +49,15 @@ public class TokenBlacklistEntity {
 
     public enum TokenType {
         ACCESS, REFRESH, ID
+    }
+
+    /**
+     * 在持久化前生成UUID（后备机制，正常情况下应该由应用层设置）
+     */
+    @PrePersist
+    protected void onCreate() {
+        if (id == null || id.trim().isEmpty()) {
+            id = UUID.randomUUID().toString();
+        }
     }
 }

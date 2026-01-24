@@ -105,7 +105,7 @@ public class SecurityConfig {
 
                 try {
                     // 🎯 核心：检查用户是否已登录
-                    Long currentUserId = getCurrentUserIdFromRequest(request);
+                    String currentUserId = getCurrentUserIdFromRequest(request);
                     boolean isUserLoggedIn = (currentUserId != null);
                     
                     System.out.println("User login status: " + (isUserLoggedIn ? "LOGGED_IN" : "NOT_LOGGED_IN") + 
@@ -218,7 +218,7 @@ public class SecurityConfig {
              * 从请求中获取当前登录用户ID
              * 通过JWT Cookie判断
              */
-            private Long getCurrentUserIdFromRequest(HttpServletRequest request) {
+            private String getCurrentUserIdFromRequest(HttpServletRequest request) {
                 try {
                     Cookie[] cookies = request.getCookies();
                     if (cookies == null) {

@@ -9,17 +9,17 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface UserLoginMethodRepository extends JpaRepository<UserLoginMethod, Long> {
+public interface UserLoginMethodRepository extends JpaRepository<UserLoginMethod, String> {
     
     /**
      * 查找用户的所有登录方式
      */
-    List<UserLoginMethod> findByUserId(Long userId);
+    List<UserLoginMethod> findByUserId(String userId);
     
     /**
      * 查找用户的特定登录方式
      */
-    Optional<UserLoginMethod> findByUserIdAndAuthProvider(Long userId, AuthProvider authProvider);
+    Optional<UserLoginMethod> findByUserIdAndAuthProvider(String userId, AuthProvider authProvider);
     
     /**
      * 通过OAuth2提供商和用户ID查找
@@ -35,7 +35,7 @@ public interface UserLoginMethodRepository extends JpaRepository<UserLoginMethod
     /**
      * 查找用户的主登录方式
      */
-    Optional<UserLoginMethod> findByUserIdAndIsPrimary(Long userId, boolean isPrimary);
+    Optional<UserLoginMethod> findByUserIdAndIsPrimary(String userId, boolean isPrimary);
     
     /**
      * 检查OAuth2账户是否已被绑定

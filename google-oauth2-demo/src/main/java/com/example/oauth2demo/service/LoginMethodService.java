@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 登录方式管理服务
@@ -30,7 +31,7 @@ public class LoginMethodService {
      * 获取用户的所有登录方式
      */
     @Transactional(readOnly = true)
-    public List<UserLoginMethod> getUserLoginMethods(Long userId) {
+    public List<UserLoginMethod> getUserLoginMethods(String userId) {
         return loginMethodRepository.findByUserId(userId);
     }
 
@@ -41,7 +42,7 @@ public class LoginMethodService {
      * @throws IllegalArgumentException 如果OAuth2账户已被其他用户绑定
      */
     public UserLoginMethod bindOAuth2LoginMethod(
-            Long userId,
+            String userId,
             AuthProvider provider,
             String providerUserId,
             String providerEmail,
@@ -68,6 +69,7 @@ public class LoginMethodService {
             .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
         
         UserLoginMethod loginMethod = UserLoginMethod.builder()
+            .id(UUID.randomUUID().toString())  // 生成 UUID
             .user(user)
             .authProvider(provider)
             .providerUserId(providerUserId)
@@ -106,7 +108,7 @@ public class LoginMethodService {
     /**
      * 更新登录方式的最后使用时间
      */
-    public void updateLastUsedAt(Long loginMethodId) {
+    public void updateLastUsedAt(String loginMethodId) {
         loginMethodRepository.findById(loginMethodId).ifPresent(method -> {
             method.updateLastUsedAt();
             loginMethodRepository.save(method);
@@ -118,7 +120,7 @@ public class LoginMethodService {
      * 
      * @throws IllegalStateException 如果是最后一个登录方式
      */
-    public void removeLoginMethod(Long userId, Long loginMethodId) {
+    public void removeLoginMethod(String userId, String loginMethodId) {
         log.info("Removing login method: userId={}, loginMethodId={}", userId, loginMethodId);
         
         // 1. 检查登录方式是否属于该用户
@@ -155,7 +157,7 @@ public class LoginMethodService {
     /**
      * 设置主登录方式
      */
-    public void setPrimaryLoginMethod(Long userId, Long loginMethodId) {
+    public void setPrimaryLoginMethod(String userId, String loginMethodId) {
         log.info("Setting primary login method: userId={}, loginMethodId={}", userId, loginMethodId);
         
         // 1. 验证登录方式属于该用户
@@ -189,7 +191,7 @@ public class LoginMethodService {
      * @throws IllegalArgumentException 如果用户名已被使用
      */
     public UserLoginMethod addLocalLoginMethod(
-            Long userId,
+            String userId,
             String username,
             String password) {
         
@@ -211,6 +213,7 @@ public class LoginMethodService {
         
         // 4. 创建新的本地登录方式
         UserLoginMethod loginMethod = UserLoginMethod.builder()
+            .id(UUID.randomUUID().toString())  // 生成 UUID
             .user(user)
             .authProvider(AuthProvider.LOCAL)
             .localUsername(username)

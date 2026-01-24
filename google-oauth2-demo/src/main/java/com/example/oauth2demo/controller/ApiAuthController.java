@@ -73,7 +73,7 @@ public class ApiAuthController {
         }
         // 处理JWT用户（本地登录或OAuth2登录后的JWT认证）
         else if (principal instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
-            Long userId = jwt.getClaim("userId");
+            String userId = jwt.getClaim("userId");
 
             // 从数据库查询用户信息（provider信息已在JWT中）
             UserEntity user = userRepository.findById(userId).orElse(null);

@@ -10,6 +10,7 @@ spring:
     name: google-oauth2-demo
   profiles:
     active: test
+    # dev 默认使用 SQLite 数据库，test 使用 PostgreSQL 数据库，prod 使用 PostgreSQL 数据库
 
   # 数据库配置由环境特定的配置文件（application-{profile}.yml）接管
   # - application-dev.yml: SQLite配置

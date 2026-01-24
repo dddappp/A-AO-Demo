@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * 开发环境初始化器 - 完整的测试场景设置
@@ -135,6 +136,7 @@ public class DevEnvironmentInitializer implements CommandLineRunner {
      */
     private void createLocalOnlyUser(String username, String email, String displayName) {
         UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID().toString());  // 生成 UUID
         user.setUsername(username);
         user.setEmail(email);
         user.setDisplayName(displayName);
@@ -148,6 +150,7 @@ public class DevEnvironmentInitializer implements CommandLineRunner {
 
         // 创建本地登录方式
         UserLoginMethod loginMethod = UserLoginMethod.builder()
+            .id(UUID.randomUUID().toString())  // 生成 UUID
             .user(user)
             .authProvider(UserLoginMethod.AuthProvider.LOCAL)
             .localUsername(username)
@@ -167,6 +170,7 @@ public class DevEnvironmentInitializer implements CommandLineRunner {
      */
     private void createSSOOnlyUser(String username, String email, String displayName) {
         UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID().toString());  // 生成 UUID
         user.setUsername(email); // SSO用户使用邮箱作为用户名
         user.setEmail(email);
         user.setDisplayName(displayName);
@@ -180,6 +184,7 @@ public class DevEnvironmentInitializer implements CommandLineRunner {
 
         // 创建Google登录方式（模拟Google OAuth2登录）
         UserLoginMethod googleMethod = UserLoginMethod.builder()
+            .id(UUID.randomUUID().toString())  // 生成 UUID
             .user(user)
             .authProvider(UserLoginMethod.AuthProvider.GOOGLE)
             .providerUserId("mock_google_" + username)
@@ -201,6 +206,7 @@ public class DevEnvironmentInitializer implements CommandLineRunner {
      */
     private void createMixedUser(String username, String email, String displayName) {
         UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID().toString());  // 生成 UUID
         user.setUsername(username);
         user.setEmail(email);
         user.setDisplayName(displayName);
@@ -214,6 +220,7 @@ public class DevEnvironmentInitializer implements CommandLineRunner {
 
         // 1. 创建本地登录方式（主登录方式）
         UserLoginMethod localMethod = UserLoginMethod.builder()
+            .id(UUID.randomUUID().toString())  // 生成 UUID
             .user(user)
             .authProvider(UserLoginMethod.AuthProvider.LOCAL)
             .localUsername(username)
@@ -226,6 +233,7 @@ public class DevEnvironmentInitializer implements CommandLineRunner {
 
         // 2. 创建Google登录方式
         UserLoginMethod googleMethod = UserLoginMethod.builder()
+            .id(UUID.randomUUID().toString())  // 生成 UUID
             .user(user)
             .authProvider(UserLoginMethod.AuthProvider.GOOGLE)
             .providerUserId("mock_google_" + username)

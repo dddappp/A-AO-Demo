@@ -1,8 +1,9 @@
 -- PostgreSQL数据库表结构定义
 
 -- 用户表
+-- 注意：id 改为 UUID 字符串，由应用层（Java代码）生成，而不是数据库自己生成
 CREATE TABLE IF NOT EXISTS users (
-    id BIGSERIAL PRIMARY KEY,
+    id VARCHAR(36) PRIMARY KEY,  -- UUID 字符串格式：xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     display_name TEXT,
@@ -16,8 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- 用户登录方式表
 CREATE TABLE IF NOT EXISTS user_login_methods (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id VARCHAR(36) PRIMARY KEY,  -- 此表的主键也使用 UUID
+    user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- 引用 users 表的 UUID
     auth_provider TEXT NOT NULL,
     provider_user_id TEXT,
     provider_email TEXT,
@@ -54,17 +55,17 @@ CREATE INDEX IF NOT EXISTS idx_login_methods_primary
 
 -- 用户权限关联表
 CREATE TABLE IF NOT EXISTS user_authorities (
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- 使用 UUID 字符串
     authority TEXT NOT NULL,
     PRIMARY KEY (user_id, authority)
 );
 
 -- Token黑名单表
 CREATE TABLE IF NOT EXISTS token_blacklist (
-    id BIGSERIAL PRIMARY KEY,
+    id VARCHAR(36) PRIMARY KEY,  -- 使用 UUID 字符串
     jti TEXT UNIQUE NOT NULL,
     token_type TEXT,
-    user_id BIGINT,
+    user_id VARCHAR(36),  -- 使用 UUID 字符串，允许 NULL（非认证用户的 token）
     expires_at TIMESTAMP NOT NULL,
     blacklisted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reason TEXT
