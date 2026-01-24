@@ -77,6 +77,9 @@ public class SecurityConfig {
     @Autowired
     private JwtTokenService jwtTokenService;
 
+    @Autowired
+    private com.example.oauth2demo.service.LoginMethodService loginMethodService;
+
     /**
      * 配置AuthenticationManager用于本地用户认证
      */
@@ -89,8 +92,8 @@ public class SecurityConfig {
     }
 
     /**
-     * OAuth2登录成功处理器
-     * 处理用户认证成功后的逻辑
+     * OAuth2登录成功处理器 - 智能路由版本
+     * 根据用户登录状态自动选择登录或绑定流程
      */
     @Bean
     public AuthenticationSuccessHandler oauth2SuccessHandler() {
@@ -98,9 +101,16 @@ public class SecurityConfig {
             @Override
             public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                               Authentication authentication) throws IOException {
-                System.out.println("=== OAuth2 Authentication Success ===");
+                System.out.println("=== OAuth2 Authentication Success - Smart Routing ===");
 
                 try {
+                    // 🎯 核心：检查用户是否已登录
+                    Long currentUserId = getCurrentUserIdFromRequest(request);
+                    boolean isUserLoggedIn = (currentUserId != null);
+                    
+                    System.out.println("User login status: " + (isUserLoggedIn ? "LOGGED_IN" : "NOT_LOGGED_IN") + 
+                                     ", userId: " + currentUserId);
+
                     UserDto userDto = null;
 
                     // 处理Google用户（OpenID Connect）
@@ -110,9 +120,12 @@ public class SecurityConfig {
                         String name = oidcUser.getFullName();
                         String picture = oidcUser.getPicture();
 
-                        // 获取或创建用户
-                        userDto = userService.getOrCreateOAuthUser(UserEntity.AuthProvider.GOOGLE,
-                                                                  providerUserId, email, name, picture);
+                        // 调用新的方法，传入isBinding和currentUserId
+                        userDto = userService.getOrCreateOAuthUser(
+                            "GOOGLE",
+                            providerUserId, email, name, picture,
+                            isUserLoggedIn, currentUserId
+                        );
 
                         System.out.println("Provider: Google");
                         System.out.println("User: " + name);
@@ -126,58 +139,114 @@ public class SecurityConfig {
                         String name = getProviderName(oauth2User, provider);
                         String picture = getProviderPicture(oauth2User, provider);
 
-                        // 获取或创建用户
-                        UserEntity.AuthProvider authProvider = UserEntity.AuthProvider.valueOf(provider.toUpperCase());
-                        userDto = userService.getOrCreateOAuthUser(authProvider, providerUserId, email, name, picture);
+                        userDto = userService.getOrCreateOAuthUser(
+                            provider, providerUserId, email, name, picture,
+                            isUserLoggedIn, currentUserId
+                        );
 
                         System.out.println("Provider: " + provider);
                         System.out.println("User: " + name);
                         System.out.println("Email: " + email);
                     }
 
-                    // 生成我们自己的JWT Token并存储在HttpOnly Cookie中
+                    // 🎯 关键区别：绑定流程不生成新JWT token
                     if (userDto != null) {
-                        String accessToken = jwtTokenService.generateAccessToken(
-                            userDto.getUsername(),
-                            userDto.getEmail(),
-                            userDto.getId()
-                        );
+                        if (isUserLoggedIn) {
+                            // 绑定流程：不修改现有token，直接重定向
+                            System.out.println("Binding completed successfully for user: " + currentUserId);
+                            response.sendRedirect("/?message=binding_success");
+                        } else {
+                            // 登录流程：生成JWT token
+                            String accessToken = jwtTokenService.generateAccessToken(
+                                userDto.getUsername(),
+                                userDto.getEmail(),
+                                userDto.getId()
+                            );
 
-                        String refreshToken = jwtTokenService.generateRefreshToken(
-                            userDto.getUsername(),
-                            userDto.getId()
-                        );
+                            String refreshToken = jwtTokenService.generateRefreshToken(
+                                userDto.getUsername(),
+                                userDto.getId()
+                            );
 
-                        // 存储Access Token到HttpOnly Cookie
-                        Cookie accessTokenCookie = new Cookie("accessToken", accessToken);
-                        accessTokenCookie.setHttpOnly(true);
-                        accessTokenCookie.setPath("/");
-                        accessTokenCookie.setMaxAge(3600); // 1小时
-                        accessTokenCookie.setSecure(false); // 开发环境设为false
-                        accessTokenCookie.setAttribute("SameSite", "Lax");
-                        response.addCookie(accessTokenCookie);
+                            // 存储Access Token到HttpOnly Cookie
+                            Cookie accessTokenCookie = new Cookie("accessToken", accessToken);
+                            accessTokenCookie.setHttpOnly(true);
+                            accessTokenCookie.setPath("/");
+                            accessTokenCookie.setMaxAge(3600); // 1小时
+                            accessTokenCookie.setSecure(false); // 开发环境设为false
+                            accessTokenCookie.setAttribute("SameSite", "Lax");
+                            response.addCookie(accessTokenCookie);
 
-                        // 存储Refresh Token到HttpOnly Cookie
-                        Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
-                        refreshTokenCookie.setHttpOnly(true);
-                        refreshTokenCookie.setPath("/");
-                        refreshTokenCookie.setMaxAge(604800); // 7天
-                        refreshTokenCookie.setSecure(false); // 开发环境设为false
-                        refreshTokenCookie.setAttribute("SameSite", "Lax");
-                        response.addCookie(refreshTokenCookie);
+                            // 存储Refresh Token到HttpOnly Cookie
+                            Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
+                            refreshTokenCookie.setHttpOnly(true);
+                            refreshTokenCookie.setPath("/");
+                            refreshTokenCookie.setMaxAge(604800); // 7天
+                            refreshTokenCookie.setSecure(false); // 开发环境设为false
+                            refreshTokenCookie.setAttribute("SameSite", "Lax");
+                            response.addCookie(refreshTokenCookie);
+
+                            System.out.println("Login completed successfully for user: " + userDto.getId());
+                            
+                            // 根据前端类型重定向
+                            if ("react".equals(frontendType)) {
+                                response.sendRedirect("/");  // React SPA
+                            } else {
+                                response.sendRedirect("/test");  // Thymeleaf页面
+                            }
+                        }
                     }
 
-                    // 根据前端类型重定向
-                    if ("react".equals(frontendType)) {
-                        response.sendRedirect("/");  // React SPA
-                    } else {
-                        response.sendRedirect("/test");  // Thymeleaf页面
+                } catch (IllegalArgumentException e) {
+                    // 业务逻辑错误（如账户已被绑定）
+                    System.out.println("OAuth2 processing failed: " + e.getMessage());
+                    try {
+                        String errorMsg = java.net.URLEncoder.encode(e.getMessage(), "UTF-8");
+                        response.sendRedirect("/?error=" + errorMsg);
+                    } catch (Exception ex) {
+                        response.sendRedirect("/?error=oauth2_processing_failed");
                     }
-
                 } catch (Exception e) {
-                    System.err.println("Error processing OAuth2 login: " + e.getMessage());
+                    // 系统错误
+                    System.err.println("OAuth2 processing error: " + e.getMessage());
                     e.printStackTrace();
-                    response.sendRedirect("/login?error=oauth2_processing_failed");
+                    response.sendRedirect("/?error=oauth2_processing_failed");
+                }
+            }
+
+            /**
+             * 从请求中获取当前登录用户ID
+             * 通过JWT Cookie判断
+             */
+            private Long getCurrentUserIdFromRequest(HttpServletRequest request) {
+                try {
+                    Cookie[] cookies = request.getCookies();
+                    if (cookies == null) {
+                        return null;
+                    }
+
+                    String accessToken = null;
+                    for (Cookie cookie : cookies) {
+                        if ("accessToken".equals(cookie.getName())) {
+                            accessToken = cookie.getValue();
+                            break;
+                        }
+                    }
+
+                    if (accessToken == null || accessToken.trim().isEmpty()) {
+                        return null;
+                    }
+
+                    // 尝试提取userId，异常则返回null（不是登录状态）
+                    try {
+                        return jwtTokenService.getUserIdFromToken(accessToken);
+                    } catch (RuntimeException e) {
+                        System.out.println("Invalid or expired access token: " + e.getMessage());
+                        return null;
+                    }
+                } catch (Exception e) {
+                    System.out.println("Failed to extract user ID from cookies: " + e.getMessage());
+                    return null;
                 }
             }
         };

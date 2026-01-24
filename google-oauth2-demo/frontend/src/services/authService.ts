@@ -127,6 +127,54 @@ export class AuthService {
   }
 
   /**
+   * 获取用户的所有登录方式
+   */
+  static async getLoginMethods(): Promise<any> {
+    const response = await axios.get(`${API_BASE_URL}/api/user/login-methods`, {
+      withCredentials: true,
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    return response.data;
+  }
+
+  /**
+   * 删除一个登录方式
+   */
+  static async removeLoginMethod(methodId: number): Promise<any> {
+    const response = await axios.delete(`${API_BASE_URL}/api/user/login-methods/${methodId}`, {
+      withCredentials: true
+    });
+    return response.data;
+  }
+
+  /**
+   * 设置主登录方式
+   */
+  static async setPrimaryLoginMethod(methodId: number): Promise<any> {
+    const response = await axios.put(`${API_BASE_URL}/api/user/login-methods/${methodId}/primary`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  }
+
+  /**
+   * 为SSO用户添加本地登录方式
+   */
+  static async addLocalLoginMethod(username: string, password: string, passwordConfirm: string): Promise<any> {
+    const response = await axios.post(`${API_BASE_URL}/api/user/login-methods/add-local-login`, {
+      username,
+      password,
+      passwordConfirm
+    }, {
+      withCredentials: true
+    });
+    return response.data;
+  }
+
+  /**
    * 获取OAuth2登录URL
    */
   static getLoginUrl(provider: 'google' | 'github' | 'x'): string {  // ✅ X API v2：提供者名改为 'x'

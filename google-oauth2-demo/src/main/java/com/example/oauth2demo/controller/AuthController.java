@@ -2,7 +2,9 @@ package com.example.oauth2demo.controller;
 
 import com.example.oauth2demo.dto.RegisterRequest;
 import com.example.oauth2demo.dto.UserDto;
+import com.example.oauth2demo.entity.UserLoginMethod;
 import com.example.oauth2demo.repository.UserRepository;
+import com.example.oauth2demo.repository.UserLoginMethodRepository;
 import com.example.oauth2demo.service.UserService;
 import com.example.oauth2demo.service.JwtTokenService;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ public class AuthController {
     private final UserService userService;
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
+    private final UserLoginMethodRepository loginMethodRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
 
@@ -144,8 +147,7 @@ public class AuthController {
                         "id", user.get().getId(),
                         "username", user.get().getUsername(),
                         "email", user.get().getEmail(),
-                        "enabled", user.get().isEnabled(),
-                        "passwordHash", user.get().getPasswordHash() // 添加密码哈希用于调试
+                        "enabled", user.get().isEnabled()
                     )
                 ));
             } else {
@@ -205,14 +207,14 @@ public class AuthController {
     @Profile("dev")
     public ResponseEntity<?> resetPassword(@RequestParam String username, @RequestParam String newPassword) {
         try {
-            var userOptional = userRepository.findByUsername(username);
-            if (userOptional.isEmpty()) {
+            var loginMethodOptional = loginMethodRepository.findByLocalUsername(username);
+            if (loginMethodOptional.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
             }
 
-            var user = userOptional.get();
-            user.setPasswordHash(passwordEncoder.encode(newPassword));
-            userRepository.save(user);
+            var loginMethod = loginMethodOptional.get();
+            loginMethod.setLocalPasswordHash(passwordEncoder.encode(newPassword));
+            loginMethodRepository.save(loginMethod);
 
             return ResponseEntity.ok(Map.of(
                 "message", "Password reset successfully",

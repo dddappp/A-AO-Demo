@@ -75,12 +75,9 @@ public class ApiAuthController {
         else if (principal instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
             Long userId = jwt.getClaim("userId");
 
-            // 从数据库查询用户的真实认证提供商
+            // 从数据库查询用户信息（provider信息已在JWT中）
             UserEntity user = userRepository.findById(userId).orElse(null);
             String actualProvider = "local"; // 默认值
-            if (user != null) {
-                actualProvider = user.getAuthProvider().name().toLowerCase();
-            }
 
             userInfo.put("provider", actualProvider);
             userInfo.put("userId", userId);

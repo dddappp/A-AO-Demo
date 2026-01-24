@@ -1,7 +1,8 @@
 package com.example.oauth2demo.service;
 
 import com.example.oauth2demo.entity.UserEntity;
-import com.example.oauth2demo.repository.UserRepository;
+import com.example.oauth2demo.entity.UserLoginMethod;
+import com.example.oauth2demo.repository.UserLoginMethodRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -19,13 +20,16 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
-    private final UserRepository userRepository;
+    private final UserLoginMethodRepository loginMethodRepository;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        UserEntity user = userRepository.findByUsername(username)
+        // 从user_login_methods表查询本地登录方式
+        UserLoginMethod loginMethod = loginMethodRepository.findByLocalUsername(username)
             .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
+        UserEntity user = loginMethod.getUser();
+        
         if (!user.isEnabled()) {
             throw new UsernameNotFoundException("User is disabled: " + username);
         }
@@ -36,8 +40,8 @@ public class CustomUserDetailsService implements UserDetailsService {
             .toList();
 
         return User.builder()
-            .username(user.getUsername())
-            .password(user.getPasswordHash())  // BCrypt hash
+            .username(username)
+            .password(loginMethod.getLocalPasswordHash())  // BCrypt hash from user_login_methods
             .authorities(grantedAuthorities)   // 从数据库读取权限
             .accountExpired(false)
             .accountLocked(false)
