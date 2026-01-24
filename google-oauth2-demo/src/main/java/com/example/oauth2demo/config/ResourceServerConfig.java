@@ -7,11 +7,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.*;
 
 /**
  * 资源服务器配置
@@ -64,6 +68,26 @@ public class ResourceServerConfig {
     }
 
     /**
+     * JWT认证转换器，从token中提取权限信息
+     */
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            Collection<GrantedAuthority> authorities = new ArrayList<>();
+            // 从token中提取权限信息
+            List<String> auths = jwt.getClaimAsStringList("authorities");
+            if (auths != null) {
+                for (String auth : auths) {
+                    authorities.add(new SimpleGrantedAuthority(auth));
+                }
+            }
+            return authorities;
+        });
+        return converter;
+    }
+
+    /**
      * 资源服务器安全过滤器链
      * 配置受保护的API端点
      */
@@ -71,16 +95,22 @@ public class ResourceServerConfig {
     @Order(3)
     public SecurityFilterChain resourceServerSecurityFilterChain(HttpSecurity http,
                                                                  BearerTokenResolver bearerTokenResolver,
-                                                                 JwtDecoder jwtDecoder) throws Exception {
+                                                                 JwtDecoder jwtDecoder,
+                                                                 JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
         http
             .securityMatcher("/api/**")  // 只匹配API请求（排除认证API，因为AuthApiConfig优先级更高）
             .authorizeHttpRequests(authz -> authz
+                .requestMatchers("/api/auth/**").permitAll()  // 认证API公开
+                .requestMatchers("/api/user").authenticated()  // 所有认证用户都可以访问
+                .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")  // 只有ROLE_ADMIN权限可以访问
+                .requestMatchers("/api/manager/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_MANAGER")  // ROLE_ADMIN或ROLE_MANAGER权限可以访问
                 .anyRequest().authenticated()  // 所有API请求都需要认证
             )
             .oauth2ResourceServer(oauth2 -> oauth2
                 .bearerTokenResolver(bearerTokenResolver)
                 .jwt(jwt -> jwt
                     .decoder(jwtDecoder)
+                    .jwtAuthenticationConverter(jwtAuthenticationConverter)
                 )
             );
 

@@ -160,7 +160,8 @@ public class SecurityConfig {
                             String accessToken = jwtTokenService.generateAccessToken(
                                 userDto.getUsername(),
                                 userDto.getEmail(),
-                                userDto.getId()
+                                userDto.getId(),
+                                userService.getCurrentUser(userDto.getUsername()).getAuthorities()
                             );
 
                             String refreshToken = jwtTokenService.generateRefreshToken(
@@ -272,6 +273,9 @@ public class SecurityConfig {
                                "/images/**", "/static/**", "/index.html", "/assets/**",
                                "/favicon.ico", "/error").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()  // 认证API公开
+                .requestMatchers("/api/user").authenticated()  // 所有认证用户都可以访问
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")  // 只有ADMIN角色可以访问
+                .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")  // ADMIN或MANAGER角色可以访问
                 .anyRequest().authenticated()
             )
             // OAuth2登录配置

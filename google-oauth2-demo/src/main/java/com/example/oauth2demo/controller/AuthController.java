@@ -72,7 +72,8 @@ public class AuthController {
             String accessToken = jwtTokenService.generateAccessToken(
                 user.getUsername(),
                 user.getEmail(),
-                user.getId()
+                user.getId(),
+                userService.getCurrentUser(user.getUsername()).getAuthorities()
             );
 
             String refreshToken = jwtTokenService.generateRefreshToken(

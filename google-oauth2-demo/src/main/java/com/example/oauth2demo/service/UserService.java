@@ -213,6 +213,7 @@ public class UserService {
         dto.setEmail(user.getEmail());
         dto.setDisplayName(user.getDisplayName());
         dto.setAvatarUrl(user.getAvatarUrl());
+        dto.setAuthorities(user.getAuthorities());
         return dto;
     }
 }

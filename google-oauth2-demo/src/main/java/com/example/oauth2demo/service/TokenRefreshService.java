@@ -46,7 +46,7 @@ public class TokenRefreshService {
 
             // 5. 生成新的Token对
             String newAccessToken = jwtTokenService.generateAccessToken(
-                user.getUsername(), user.getEmail(), user.getId()
+                user.getUsername(), user.getEmail(), user.getId(), user.getAuthorities()
             );
             String newRefreshToken = jwtTokenService.generateRefreshToken(
                 user.getUsername(), user.getId()

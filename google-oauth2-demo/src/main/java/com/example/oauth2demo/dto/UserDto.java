@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Set;
+
 /**
  * 用户DTO
  */
@@ -18,4 +20,5 @@ public class UserDto {
     private String email;
     private String displayName;
     private String avatarUrl;
+    private Set<String> authorities;
 }
