@@ -1946,3 +1946,35 @@ jobs:
 - `data-sqlite.sql` / `data-postgresql.sql` - 规范化与注释调整
 - `TestEnvironmentInitializer.java` - 关键修复
 - `application-dev.yml` / `application-test.yml` - 配置更新
+
+### 📚 集成指南文档编写
+
+**新增文档**：
+- ✅ `INTEGRATION-GUIDE.md` - 完整的集成指南（1500+ 行）
+  - 快速开始指南
+  - 逐步集成步骤
+  - 包名重构指南
+  - Maven 依赖配置
+  - 数据库初始化
+  - Spring Boot 配置
+  - 认证流程说明
+  - API 接口参考
+  - OAuth2 SSO 配置
+  - 常见问题排查（5+ 个典型问题）
+
+- ✅ `INTEGRATION-CHECKLIST.md` - 集成检查清单
+  - 代码集成检查
+  - 依赖验证
+  - 数据库配置
+  - 功能测试
+  - OAuth2 验证
+  - 安全检查
+  - 性能验证
+  - 总计 60+ 项检查点
+
+**文档特点**：
+- 面向其他 Spring Boot 项目的"拷贝集成"方式
+- 包含实际代码示例和命令行指令
+- 详细的问题排查指南
+- 清晰的检查清单确保完整性
+- 支持快速集成（30分钟到2小时）
