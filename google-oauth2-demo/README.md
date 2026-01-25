@@ -938,7 +938,36 @@ headers.set("Authorization", "Bearer " + accessToken);
 
 ---
 
-**最后更新时间**: 2025-01-14
+## 📝 关于Spring Authorization Server的使用说明
+
+### 当前使用情况
+
+本项目虽然在依赖中引入了Spring Authorization Server，但实际上**并未充分利用其核心能力**：
+
+- **配置简单**：仅在内存中配置了一个客户端，使用`InMemoryRegisteredClientRepository`
+- **认证流程**：主要使用自定义的JWT Token生成和管理（`JwtTokenService`）
+- **数据库结构**：未使用Spring Authorization Server所需的标准表结构（如`oauth2_authorization`、`oauth2_registered_client`等）
+
+### 技术评估
+
+对于本项目的实际需求（本地登录 + Google/GitHub/Twitter SSO），使用Spring Authorization Server可能有些**小题大作**，原因如下：
+
+- **项目规模**：这是一个相对简单的OAuth2登录演示项目
+- **认证需求**：核心功能可通过Spring Security和Spring OAuth2 Client实现
+- **复杂度**：引入Spring Authorization Server会增加项目复杂度，而当前并未充分利用其能力
+
+### 建议
+
+如果项目需求保持不变，可考虑：
+- 移除Spring Authorization Server依赖
+- 保留Spring Security和Spring OAuth2 Client
+- 继续使用现有的自定义JWT Token管理方案
+
+这样可以简化项目结构，减少不必要的依赖，同时保持功能完整。
+
+---
+
+**最后更新时间**: 2026-01-25
 **项目状态**: ✅ 支持Google、GitHub和Twitter三家OAuth2提供商
                ✅ 双前端实现：Thymeleaf + React SPA
                ✅ 完整功能测试通过，生产就绪
