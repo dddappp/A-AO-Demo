@@ -144,6 +144,7 @@ public class JwtTokenService {
                 .setSubject(username)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 3600000)) // 1小时
+                .setHeaderParam("kid", "key-1")  // 添加kid用于JWKS匹配
                 .signWith(secretKey)
                 .compact();
     }

@@ -32,6 +32,6 @@ export default defineConfig({
   },
   // 生产环境API路径配置
   define: {
-    __API_BASE_URL__: JSON.stringify('/'), // 使用相对路径，指向同一域的API
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(''), // 使用相对路径，指向同一域的API
   }
 })
