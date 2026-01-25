@@ -98,12 +98,16 @@ public class AuthController {
             refreshTokenCookie.setAttribute("SameSite", "Lax");
             response.addCookie(refreshTokenCookie);
 
-            // 返回成功响应
-            Map<String, Object> responseData = Map.of(
-                "user", user,
-                "message", "Login successful",
-                "authenticated", true
-            );
+            // 返回成功响应（包含Token用于跨域场景）
+            Map<String, Object> responseData = new java.util.LinkedHashMap<>();
+            responseData.put("user", user);
+            responseData.put("message", "Login successful");
+            responseData.put("authenticated", true);
+            responseData.put("accessToken", accessToken);
+            responseData.put("refreshToken", refreshToken);
+            responseData.put("accessTokenExpiresIn", 3600);  // 1小时
+            responseData.put("refreshTokenExpiresIn", 604800);  // 7天
+            responseData.put("tokenType", "Bearer");
 
             return ResponseEntity.ok(responseData);
 
