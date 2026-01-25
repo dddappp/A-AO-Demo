@@ -60,11 +60,13 @@ public class ResourceServerConfig {
 
     /**
      * JWT解码器配置
+     * 使用 RSA 公钥进行验证
      */
     @Bean
     public JwtDecoder jwtDecoder() {
-        // 使用我们自己的JWT密钥验证
-        return NimbusJwtDecoder.withSecretKey(jwtTokenService.getSecretKey()).build();
+        // 使用 RSA 公钥验证 JWT 签名
+        return NimbusJwtDecoder.withPublicKey((java.security.interfaces.RSAPublicKey) jwtTokenService.getPublicKey())
+                .build();
     }
 
     /**
