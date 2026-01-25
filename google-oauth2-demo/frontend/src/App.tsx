@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import TestPage from './pages/TestPage';
+import ResourceTestPage from './pages/ResourceTestPage';
 import './App.css';
 
 function AppContent() {
@@ -14,6 +15,7 @@ function AppContent() {
 
         {/* 受保护路由 */}
         <Route path="/test" element={<TestPage />} />
+        <Route path="/resource-test" element={<ResourceTestPage />} />
 
         {/* OAuth2回调路由 */}
         <Route path="/oauth2/callback" element={
