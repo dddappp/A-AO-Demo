@@ -23,6 +23,36 @@ export function useAuth() {
     }
   }, [user]);
 
+  // 登出
+  const logout = useCallback(async () => {
+    console.log('Starting logout process...');
+
+    try {
+      await AuthService.logout();
+      console.log('Logout API call successful');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+
+    // 立即清除前端用户状态
+    setUser(null);
+    setError(null);
+
+    // 清除所有可能的用户状态存储
+    localStorage.removeItem('auth_user');
+    localStorage.clear(); // 清除所有localStorage
+
+    // 清除所有cookies
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+
+    console.log('All storage cleared, navigating to login...');
+
+    // 直接导航到登录页面，避免页面刷新可能带来的缓存问题
+    window.location.href = '/login';
+  }, []);
+
   // 检查认证状态
   const checkAuth = useCallback(async () => {
     // 总是检查认证状态，确保与后端同步
@@ -52,6 +82,63 @@ export function useAuth() {
       setLoading(false);
     }
   }, [loading]);
+
+  // 解析JWT token，获取过期时间
+  const getTokenExpiry = useCallback(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) return null;
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.exp * 1000; // 转换为毫秒
+    } catch (error) {
+      console.error('Failed to parse token:', error);
+      return null;
+    }
+  }, []);
+
+  // 检查token是否即将过期（剩余时间少于5分钟）
+  const isTokenExpiring = useCallback(() => {
+    const expiry = getTokenExpiry();
+    if (!expiry) return true;
+
+    const now = Date.now();
+    const timeUntilExpiry = expiry - now;
+    return timeUntilExpiry < 5 * 60 * 1000; // 5分钟
+  }, [getTokenExpiry]);
+
+  // 刷新Token
+  const refreshToken = useCallback(async () => {
+    try {
+      console.log('Starting token refresh...');
+      const result = await AuthService.refreshToken();
+      console.log('Token refresh successful:', result);
+      return result;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // 如果刷新失败，说明refresh token也过期了，需要重新登录
+      logout();
+      throw error;
+    }
+  }, [logout]);
+
+  // 自动刷新token
+  const autoRefreshToken = useCallback(async () => {
+    if (isTokenExpiring()) {
+      try {
+        console.log('Token is expiring, refreshing...');
+        await AuthService.refreshToken();
+        console.log('Token refresh successful');
+
+        // 刷新token后，重新获取用户信息以确保状态同步
+        await checkAuth();
+      } catch (error) {
+        console.error('Auto token refresh failed:', error);
+        // 刷新失败，清除用户状态并跳转到登录页
+        logout();
+      }
+    }
+  }, [isTokenExpiring, logout, checkAuth]);
 
   // OAuth2登录
   const oauthLogin = (provider: 'google' | 'github' | 'x') => {  // ✅ X API v2：提供者名改为 'x'
@@ -130,50 +217,19 @@ export function useAuth() {
     }
   };
 
-  // 刷新Token
-  const refreshToken = useCallback(async () => {
-    try {
-      console.log('Starting token refresh...');
-      const result = await AuthService.refreshToken();
-      console.log('Token refresh successful:', result);
-      return result;
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      // 如果刷新失败，说明refresh token也过期了，需要重新登录
-      logout();
-      throw error;
+  // 自动刷新token的定时器
+  useEffect(() => {
+    if (user) {
+      // 立即检查一次token是否即将过期
+      autoRefreshToken();
+
+      // 设置定时器，每1分钟检查一次
+      const intervalId = setInterval(autoRefreshToken, 60 * 1000); // 1分钟
+
+      // 清除定时器
+      return () => clearInterval(intervalId);
     }
-  }, []);
-
-  // 登出
-  const logout = useCallback(async () => {
-    console.log('Starting logout process...');
-
-    try {
-      await AuthService.logout();
-      console.log('Logout API call successful');
-    } catch (err) {
-      console.error('Logout failed:', err);
-    }
-
-    // 立即清除前端用户状态
-    setUser(null);
-    setError(null);
-
-    // 清除所有可能的用户状态存储
-    localStorage.removeItem('auth_user');
-    localStorage.clear(); // 清除所有localStorage
-
-    // 清除所有cookies
-    document.cookie.split(";").forEach((c) => {
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-    });
-
-    console.log('All storage cleared, navigating to login...');
-
-    // 直接导航到登录页面，避免页面刷新可能带来的缓存问题
-    window.location.href = '/login';
-  }, []);
+  }, [user, autoRefreshToken]);
 
   // 组件挂载时检查认证状态
   useEffect(() => {

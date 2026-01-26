@@ -1013,6 +1013,91 @@ export default function TestPage() {
                 </div>
               )}
             </div>
+
+            {/* 模拟Token过期测试 */}
+            <div style={{
+              padding: '15px',
+              border: '1px solid #ddd',
+              borderRadius: '5px'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px'
+              }}>
+                <h3 style={{ margin: 0, color: '#333' }}>模拟Token过期测试</h3>
+                <button
+                  onClick={async () => {
+                    // 模拟token过期
+                    setTokenValidationLoading('simulateExpiry');
+                    try {
+                      // 获取当前token
+                      const currentToken = localStorage.getItem('accessToken');
+                      if (!currentToken) {
+                        throw new Error('No access token found');
+                      }
+
+                      // 解析token
+                      const payload = JSON.parse(atob(currentToken.split('.')[1]));
+                      // 修改过期时间为1分钟前
+                      payload.exp = Math.floor(Date.now() / 1000) - 60;
+                      // 重新编码token（注意：这里只是模拟，实际token需要签名）
+                      const modifiedPayload = btoa(JSON.stringify(payload));
+                      const modifiedToken = currentToken.split('.')[0] + '.' + modifiedPayload + '.' + currentToken.split('.')[2];
+                      // 保存修改后的token
+                      localStorage.setItem('accessToken', modifiedToken);
+                      
+                      console.log('Token expiry simulated');
+                      
+                      // 触发自动刷新
+                      setTimeout(async () => {
+                        try {
+                          await AuthService.refreshToken();
+                          console.log('Token automatically refreshed');
+                          // 重新加载用户信息
+                          window.location.reload();
+                        } catch (error) {
+                          console.error('Token refresh failed:', error);
+                        } finally {
+                          setTokenValidationLoading(null);
+                        }
+                      }, 1000);
+                    } catch (error) {
+                      console.error('Failed to simulate token expiry:', error);
+                      setTokenValidationLoading(null);
+                    }
+                  }}
+                  disabled={tokenValidationLoading === 'simulateExpiry'}
+                  style={{
+                    backgroundColor: '#ffc107',
+                    color: '#212529',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    cursor: tokenValidationLoading === 'simulateExpiry' ? 'not-allowed' : 'pointer',
+                    opacity: tokenValidationLoading === 'simulateExpiry' ? 0.6 : 1
+                  }}
+                >
+                  {tokenValidationLoading === 'simulateExpiry' ? '模拟中...' : '模拟Token过期'}
+                </button>
+              </div>
+              <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                测试Token过期后自动刷新功能。点击按钮后，系统会模拟token过期并触发自动刷新流程。
+              </p>
+              {tokenValidationLoading === 'simulateExpiry' && (
+                <div style={{
+                  padding: '10px',
+                  borderRadius: '4px',
+                  backgroundColor: '#fff3cd',
+                  color: '#856404',
+                  marginTop: '10px'
+                }}>
+                  <strong>🔄 模拟Token过期中...</strong>
+                  <p style={{ marginTop: '5px', marginBottom: 0 }}>正在模拟token过期并触发自动刷新流程，请稍候...</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

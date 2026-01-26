@@ -11,6 +11,19 @@ const ResourceTestPage: React.FC = () => {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [activeTest, setActiveTest] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  // 拷贝JSON数据到剪贴板
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      })
+      .catch(err => {
+        console.error('无法拷贝文本:', err);
+      });
+  };
 
   // 监听 access token 变化
   useEffect(() => {
@@ -253,7 +266,7 @@ const ResourceTestPage: React.FC = () => {
             disabled={loading}
             className={`relative overflow-hidden rounded-xl font-semibold py-4 px-6 transition-all duration-300 transform hover:scale-105 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 text-white'}`}
           >
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center gap-2">
               {activeTest === 'health-check' && loading && (
                 <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -271,7 +284,7 @@ const ResourceTestPage: React.FC = () => {
             disabled={loading}
             className={`relative overflow-hidden rounded-xl font-semibold py-4 px-6 transition-all duration-300 transform hover:scale-105 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
           >
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center gap-2">
               {activeTest === 'jwks' && loading && (
                 <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -289,7 +302,7 @@ const ResourceTestPage: React.FC = () => {
             disabled={loading}
             className={`relative overflow-hidden rounded-xl font-semibold py-4 px-6 transition-all duration-300 transform hover:scale-105 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-500 hover:bg-purple-600 text-white'}`}
           >
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center gap-2">
               {activeTest === 'introspect' && loading && (
                 <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -307,7 +320,7 @@ const ResourceTestPage: React.FC = () => {
             disabled={loading}
             className={`relative overflow-hidden rounded-xl font-semibold py-4 px-6 transition-all duration-300 transform hover:scale-105 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'}`}
           >
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center gap-2">
               {activeTest === 'protected-resource' && loading && (
                 <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -339,8 +352,17 @@ const ResourceTestPage: React.FC = () => {
             <div className="bg-green-50 border border-green-200 rounded-xl shadow-sm p-6">
               <div>
                 <h3 className="text-lg font-semibold text-green-800 mb-2">✅ 测试成功</h3>
-                <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
-                  <pre className="text-sm text-gray-800 whitespace-pre-wrap overflow-x-auto max-h-96">
+                <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm relative" style={{ textAlign: 'left' }}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs text-gray-500">JSON 响应</span>
+                    <button
+                      onClick={() => copyToClipboard(JSON.stringify(resourceData, null, 2))}
+                      className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors flex items-center gap-1"
+                    >
+                      {copySuccess ? '✅ 已拷贝' : '📋 拷贝'}
+                    </button>
+                  </div>
+                  <pre className="text-sm text-gray-800 whitespace-pre-wrap overflow-x-auto max-h-96 bg-gray-50 p-4 rounded-md font-mono" style={{ textAlign: 'left', display: 'block' }}>
                     {JSON.stringify(resourceData, null, 2)}
                   </pre>
                 </div>
