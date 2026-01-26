@@ -940,22 +940,34 @@ private void setTokenCookies(HttpServletResponse response, String accessToken, S
 1. **SSO 登录未实现 Token 双重传递**：
    - SSO 登录成功后只将 Token 存储到 cookie 中
    - 未在响应体中返回 Token，不符合前后端分离原则
+   - 前端无法直接获取 Token 用于访问异构资源服务器
+   - 目前前端通过"马上刷新token"的方式绕过这个问题，增加了额外的网络请求和延迟
+   - 代码逻辑复杂，不符合前后端分离的优雅实现
 
 2. **OAuth2 登录成功后使用重定向**：
    - 不符合前后端分离原则，应该返回 JSON 响应
    - 不利于前端灵活处理登录成功后的逻辑
+   - 无法在登录成功后直接获取用户信息和 Token
 
 3. **部分错误使用 URL 参数传递**：
    - 不符合标准化错误处理原则
    - 不利于前端统一处理错误
+   - 错误信息暴露在 URL 中，存在安全风险
 
 4. **缺少全局 CORS 配置**：
    - 不支持跨域请求
    - 不利于异构资源服务器集成
+   - 前端无法从不同域名访问 API
 
 5. **前端 Token 存储**：
    - 为了支持异构资源服务器访问，将 Token 存储到 localStorage
    - 存在一定的安全风险，需要权衡安全性和灵活性
+   - 可能导致 XSS 攻击风险
+
+6. **缺少 API 文档**：
+   - 没有使用 Swagger 或 SpringDoc 生成 API 文档
+   - 不利于第三方项目集成
+   - 接口信息不够透明
 
 ### 9.2 改进建议
 
@@ -965,6 +977,11 @@ private void setTokenCookies(HttpServletResponse response, String accessToken, S
    - 修改 `SecurityConfig.java` 中的 `oauth2SuccessHandler` 方法
    - 在 SSO 登录成功后，同时通过 cookie 和 JSON 响应体传递 Token
    - 支持返回 JSON 响应或重定向，根据前端需求选择
+   - **技术方案**：
+     - 检测请求头中的 `Accept` 字段，如果包含 `application/json`，返回 JSON 响应
+     - 否则，保持现有重定向逻辑
+     - 在 JSON 响应中包含用户信息、Token 和过期时间
+     - 同时设置 HTTP-only cookie 存储 Token
 
 2. **优化 OAuth2 回调处理**：
    - 支持多种回调模式：
@@ -972,22 +989,38 @@ private void setTokenCookies(HttpServletResponse response, String accessToken, S
      - 对于集成项目：支持通过状态参数指定回调方式，返回 JSON 响应
    - 减少对特定前端技术栈的依赖
    - 实现基于状态参数的 CSRF 保护
+   - **技术方案**：
+     - 解析 OAuth2 状态参数，支持前端传递自定义信息
+     - 支持 `response_type` 参数，允许前端指定响应类型
+     - 为集成项目提供 JSON 响应模式
 
 3. **统一错误处理**：
    - 使用统一的错误响应格式
    - 对 JSON 请求返回标准化的错误响应
    - 对传统请求保留 URL 参数错误传递
+   - **技术方案**：
+     - 实现全局异常处理器
+     - 根据请求类型返回不同格式的错误信息
+     - 确保错误信息的安全性和一致性
 
 4. **添加全局 CORS 配置**：
    - 配置全局 CORS 策略，支持跨域请求
    - 允许特定的域名访问 API
    - 允许必要的 HTTP 方法和请求头
    - 配置凭证（credentials）支持
+   - **技术方案**：
+     - 使用 Spring 的 `WebMvcConfigurer` 配置 CORS
+     - 允许所有跨域请求（生产环境中应限制特定域名）
+     - 支持凭证传递，确保 cookie 能够正确发送
 
 5. **增强 API 文档**：
    - 使用 Swagger 或 SpringDoc 生成 API 文档
    - 详细描述每个接口的请求和响应格式
    - 提供示例代码
+   - **技术方案**：
+     - 添加 SpringDoc 依赖
+     - 配置 API 文档生成器
+     - 为每个接口添加详细的注释和示例
 
 #### 9.2.2 前端改进
 
@@ -995,21 +1028,41 @@ private void setTokenCookies(HttpServletResponse response, String accessToken, S
    - 实现更安全的 Token 存储方式
    - 考虑使用会话存储或内存存储，减少 XSS 攻击风险
    - 实现 Token 过期检测和自动刷新
+   - **技术方案**：
+     - 优先使用 HTTP-only cookie 进行认证
+     - 对于需要访问异构资源服务器的场景，使用会话存储
+     - 实现 Token 过期前自动刷新机制
+     - 定期检查 Token 状态，确保认证有效性
 
 2. **增强错误处理**：
    - 实现统一的错误处理机制
    - 显示用户友好的错误信息
    - 处理 Token 过期等特殊情况
+   - **技术方案**：
+     - 使用 axios 拦截器统一处理错误
+     - 实现错误分类和优先级处理
+     - 为不同类型的错误提供不同的用户提示
+     - 处理网络错误、认证错误等特殊情况
 
 3. **优化用户体验**：
    - 实现加载状态
    - 友好的错误提示
    - 响应式设计
+   - **技术方案**：
+     - 为所有异步操作添加加载状态
+     - 实现全局通知系统，统一管理错误和成功提示
+     - 确保在各种设备上的良好显示效果
+     - 优化登录和认证流程的用户体验
 
 4. **增强安全性**：
    - 防止 XSS 攻击
    - 防止 CSRF 攻击
    - 安全存储敏感信息
+   - **技术方案**：
+     - 使用 React 的 dangerouslySetInnerHTML 时进行安全检查
+     - 正确处理 CSRF token
+     - 避免在 localStorage 中存储敏感信息
+     - 实现内容安全策略（CSP）
 
 #### 9.2.3 集成改进
 
@@ -1017,15 +1070,30 @@ private void setTokenCookies(HttpServletResponse response, String accessToken, S
    - 创建可复用的前端认证服务模板
    - 提供 Spring Boot 配置模板
    - 减少第三方项目的集成工作量
+   - **技术方案**：
+     - 创建前端认证服务 npm 包
+     - 提供后端集成 starter 模块
+     - 为不同前端框架（React、Vue、Angular）提供模板
+     - 包含完整的认证流程实现
 
 2. **完善集成文档**：
    - 详细说明每一步的实施过程
    - 提供代码示例和配置示例
    - 说明常见问题和解决方案
+   - **技术方案**：
+     - 创建详细的集成指南，分步骤说明
+     - 提供不同场景的配置示例
+     - 维护常见问题和解决方案的知识库
+     - 为每个集成步骤提供测试方法
 
 3. **创建集成示例项目**：
    - 基于第二种部署方式创建一个完整的集成示例
    - 包含前端和后端代码，展示完整的集成流程
+   - **技术方案**：
+     - 创建完整的示例项目，包含前端和后端
+     - 展示不同的集成场景和配置
+     - 提供详细的 README 和注释
+     - 包含测试用例和部署指南
 
 ### 9.3 实施优先级
 
@@ -1038,11 +1106,13 @@ private void setTokenCookies(HttpServletResponse response, String accessToken, S
    - 优化 OAuth2 回调处理
    - 增强 API 文档
    - 优化前端 Token 管理
+   - 增强前端错误处理
 
 3. **低优先级**：
-   - 增强前端错误处理
    - 优化用户体验
+   - 增强安全性
    - 提供集成模板和示例项目
+   - 完善集成文档
 
 ### 9.4 总结
 
