@@ -46,6 +46,9 @@ export interface LoginProvider {
 
 export interface TokenRefreshResult {
   message: string;
+  accessToken: string;
+  refreshToken: string;
   accessTokenExpiresIn: number;
   refreshTokenExpiresIn: number;
+  tokenType?: string;
 }

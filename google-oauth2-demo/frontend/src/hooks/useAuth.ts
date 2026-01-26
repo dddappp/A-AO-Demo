@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { User } from '../types';
 import { AuthService } from '../services/authService';
 
+
+
 /**
  * 认证状态管理Hook
  */
@@ -69,6 +71,24 @@ export function useAuth() {
       const userData = await AuthService.getCurrentUser();
       console.log('User authenticated:', userData);
       setUser(userData);
+      
+      // 尝试获取Token并存储到localStorage
+      try {
+        console.log('Attempting to refresh token to get access token...');
+        const tokenResponse = await AuthService.refreshToken();
+        console.log('Token refresh successful, storing tokens to localStorage:', tokenResponse);
+        
+        // 存储令牌到localStorage，用于前端测试和异构资源服务器集成
+        if (tokenResponse.accessToken) {
+          localStorage.setItem('accessToken', tokenResponse.accessToken);
+        }
+        if (tokenResponse.refreshToken) {
+          localStorage.setItem('refreshToken', tokenResponse.refreshToken);
+        }
+      } catch (tokenErr) {
+        console.log('Token refresh failed during auth check:', tokenErr);
+        // 令牌刷新失败不影响用户认证状态检查
+      }
     } catch (err) {
       console.log('Authentication check failed:', err);
       setUser(null);
@@ -113,6 +133,15 @@ export function useAuth() {
       console.log('Starting token refresh...');
       const result = await AuthService.refreshToken();
       console.log('Token refresh successful:', result);
+      
+      // 存储新令牌到localStorage，用于前端测试和异构资源服务器集成
+      if (result.accessToken) {
+        localStorage.setItem('accessToken', result.accessToken);
+      }
+      if (result.refreshToken) {
+        localStorage.setItem('refreshToken', result.refreshToken);
+      }
+      
       return result;
     } catch (error) {
       console.error('Token refresh failed:', error);
@@ -127,8 +156,16 @@ export function useAuth() {
     if (isTokenExpiring()) {
       try {
         console.log('Token is expiring, refreshing...');
-        await AuthService.refreshToken();
-        console.log('Token refresh successful');
+        const result = await AuthService.refreshToken();
+        console.log('Token refresh successful:', result);
+
+        // 存储新令牌到localStorage，用于前端测试和异构资源服务器集成
+        if (result.accessToken) {
+          localStorage.setItem('accessToken', result.accessToken);
+        }
+        if (result.refreshToken) {
+          localStorage.setItem('refreshToken', result.refreshToken);
+        }
 
         // 刷新token后，重新获取用户信息以确保状态同步
         await checkAuth();
@@ -167,14 +204,12 @@ export function useAuth() {
         provider: 'local'
       });
       
-      // 存储令牌到localStorage，用于资源服务器认证
+      // 存储令牌到localStorage，用于前端测试和异构资源服务器集成
       if (response.accessToken) {
         localStorage.setItem('accessToken', response.accessToken);
-        console.log('Access token stored to localStorage');
       }
       if (response.refreshToken) {
         localStorage.setItem('refreshToken', response.refreshToken);
-        console.log('Refresh token stored to localStorage');
       }
       
       setError(null);

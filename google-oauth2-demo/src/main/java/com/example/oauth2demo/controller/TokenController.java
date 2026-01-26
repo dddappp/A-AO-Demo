@@ -50,9 +50,13 @@ public class TokenController {
 
             return ResponseEntity.ok(Map.of(
                 "message", "Token refreshed successfully",
+                "accessToken", tokenPair.getAccessToken(),
+                "refreshToken", tokenPair.getRefreshToken(),
                 "accessTokenExpiresIn", 3600,  // 1小时
-                "refreshTokenExpiresIn", 604800 // 7天
+                "refreshTokenExpiresIn", 604800, // 7天
+                "tokenType", "Bearer"
             ));
+
 
         } catch (Exception e) {
             log.error("Token refresh failed", e);

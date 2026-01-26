@@ -29,7 +29,17 @@ const ResourceTestPage: React.FC = () => {
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     setAccessToken(token);
-  }, []);
+    
+    // 定期检查 token 变化
+    const interval = setInterval(() => {
+      const updatedToken = localStorage.getItem('accessToken');
+      if (updatedToken !== accessToken) {
+        setAccessToken(updatedToken);
+      }
+    }, 1000); // 每1秒检查一次
+    
+    return () => clearInterval(interval);
+  }, [accessToken]);
 
   const fetchProtectedResource = async () => {
     setActiveTest('protected-resource');
