@@ -971,6 +971,12 @@ private void setTokenCookies(HttpServletResponse response, String accessToken, S
 
 ### 9.2 改进建议
 
+改进要点：
+- 我们当前项目的 Spring Boot 应用其**主体应该是一个无头服务**。
+- 不管是像当前项目一样，将前端页面部署到 Spring Boot 应用（应用同时也作为 Web 服务器），还是可能使用外部的 Web 服务器/反向代理（如 Nginx），我们的项目都应该支持。
+- 支持“集成当前项目”的项目客制化实现**整套自己想要的页面**。
+- 这就需要由“前端”来主导页面的跳转流程。这里的“前端”主导，包括前端团队或者运维人员按照前端的要求通过配置 Web 服务器/反向代理来实现页面的按需跳转——而不是我们的 Spring Boot 应用代码中“硬编码页面跳转逻辑”。
+
 #### 9.2.1 后端改进
 
 1. **实现 SSO 登录的 Token 双重传递**：
@@ -984,9 +990,6 @@ private void setTokenCookies(HttpServletResponse response, String accessToken, S
      - 同时设置 HTTP-only cookie 存储 Token
 
 2. **优化 OAuth2 回调处理**：
-   - 支持多种回调模式：
-     - 对于当前项目：保留重定向到前端页面的逻辑
-     - 对于集成项目：支持通过状态参数指定回调方式，返回 JSON 响应
    - 减少对特定前端技术栈的依赖
    - 实现基于状态参数的 CSRF 保护
    - **技术方案**：
