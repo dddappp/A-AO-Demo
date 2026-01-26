@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * 异构资源服务器集成测试页面
@@ -9,8 +9,17 @@ const ResourceTestPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [activeTest, setActiveTest] = useState<string | null>(null);
+
+  // 监听 access token 变化
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    setAccessToken(token);
+  }, []);
 
   const fetchProtectedResource = async () => {
+    setActiveTest('protected-resource');
     setLoading(true);
     setError(null);
     setResourceData(null);
@@ -18,22 +27,35 @@ const ResourceTestPage: React.FC = () => {
 
     try {
       // 从 localStorage 获取 access token
-      const accessToken = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('accessToken');
 
-      if (!accessToken) {
-        setError('❌ No access token found. Please login first.');
+      if (!token) {
+        setError('❌ 未找到访问令牌，请先登录');
         setTestStatus('error');
         setLoading(false);
         return;
       }
 
-      console.log('📤 Fetching protected resource from Python server...');
+      console.log('📤 从 Python 服务器获取受保护资源...');
+      console.log('使用的令牌:', token);
+      console.log('令牌长度:', token.length);
+      
+      // 解析令牌头，检查 kid
+      try {
+        const tokenParts = token.split('.');
+        const headerPart = tokenParts[0];
+        const header = JSON.parse(atob(headerPart));
+        console.log('令牌头:', header);
+        console.log('令牌 kid:', header.kid);
+      } catch (e) {
+        console.error('解析令牌头失败:', e);
+      }
 
       // 调用 Python 资源服务器
-      const response = await fetch('http://localhost:5001/api/protected', {
+      const response = await fetch('http://localhost:5002/api/protected', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         credentials: 'include',
@@ -45,55 +67,59 @@ const ResourceTestPage: React.FC = () => {
       }
 
       const data = await response.json();
-      console.log('✅ Protected resource retrieved:', data);
+      console.log('✅ 成功获取受保护资源:', data);
       setResourceData(data);
       setTestStatus('success');
     } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('❌ Error fetching resource:', errorMessage);
+      console.error('❌ 获取资源失败:', errorMessage);
       setError(errorMessage);
       setTestStatus('error');
     } finally {
       setLoading(false);
+      setActiveTest(null);
     }
   };
 
   const testHealthCheck = async () => {
+    setActiveTest('health-check');
     setLoading(true);
     setError(null);
     setResourceData(null);
     setTestStatus('testing');
 
     try {
-      console.log('🏥 Testing resource server health...');
-      const response = await fetch('http://localhost:5001/health');
+      console.log('🏥 测试资源服务器健康状态...');
+      const response = await fetch('http://localhost:5002/health');
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('✅ Health check passed:', data);
+      console.log('✅ 健康检查通过:', data);
       setResourceData(data);
       setTestStatus('success');
     } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('❌ Health check failed:', errorMessage);
+      console.error('❌ 健康检查失败:', errorMessage);
       setError(errorMessage);
       setTestStatus('error');
     } finally {
       setLoading(false);
+      setActiveTest(null);
     }
   };
 
   const testJwks = async () => {
+    setActiveTest('jwks');
     setLoading(true);
     setError(null);
     setResourceData(null);
     setTestStatus('testing');
 
     try {
-      console.log('🔑 Fetching JWKS from auth server...');
+      console.log('🔑 从认证服务器获取 JWKS...');
       const response = await fetch('/oauth2/jwks');
 
       if (!response.ok) {
@@ -101,41 +127,44 @@ const ResourceTestPage: React.FC = () => {
       }
 
       const data = await response.json();
-      console.log('✅ JWKS retrieved:', data);
+      console.log('✅ 成功获取 JWKS:', data);
       setResourceData(data);
       setTestStatus('success');
     } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('❌ JWKS fetch failed:', errorMessage);
+      console.error('❌ 获取 JWKS 失败:', errorMessage);
       setError(errorMessage);
       setTestStatus('error');
     } finally {
       setLoading(false);
+      setActiveTest(null);
     }
   };
 
   const testIntrospect = async () => {
+    setActiveTest('introspect');
     setLoading(true);
     setError(null);
     setResourceData(null);
     setTestStatus('testing');
 
     try {
-      const accessToken = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('accessToken');
 
-      if (!accessToken) {
-        setError('❌ No access token found. Please login first.');
+      if (!token) {
+        setError('❌ 未找到访问令牌，请先登录');
         setTestStatus('error');
         setLoading(false);
         return;
       }
 
-      console.log('🔍 Testing Token introspection...');
-      const response = await fetch(`/oauth2/introspect?token=${encodeURIComponent(accessToken)}`, {
+      console.log('🔍 测试令牌内省...');
+      const response = await fetch('/oauth2/api/introspect', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
+        body: `token=${encodeURIComponent(token)}`,
       });
 
       if (!response.ok) {
@@ -143,154 +172,259 @@ const ResourceTestPage: React.FC = () => {
       }
 
       const data = await response.json();
-      console.log('✅ Introspect response:', data);
+      console.log('✅ 内省响应:', data);
       setResourceData(data);
       setTestStatus('success');
     } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('❌ Introspect failed:', errorMessage);
+      console.error('❌ 内省失败:', errorMessage);
       setError(errorMessage);
       setTestStatus('error');
     } finally {
       setLoading(false);
+      setActiveTest(null);
     }
   };
 
   return (
-    <div className="container mx-auto p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-4xl font-bold mb-2 text-gray-800">🌐 异构资源服务器集成测试</h1>
-      <p className="text-gray-600 mb-6">验证 Python 资源服务器与 Spring Boot OAuth2 认证服务器的集成</p>
-
-      {/* 说明区域 */}
-      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
-        <h2 className="font-semibold text-blue-900 mb-3">📋 测试说明</h2>
-        <ul className="text-sm text-blue-800 space-y-2">
-          <li>✅ 确保 Java 认证服务器运行在 8081 端口</li>
-          <li>✅ 确保 Python 资源服务器运行在 5001 端口</li>
-          <li>✅ 先登录获取 access token</li>
-          <li>✅ 依次点击下方按钮进行集成测试</li>
-          <li>✅ 查看控制台输出了解详细过程</li>
-        </ul>
-      </div>
-
-      {/* 测试按钮区域 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* 健康检查 */}
-        <button
-          onClick={testHealthCheck}
-          disabled={loading}
-          className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded flex items-center justify-center gap-2 transition"
-        >
-          {loading ? '⏳ 检测中...' : '🏥 资源服务器健康检查'}
-        </button>
-
-        {/* JWKS 测试 */}
-        <button
-          onClick={testJwks}
-          disabled={loading}
-          className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded flex items-center justify-center gap-2 transition"
-        >
-          {loading ? '⏳ 获取中...' : '🔑 测试 JWKS 端点'}
-        </button>
-
-        {/* Token 验证 */}
-        <button
-          onClick={testIntrospect}
-          disabled={loading}
-          className="bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded flex items-center justify-center gap-2 transition"
-        >
-          {loading ? '⏳ 验证中...' : '🔍 测试 Token 内省'}
-        </button>
-
-        {/* 获取资源 */}
-        <button
-          onClick={fetchProtectedResource}
-          disabled={loading}
-          className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded flex items-center justify-center gap-2 transition"
-        >
-          {loading ? '⏳ 获取中...' : '🔓 获取受保护资源'}
-        </button>
-      </div>
-
-      {/* 错误显示 */}
-      {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded">
-          <h3 className="font-semibold mb-2">❌ 错误信息</h3>
-          <p className="text-sm font-mono">{error}</p>
-        </div>
-      )}
-
-      {/* 成功响应显示 */}
-      {resourceData && testStatus === 'success' && (
-        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded">
-          <h3 className="font-semibold mb-2">✅ 测试成功</h3>
-          <pre className="bg-white p-4 rounded text-xs overflow-auto max-h-96 border border-green-300 text-gray-800">
-            {JSON.stringify(resourceData, null, 2)}
-          </pre>
-        </div>
-      )}
-
-      {/* 测试进行中 */}
-      {loading && (
-        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded">
-          <h3 className="font-semibold">⏳ 测试进行中...</h3>
-          <p className="text-sm">请稍候，正在发送请求...</p>
-        </div>
-      )}
-
-      {/* 初始状态信息 */}
-      {!resourceData && !error && !loading && testStatus === 'idle' && (
-        <div className="bg-gray-100 border-l-4 border-gray-500 text-gray-700 p-4 rounded">
-          <h3 className="font-semibold">ℹ️ 就绪</h3>
-          <p className="text-sm">点击上方按钮开始测试异构资源服务器集成</p>
-        </div>
-      )}
-
-      {/* 集成流程说明 */}
-      <div className="mt-8 bg-white p-6 rounded border border-gray-300">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">🔄 集成流程</h2>
-        
-        <div className="space-y-4">
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">1</div>
-            <div>
-              <h3 className="font-semibold text-gray-800">用户登录</h3>
-              <p className="text-gray-600 text-sm">用户在 Spring Boot 应用中登录，获得 JWT Token</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+      <div className="max-w-6xl mx-auto">
+        {/* 页面头部 */}
+        <header className="mb-10">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-3">🌐 异构资源服务器集成测试</h1>
+          <p className="text-xl text-gray-600 max-w-3xl">
+            验证 Python 资源服务器与 Spring Boot OAuth2 认证服务器的安全集成
+          </p>
+          
+          {/* 登录状态指示器 */}
+          <div className={`mt-4 inline-block px-4 py-2 rounded-full text-sm font-medium ${accessToken ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {accessToken ? '✅ 已登录' : '❌ 未登录'}
           </div>
+        </header>
 
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">2</div>
+        {/* 说明区域 */}
+        <div className="bg-white rounded-xl shadow-md p-6 mb-8 border-l-4 border-blue-500">
+          <h2 className="text-xl font-semibold text-blue-900 mb-4 flex items-center gap-2">
+            📋 测试说明
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h3 className="font-semibold text-gray-800">Token 存储</h3>
-              <p className="text-gray-600 text-sm">Token 存储在浏览器 localStorage 中</p>
+              <h3 className="font-medium text-gray-800 mb-2">🔧 前置条件</h3>
+              <ul className="space-y-2 text-gray-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-1">✅</span>
+                  <span>Java 认证服务器运行在 8081 端口</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-1">✅</span>
+                  <span>Python 资源服务器运行在 5002 端口</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-1">✅</span>
+                  <span>已登录获取访问令牌</span>
+                </li>
+              </ul>
             </div>
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">3</div>
             <div>
-              <h3 className="font-semibold text-gray-800">获取公钥</h3>
-              <p className="text-gray-600 text-sm">Python 资源服务器从 JWKS 端点获取认证服务器的公钥</p>
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">4</div>
-            <div>
-              <h3 className="font-semibold text-gray-800">验证 Token</h3>
-              <p className="text-gray-600 text-sm">Python 资源服务器使用公钥验证 Token 签名</p>
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">5</div>
-            <div>
-              <h3 className="font-semibold text-gray-800">访问资源</h3>
-              <p className="text-gray-600 text-sm">验证成功后，前端可以访问 Python 资源服务器的受保护资源</p>
+              <h3 className="font-medium text-gray-800 mb-2">🔍 测试步骤</h3>
+              <ul className="space-y-2 text-gray-700">
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">1.</span>
+                  <span>点击下方按钮进行集成测试</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">2.</span>
+                  <span>查看测试结果和详细信息</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-1">3.</span>
+                  <span>检查浏览器控制台了解过程</span>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
+
+        {/* 测试按钮区域 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {/* 健康检查 */}
+          <button
+            onClick={testHealthCheck}
+            disabled={loading}
+            className={`relative overflow-hidden rounded-xl font-semibold py-4 px-6 transition-all duration-300 transform hover:scale-105 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              {activeTest === 'health-check' && loading && (
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
+              {!loading && '🏥 资源服务器健康检查'}
+              {loading && !activeTest && '⏳ 检测中...'}
+            </div>
+          </button>
+
+          {/* JWKS 测试 */}
+          <button
+            onClick={testJwks}
+            disabled={loading}
+            className={`relative overflow-hidden rounded-xl font-semibold py-4 px-6 transition-all duration-300 transform hover:scale-105 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              {activeTest === 'jwks' && loading && (
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
+              {!loading && '🔑 测试 JWKS 端点'}
+              {loading && !activeTest && '⏳ 获取中...'}
+            </div>
+          </button>
+
+          {/* Token 验证 */}
+          <button
+            onClick={testIntrospect}
+            disabled={loading}
+            className={`relative overflow-hidden rounded-xl font-semibold py-4 px-6 transition-all duration-300 transform hover:scale-105 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-500 hover:bg-purple-600 text-white'}`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              {activeTest === 'introspect' && loading && (
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
+              {!loading && '🔍 测试 Token 内省'}
+              {loading && !activeTest && '⏳ 验证中...'}
+            </div>
+          </button>
+
+          {/* 获取资源 */}
+          <button
+            onClick={fetchProtectedResource}
+            disabled={loading}
+            className={`relative overflow-hidden rounded-xl font-semibold py-4 px-6 transition-all duration-300 transform hover:scale-105 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              {activeTest === 'protected-resource' && loading && (
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
+              {!loading && '🔓 获取受保护资源'}
+              {loading && !activeTest && '⏳ 获取中...'}
+            </div>
+          </button>
+        </div>
+
+        {/* 测试结果区域 */}
+        <div className="space-y-6">
+          {/* 错误显示 */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl shadow-sm p-6">
+              <div>
+                <h3 className="text-lg font-semibold text-red-800 mb-2">❌ 测试失败</h3>
+                <div className="bg-white rounded-lg p-4 border border-red-100">
+                  <pre className="text-sm text-red-700 whitespace-pre-wrap">{error}</pre>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 成功响应显示 */}
+          {resourceData && testStatus === 'success' && (
+            <div className="bg-green-50 border border-green-200 rounded-xl shadow-sm p-6">
+              <div>
+                <h3 className="text-lg font-semibold text-green-800 mb-2">✅ 测试成功</h3>
+                <div className="bg-white rounded-lg p-4 border border-green-100 shadow-sm">
+                  <pre className="text-sm text-gray-800 whitespace-pre-wrap overflow-x-auto max-h-96">
+                    {JSON.stringify(resourceData, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 测试进行中 */}
+          {loading && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl shadow-sm p-6">
+              <div>
+                <h3 className="text-lg font-semibold text-yellow-800 mb-2">⏳ 测试进行中</h3>
+                <p className="text-yellow-700">请稍候，正在发送请求...</p>
+              </div>
+            </div>
+          )}
+
+          {/* 初始状态信息 */}
+          {!resourceData && !error && !loading && testStatus === 'idle' && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl shadow-sm p-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">ℹ️ 就绪</h3>
+                <p className="text-gray-600">点击上方按钮开始测试异构资源服务器集成</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 集成流程说明 */}
+        <div className="mt-10 bg-white rounded-xl shadow-md p-8 border border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">🔄 集成流程</h2>
+          
+          <div className="relative">
+            {/* 连接线 */}
+            <div className="absolute left-4 top-12 bottom-12 w-0.5 bg-blue-200 hidden md:block"></div>
+            
+            <div className="space-y-8">
+              <div className="flex gap-6">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold shadow-md z-10">1</div>
+                <div className="flex-1 bg-blue-50 rounded-lg p-5">
+                  <h3 className="font-semibold text-blue-900 text-lg mb-2">用户登录</h3>
+                  <p className="text-gray-700">用户在 Spring Boot 应用中登录，获得 JWT Token</p>
+                </div>
+              </div>
+
+              <div className="flex gap-6">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold shadow-md z-10">2</div>
+                <div className="flex-1 bg-blue-50 rounded-lg p-5">
+                  <h3 className="font-semibold text-blue-900 text-lg mb-2">Token 存储</h3>
+                  <p className="text-gray-700">Token 安全存储在浏览器 localStorage 中</p>
+                </div>
+              </div>
+
+              <div className="flex gap-6">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold shadow-md z-10">3</div>
+                <div className="flex-1 bg-blue-50 rounded-lg p-5">
+                  <h3 className="font-semibold text-blue-900 text-lg mb-2">获取公钥</h3>
+                  <p className="text-gray-700">Python 资源服务器从 JWKS 端点获取认证服务器的公钥</p>
+                </div>
+              </div>
+
+              <div className="flex gap-6">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold shadow-md z-10">4</div>
+                <div className="flex-1 bg-blue-50 rounded-lg p-5">
+                  <h3 className="font-semibold text-blue-900 text-lg mb-2">验证 Token</h3>
+                  <p className="text-gray-700">Python 资源服务器使用公钥验证 Token 签名和有效性</p>
+                </div>
+              </div>
+
+              <div className="flex gap-6">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold shadow-md z-10">5</div>
+                <div className="flex-1 bg-blue-50 rounded-lg p-5">
+                  <h3 className="font-semibold text-blue-900 text-lg mb-2">访问资源</h3>
+                  <p className="text-gray-700">验证成功后，前端可以安全访问 Python 资源服务器的受保护资源</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 页脚 */}
+        <footer className="mt-12 text-gray-500 text-sm">
+          <p>© 2026 异构资源服务器集成测试 | 版本 1.0.0</p>
+        </footer>
       </div>
     </div>
   );

@@ -2,16 +2,18 @@ package com.example.oauth2demo.controller;
 
 import com.example.oauth2demo.service.JwtTokenService;
 import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.jwk.JWK;
-import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.io.BufferedReader;
+import java.net.URLDecoder;
 import java.security.PublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
@@ -48,10 +50,12 @@ public class OAuth2TokenController {
                         .algorithm(JWSAlgorithm.RS256)
                         .build();
                 
-                JWKSet jwkSet = new JWKSet(jwk);
+                // 使用RSAKey的toJSONObject()方法生成正确的JWK格式
+                List<Map<String, Object>> keys = new ArrayList<>();
+                keys.add(jwk.toJSONObject());
                 
-                log.debug("JWKS returned successfully");
-                return ResponseEntity.ok(Map.of("keys", jwkSet.getKeys()));
+                log.debug("JWKS returned successfully with kid: key-1");
+                return ResponseEntity.ok(Map.of("keys", keys));
             } else {
                 log.error("Public key is not RSA key");
                 return ResponseEntity.status(500).body(Map.of(
@@ -73,9 +77,12 @@ public class OAuth2TokenController {
      * 验证 Token 有效性并返回 Token 信息
      * 符合 RFC 7662 (Token Introspection) 规范
      */
-    @PostMapping("/introspect")
-    public ResponseEntity<?> introspect(@RequestParam String token) {
-        log.debug("Token introspection request received");
+    @PostMapping("/api/introspect")
+    public ResponseEntity<?> introspect(@RequestBody MultiValueMap<String, String> formData) {
+        log.info("Token introspection request received");
+        
+        // 从请求体中获取 token 参数
+        String token = formData.getFirst("token");
         
         if (token == null || token.trim().isEmpty()) {
             log.warn("Empty token provided for introspection");
@@ -127,6 +134,18 @@ public class OAuth2TokenController {
                     "error", "Invalid token"
             ));
         }
+    }
+    
+    /**
+     * Token 内省测试端点（GET方法）
+     * 用于测试端点是否能够成功响应
+     */
+    @GetMapping("/introspect-test")
+    public ResponseEntity<?> introspectTest() {
+        log.debug("Token introspection test request received");
+        
+        // 直接返回 active: false，测试是否能够成功响应
+        return ResponseEntity.ok(Map.of("active", false, "test", "success"));
     }
 
     /**

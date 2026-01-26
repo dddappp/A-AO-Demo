@@ -1,5 +1,6 @@
 package com.example.oauth2demo.config;
 
+import com.example.oauth2demo.service.JwtTokenService;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -21,6 +22,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.time.Duration;
 import java.util.UUID;
@@ -72,20 +74,16 @@ public class AuthorizationServerConfig {
 
     /**
      * JWT 密钥源
-     * 使用RSA密钥对进行JWT签名
+     * 使用JwtTokenService中的RSA密钥对进行JWT签名
      */
     @Bean
-    public JWKSource<SecurityContext> jwkSource() throws NoSuchAlgorithmException {
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-        keyPairGenerator.initialize(2048);
-        KeyPair keyPair = keyPairGenerator.generateKeyPair();
-
-        PublicKey publicKey = keyPair.getPublic();
-        java.security.PrivateKey privateKey = keyPair.getPrivate();
+    public JWKSource<SecurityContext> jwkSource(JwtTokenService jwtTokenService) throws NoSuchAlgorithmException {
+        PublicKey publicKey = jwtTokenService.getPublicKey();
+        PrivateKey privateKey = jwtTokenService.getPrivateKey();
 
         RSAKey rsaKey = new RSAKey.Builder((java.security.interfaces.RSAPublicKey) publicKey)
             .privateKey((java.security.interfaces.RSAPrivateKey) privateKey)
-            .keyID(UUID.randomUUID().toString())
+            .keyID("key-1")  // 使用固定的keyID，与JwtTokenService中的kid保持一致
             .build();
 
         JWKSet jwkSet = new JWKSet(rsaKey);

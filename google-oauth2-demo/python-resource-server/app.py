@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # 配置CORS允许来自不同域的请求
 CORS(app, resources={
-    r"/api/*": {
+    r"/*": {
         "origins": ["http://localhost:5173", "http://localhost:8081", "https://api.u2511175.nyat.app:55139"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Authorization", "Content-Type"],
@@ -24,8 +24,8 @@ CORS(app, resources={
 })
 
 # 认证服务器配置
-AUTH_SERVER_URL = "https://api.u2511175.nyat.app:55139"
-JWKS_URL = f"{AUTH_SERVER_URL}/oauth2/jwks"
+AUTH_SERVER_URL = "https://auth.example.com"
+JWKS_URL = "https://api.u2511175.nyat.app:55139/oauth2/jwks"
 
 # JWKS缓存
 jwks_cache = None
@@ -78,10 +78,16 @@ def validate_token(token):
             if jwk.get('kid') == kid:
                 try:
                     logger.debug(f"Found matching key with kid: {kid}")
-                    key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+                    logger.debug(f"JWK: {json.dumps(jwk, indent=2)}")
+                    jwk_json = json.dumps(jwk)
+                    logger.debug(f"JWK JSON: {jwk_json}")
+                    key = jwt.algorithms.RSAAlgorithm.from_jwk(jwk_json)
+                    logger.debug(f"Successfully converted JWK to key")
                     break
                 except Exception as e:
                     logger.error(f"Error converting JWK to key: {e}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
                     continue
         
         if not key:
@@ -216,7 +222,7 @@ if __name__ == '__main__':
     # 生产环境应使用 gunicorn，开发环境使用 Flask 内置服务器
     app.run(
         host='0.0.0.0',
-        port=5001,
+        port=5002,
         debug=True,
         use_reloader=True
     )

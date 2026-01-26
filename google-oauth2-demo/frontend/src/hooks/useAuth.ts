@@ -70,8 +70,7 @@ export function useAuth() {
       const response = await AuthService.login(username, password);
       console.log('Local login successful:', response);
 
-      // 本地用户登录成功后，直接设置用户信息状态
-      // 注意：生产环境中应该使用JWT token，这里暂时使用session存储
+      // 本地用户登录成功后，设置用户信息状态并存储令牌
       setUser({
         id: response.user.id,
         username: response.user.username,
@@ -80,6 +79,17 @@ export function useAuth() {
         avatarUrl: response.user.avatarUrl,
         provider: 'local'
       });
+      
+      // 存储令牌到localStorage，用于资源服务器认证
+      if (response.accessToken) {
+        localStorage.setItem('accessToken', response.accessToken);
+        console.log('Access token stored to localStorage');
+      }
+      if (response.refreshToken) {
+        localStorage.setItem('refreshToken', response.refreshToken);
+        console.log('Refresh token stored to localStorage');
+      }
+      
       setError(null);
 
       return response;
