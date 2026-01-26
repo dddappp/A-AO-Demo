@@ -225,16 +225,188 @@
 **特点**：
 - 前端资源打包后放在Spring Boot的静态资源目录中
 - Spring Boot应用同时提供API和静态资源服务
+- 适合快速原型开发和小型应用
+- 便于向第三方项目展示集成能力
 
 **对重定向和转发代码的影响**：
 - 我们的`SpaController`和相关重定向逻辑会执行
 - 需要根据实际情况修改配置和代码
 
-**配置建议**：
-1. 设置`app.frontend.type`为`react`或其他合适的值
-2. 保留`forward:/index.html`逻辑以支持前端路由
-3. 根据需要调整`SecurityConfig`中的重定向逻辑
-4. 确保Spring Boot正确配置了静态资源目录
+**详细实施步骤**：
+
+1. **前端项目配置**：
+   - **项目结构建议**：
+     - 使用标准的React项目结构
+     - 认证相关的代码放在单独的文件中，例如`src/services/authService.js`
+     - 路由配置放在单独的文件中，例如`src/routes/AppRouter.jsx`
+     - 组件按照功能模块化组织
+   - **构建配置修改**：
+     - 在React项目中，使用Vite作为构建工具时，修改`vite.config.js`文件：
+       ```javascript
+       // vite.config.js
+       export default {
+         base: './', // 使用相对路径
+         // 其他配置...
+       }
+       ```
+     - 使用Webpack作为构建工具时，修改`webpack.config.js`文件，确保输出路径配置正确
+     - 确保`package.json`中的构建脚本正确，例如：
+       ```json
+       "scripts": {
+         "build": "vite build"
+       }
+       ```
+
+2. **前端资源打包**：
+   - 执行构建命令，例如：`npm run build`
+   - 构建完成后，会生成`dist`目录，包含所有静态资源
+
+3. **部署到Spring Boot**：
+   - 将`dist`目录中的所有文件复制到Spring Boot项目的`src/main/resources/static`目录中
+   - 确保`index.html`位于`static`目录的根目录
+
+4. **Spring Boot配置**：
+   - 在`application.yml`或`application.properties`中设置：
+     ```yaml
+     app:
+       frontend:
+         type: react
+     ```
+   - 确保Spring Boot正确配置了静态资源目录（默认情况下，Spring Boot会自动配置`/static`、`/public`等目录）
+
+5. **SpaController配置**：
+   - 保留`SpaController`中的所有方法，确保前端路由能正确处理
+   - 实际的`SpaController.java`文件包含以下方法：
+     ```java
+     package com.example.oauth2demo.controller;
+
+     import org.springframework.beans.factory.annotation.Value;
+     import org.springframework.stereotype.Controller;
+     import org.springframework.web.bind.annotation.GetMapping;
+     import org.springframework.web.bind.annotation.PathVariable;
+
+     /**
+      * SPA路由控制器
+      * 处理React应用的客户端路由
+      */
+     @Controller
+     public class SpaController {
+
+         @Value("${app.frontend.type:react}")
+         private String frontendType;
+
+         /**
+          * SPA路由处理 - 对于React应用，返回index.html
+          * 这确保所有前端路由都能正确加载React应用
+          */
+         @GetMapping("/login")
+         public String loginPage() {
+             if ("react".equals(frontendType)) {
+                 return "forward:/index.html";
+             }
+             return "redirect:/";
+         }
+
+         @GetMapping("/test")
+         public String testPage() {
+             if ("react".equals(frontendType)) {
+                 return "forward:/index.html";
+             }
+             return "redirect:/";
+         }
+
+         @GetMapping("/{path:[^\\.]*}")
+         public String spaRoutes(@PathVariable String path) {
+             // 排除API路径、静态资源等
+             if (path.startsWith("api/") || path.startsWith("oauth2/") ||
+                 path.startsWith("h2-console/") || path.equals("favicon.ico")) {
+                 return null; // 不处理这些路径
+             }
+
+             if ("react".equals(frontendType)) {
+                 return "forward:/index.html";
+             }
+             return "redirect:/";
+         }
+     }
+     ```
+
+6. **SecurityConfig调整**：
+   - 确保登录成功后重定向到正确的前端页面
+   - 实际的`SecurityConfig.java`文件中，OAuth2登录成功处理器会根据前端类型重定向：
+     ```java
+     // 根据前端类型重定向
+     if ("react".equals(frontendType)) {
+         response.sendRedirect("/");  // React SPA
+     } else {
+         response.sendRedirect("/test");  // Thymeleaf页面
+     }
+     ```
+   - 确保`SecurityConfig`中的授权规则正确配置，允许访问前端静态资源：
+     ```java
+     // 授权规则
+     .authorizeHttpRequests(authz -> authz
+         .requestMatchers("/", "/login/**", "/oauth2/**", "/css/**", "/js/**",
+                        "/images/**", "/static/**", "/index.html", "/assets/**",
+                        "/favicon.ico", "/error").permitAll()
+         .requestMatchers("/api/auth/**").permitAll()  // 认证API公开
+         .requestMatchers("/api/user").authenticated()  // 所有认证用户都可以访问
+         .requestMatchers("/api/admin/**").hasRole("ADMIN")  // 只有ADMIN角色可以访问
+         .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")  // ADMIN或MANAGER角色可以访问
+         .anyRequest().authenticated()
+     )
+     ```
+
+7. **测试集成流程**：
+   - 启动Spring Boot应用：`mvn spring-boot:run`
+   - 访问应用根路径，例如：`http://localhost:8080`
+   - 测试登录、登出、访问受保护页面等功能
+   - 测试第三方SSO登录功能
+
+**向第三方项目展示集成能力的建议**：
+
+1. **创建集成示例项目**：
+   - 基于第二种部署方式创建一个完整的集成示例
+   - 包含前端和后端代码，展示完整的集成流程
+
+2. **提供详细的集成文档**：
+   - 详细说明每一步的实施过程
+   - 提供代码示例和配置示例
+   - 说明常见问题和解决方案
+
+3. **演示集成流程**：
+   - 从创建前端项目开始
+   - 配置认证服务
+   - 实现登录页面
+   - 部署到Spring Boot
+   - 测试所有功能
+
+4. **提供集成模板**：
+   - 创建可复用的前端认证服务模板
+   - 提供Spring Boot配置模板
+   - 减少第三方项目的集成工作量
+
+**常见问题和解决方案**：
+
+1. **前端路由404问题**：
+   - 确保`SpaController`正确配置，将所有非API路径转发到`index.html`
+
+2. **静态资源加载失败**：
+   - 确保前端构建配置正确，使用相对路径
+   - 确保静态资源正确部署到`static`目录
+
+3. **登录后重定向问题**：
+   - 确保`SecurityConfig`中的重定向逻辑正确配置，重定向到前端应用的根路径
+
+4. **OAuth2回调问题**：
+   - 确保第三方平台的重定向URL配置正确
+   - 确保`SpaController`正确处理回调路径
+
+**优势**：
+- 部署简单，不需要额外的web服务器
+- 便于开发和测试
+- 适合向第三方项目展示集成能力
+- 减少部署和配置的复杂性
 
 ### 5.2 后端集成
 
