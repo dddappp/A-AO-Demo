@@ -78,17 +78,43 @@ export function useAuth() {
         return null;
       };
       
+      console.log('Current cookies:', document.cookie);
+      
       const accessToken = getCookie('accessToken');
       const refreshToken = getCookie('refreshToken');
+      
+      console.log('Access token from cookie:', accessToken ? 'Present' : 'Missing');
+      console.log('Refresh token from cookie:', refreshToken ? 'Present' : 'Missing');
       
       if (accessToken) {
         localStorage.setItem('accessToken', accessToken);
         console.log('Stored access token from cookie to localStorage');
+      } else {
+        console.log('No access token found in cookie');
+        // 尝试调用refreshToken API获取token
+        try {
+          console.log('Attempting to refresh token...');
+          const refreshResponse = await AuthService.refreshToken();
+          console.log('Token refresh response:', refreshResponse);
+          if (refreshResponse.accessToken) {
+            localStorage.setItem('accessToken', refreshResponse.accessToken);
+            console.log('Stored access token from API to localStorage');
+          }
+        } catch (error) {
+          console.log('Token refresh failed:', error);
+        }
       }
+      
       if (refreshToken) {
         localStorage.setItem('refreshToken', refreshToken);
         console.log('Stored refresh token from cookie to localStorage');
       }
+      
+      console.log('LocalStorage after cookie check:', {
+        accessToken: localStorage.getItem('accessToken') ? 'Present' : 'Missing',
+        refreshToken: localStorage.getItem('refreshToken') ? 'Present' : 'Missing',
+        auth_user: localStorage.getItem('auth_user') ? 'Present' : 'Missing'
+      });
       
       // 然后尝试获取用户信息
       const userData = await AuthService.getCurrentUser();

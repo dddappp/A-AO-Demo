@@ -92,7 +92,10 @@ export class AuthService {
           'Pragma': 'no-cache'
         }
       });
-      return response.data;
+      // 确保返回的是响应数据，而不是完整的响应对象
+      const result = response.data || response;
+      console.log('Refresh token response:', result);
+      return result;
     } catch (error) {
       console.error('Refresh token error:', error);
       throw this.handleApiError(error, '刷新Token失败');
