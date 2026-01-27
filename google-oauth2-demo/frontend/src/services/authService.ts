@@ -339,6 +339,11 @@ axios.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // 在登录页面时，不尝试刷新token，直接返回错误
+    if (window.location.pathname.includes('/login')) {
+      return Promise.reject(error);
+    }
+    
     if (error.response?.status === 401) {
       // 尝试刷新token
       try {
@@ -370,6 +375,10 @@ axios.interceptors.response.use(
         if (!window.location.pathname.includes('/login')) {
           window.location.href = '/login';
         }
+        // 清除localStorage中的用户状态
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
       }
     }
     return Promise.reject(error);

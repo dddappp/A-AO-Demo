@@ -57,8 +57,6 @@ export function useAuth() {
 
   // 检查认证状态
   const checkAuth = useCallback(async () => {
-    // 总是检查认证状态，确保与后端同步
-
     // 在登录页面时，不自动检查认证状态
     if (window.location.pathname.includes('/login')) {
       setLoading(false);
@@ -102,6 +100,13 @@ export function useAuth() {
           }
         } catch (error) {
           console.log('Token refresh failed:', error);
+          // 如果token刷新失败，跳转到登录页面
+          if (!window.location.pathname.includes('/login')) {
+            console.log('Redirecting to login due to token refresh failure');
+            window.location.href = '/login';
+          }
+          setLoading(false);
+          return;
         }
       }
       
@@ -125,7 +130,7 @@ export function useAuth() {
       setUser(null);
       setError(err instanceof Error ? err.message : 'Authentication check failed');
       // 如果在受保护页面且认证失败，重定向到登录页面
-      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/')) {
+      if (!window.location.pathname.includes('/login')) {
         console.log('Redirecting to login due to authentication failure');
         window.location.href = '/login';
       }
@@ -184,6 +189,11 @@ export function useAuth() {
 
   // 自动刷新token
   const autoRefreshToken = useCallback(async () => {
+    // 在登录页面时，不自动刷新token
+    if (window.location.pathname.includes('/login')) {
+      return;
+    }
+    
     if (isTokenExpiring()) {
       try {
         console.log('Token is expiring, refreshing...');

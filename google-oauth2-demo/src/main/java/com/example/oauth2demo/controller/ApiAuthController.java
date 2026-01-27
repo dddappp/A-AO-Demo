@@ -63,7 +63,7 @@ public class ApiAuthController {
                     providerInfo.put("publicRepos", oauth2User.getAttribute("public_repos"));
                     providerInfo.put("followers", oauth2User.getAttribute("followers"));
                     break;
-                case "twitter":
+                case "x":  // ✅ 使用注册ID 'x'，与 OAuth2 配置一致
                     providerInfo.put("location", getUserLocation(oauth2User));
                     providerInfo.put("verified", getUserVerified(oauth2User));
                     providerInfo.put("description", getUserDescription(oauth2User));
@@ -236,7 +236,7 @@ public class ApiAuthController {
         } else if (oauth2User.getAttribute("login") != null) {
             return "github";
         } else if (oauth2User.getAttribute("username") != null) {
-            return "twitter";
+            return "x";  // ✅ 返回注册ID 'x'，与 OAuth2 配置一致
         }
         return "unknown";
     }
@@ -245,7 +245,7 @@ public class ApiAuthController {
         switch (provider) {
             case "google": return oauth2User.getAttribute("name");
             case "github": return oauth2User.getAttribute("login");
-            case "twitter": return oauth2User.getAttribute("username");
+            case "x": return oauth2User.getAttribute("username");  // ✅ 使用注册ID 'x'
             default: return oauth2User.getName();
         }
     }
@@ -254,7 +254,7 @@ public class ApiAuthController {
         switch (provider) {
             case "google": return oauth2User.getAttribute("email");
             case "github": return oauth2User.getAttribute("email");
-            case "twitter": return null; // Twitter不提供email
+            case "x": return null; // X/Twitter不提供email
             default: return null;
         }
     }
@@ -265,7 +265,7 @@ public class ApiAuthController {
             case "github":
                 Object id = oauth2User.getAttribute("id");
                 return id != null ? id.toString() : null;
-            case "twitter": return oauth2User.getAttribute("id");
+            case "x": return oauth2User.getAttribute("id");  // ✅ 使用注册ID 'x'
             default: return null;
         }
     }
@@ -274,7 +274,7 @@ public class ApiAuthController {
         switch (provider) {
             case "google": return oauth2User.getAttribute("picture");
             case "github": return oauth2User.getAttribute("avatar_url");
-            case "twitter": return oauth2User.getAttribute("profile_image_url");
+            case "x": return oauth2User.getAttribute("profile_image_url");  // ✅ 使用注册ID 'x'
             default: return null;
         }
     }

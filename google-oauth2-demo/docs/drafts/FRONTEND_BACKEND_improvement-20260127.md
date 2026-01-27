@@ -342,6 +342,7 @@ curl -X POST "https://api.u2511175.nyat.app:55139/api/auth/login" \
 - 应该将测试前端项目发布到 Spring Boot 应用的资源目录，也就是说我们使用 Spring Boot 作为 Web 服务器承载前端页面（不需要启动 Node 服务器）
 - 使用 `export $(cat .env | xargs) && mvn clean compile spring-boot:run` 命令启动 Spring Boot 应用
 - 启动资源服务器，以配合（resource-test 页面的）相关测试
+- 当使用 MCP 浏览器做测试的时候，不要上来就用 run code 方式来做**多步自动化测试**。你应该通过手动**一步步**模拟人类用户点击/输入、观察结果。只有在体验过完整的测试流程后，有十足把握时才可以适当采用 run code 方式做多步自动化测试
 
 
 #### 4.3.2 回归测试用例

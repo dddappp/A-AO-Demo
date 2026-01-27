@@ -153,6 +153,18 @@ public class SecurityConfig {
                     // 处理GitHub和Twitter用户（OAuth2）
                     else if (authentication.getPrincipal() instanceof OAuth2User oauth2User) {
                         String provider = determineProvider(oauth2User);
+                        // ✅ 最小修复：registrationId 'x' 对应枚举值 'TWITTER'（UserService 需要枚举值）
+                        if (authentication instanceof org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken oauth2Token) {
+                            String registrationId = oauth2Token.getAuthorizedClientRegistrationId();
+                            System.out.println("=== OAuth2 Success Handler ===");
+                            System.out.println("Registration ID: " + registrationId);
+                            if ("x".equals(registrationId)) {
+                                provider = "TWITTER";  // UserService 需要枚举值 "TWITTER"
+                            } else if ("github".equals(registrationId)) {
+                                provider = "GITHUB";  // UserService 需要枚举值 "GITHUB"
+                            }
+                        }
+                        System.out.println("Final provider: " + provider);
                         String providerUserId = getProviderUserId(oauth2User, provider);
                         String email = getProviderEmail(oauth2User, provider);
                         String name = getProviderName(oauth2User, provider);
@@ -422,6 +434,15 @@ public class SecurityConfig {
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
                 .successHandler(oauth2SuccessHandler())
+                .failureHandler((request, response, exception) -> {
+                    System.err.println("=== OAuth2 Login Failure ===");
+                    System.err.println("Request URI: " + request.getRequestURI());
+                    System.err.println("Query String: " + request.getQueryString());
+                    System.err.println("Error: " + exception.getMessage());
+                    System.err.println("Error Class: " + exception.getClass().getName());
+                    exception.printStackTrace();
+                    response.sendRedirect("/login?error=oauth2_failed");
+                })
                 .authorizationEndpoint(authz -> authz
                     .authorizationRequestResolver(authorizationRequestResolver(clientRegistrationRepository))
                 )
@@ -591,50 +612,21 @@ public class SecurityConfig {
         // 配置自定义的授权请求参数 - 先启用PKCE
         defaultResolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
 
-        // 创建自定义解析器，保留前端传入的state参数
-        return new OAuth2AuthorizationRequestResolver() {
-            @Override
-            public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
-                OAuth2AuthorizationRequest authorizationRequest = defaultResolver.resolve(request);
-                if (authorizationRequest != null) {
-                    // 检查请求中是否有state参数
-                    String state = request.getParameter("state");
-                    if (state != null && !state.isEmpty()) {
-                        // 保留前端传入的state参数
-                        return OAuth2AuthorizationRequest.from(authorizationRequest)
-                                .state(state)
-                                .build();
-                    }
-                }
-                return authorizationRequest;
-            }
-
-            @Override
-            public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
-                OAuth2AuthorizationRequest authorizationRequest = defaultResolver.resolve(request, clientRegistrationId);
-                if (authorizationRequest != null) {
-                    // 检查请求中是否有state参数
-                    String state = request.getParameter("state");
-                    if (state != null && !state.isEmpty()) {
-                        // 保留前端传入的state参数
-                        return OAuth2AuthorizationRequest.from(authorizationRequest)
-                                .state(state)
-                                .build();
-                    }
-                }
-                return authorizationRequest;
-            }
-        };
+        // 创建自定义解析器，保留前端传入的state参数（但不要覆盖Spring Security生成的state）
+        // ✅ 关键修复：Spring Security使用state作为session key，不能直接覆盖
+        // 前端state信息会在回调时从URL参数中获取，不需要在这里处理
+        return defaultResolver;
     }
 
     /**
-     * 辅助方法：确定OAuth2提供商
+     * 辅助方法：确定OAuth2提供商（后备方案，当无法从 Authentication 获取 registrationId 时使用）
+     * 返回小写字符串（如 "github", "x"），与前端和 ApiAuthController 保持一致
      */
     private String determineProvider(OAuth2User oauth2User) {
         if (oauth2User.getAttribute("login") != null) {
             return "github";
         } else if (oauth2User.getAttribute("username") != null) {
-            return "twitter";
+            return "x";  // ✅ 返回注册ID 'x'，与前端和 ApiAuthController 保持一致
         }
         return "unknown";
     }
@@ -643,9 +635,10 @@ public class SecurityConfig {
      * 辅助方法：获取提供商用户ID
      */
     private String getProviderUserId(OAuth2User oauth2User, String provider) {
-        switch (provider) {
+        switch (provider.toLowerCase()) {
             case "github": return oauth2User.getAttribute("id").toString();
-            case "twitter": return oauth2User.getAttribute("id");
+            case "twitter":
+            case "x": return oauth2User.getAttribute("id");  // ✅ 支持 "twitter" 和 "x"
             default: return null;
         }
     }
@@ -654,9 +647,10 @@ public class SecurityConfig {
      * 辅助方法：获取提供商邮箱
      */
     private String getProviderEmail(OAuth2User oauth2User, String provider) {
-        switch (provider) {
+        switch (provider.toLowerCase()) {
             case "github": return oauth2User.getAttribute("email");
-            case "twitter": return null; // Twitter不提供邮箱
+            case "twitter":
+            case "x": return null; // Twitter/X不提供邮箱
             default: return null;
         }
     }
@@ -665,9 +659,10 @@ public class SecurityConfig {
      * 辅助方法：获取提供商用户名
      */
     private String getProviderName(OAuth2User oauth2User, String provider) {
-        switch (provider) {
+        switch (provider.toLowerCase()) {
             case "github": return (String) oauth2User.getAttribute("login");
-            case "twitter": return (String) oauth2User.getAttribute("username");
+            case "twitter":
+            case "x": return (String) oauth2User.getAttribute("username");  // ✅ 支持 "twitter" 和 "x"
             default: return oauth2User.getName();
         }
     }
@@ -676,9 +671,10 @@ public class SecurityConfig {
      * 辅助方法：获取提供商头像
      */
     private String getProviderPicture(OAuth2User oauth2User, String provider) {
-        switch (provider) {
+        switch (provider.toLowerCase()) {
             case "github": return (String) oauth2User.getAttribute("avatar_url");
-            case "twitter": return (String) oauth2User.getAttribute("profile_image_url");
+            case "twitter":
+            case "x": return (String) oauth2User.getAttribute("profile_image_url");  // ✅ 支持 "twitter" 和 "x"
             default: return null;
         }
     }
