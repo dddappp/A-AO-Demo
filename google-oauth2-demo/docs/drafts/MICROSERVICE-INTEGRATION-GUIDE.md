@@ -148,9 +148,60 @@ server {
         add_header Cache-Control "public, max-age=1800";
     }
 
-    # 前端入口页面
+    # 前端特定路由（对应 SpaController）
+    # 注意：如果项目想要实现自己的页面，那么下面的配置可能需要调整来适应
+    location /login {
+        proxy_pass http://localhost:8081/login;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    location /test {
+        proxy_pass http://localhost:8081/test;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    location /oauth2/callback {
+        proxy_pass http://localhost:8081/oauth2/callback;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # 前端入口页面和其他 SPA 路由
     location / {
         proxy_pass http://localhost:8081/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # SPA 客户端路由（捕获所有非 API、非静态资源的路径）
+    location ~ ^/(?!api/|oauth2/|static/|h2-console/|favicon.ico) {
+        proxy_pass http://localhost:8081/$1;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -360,10 +411,51 @@ spring:
             - PreserveHostHeader
             - AddRequestHeader=X-Forwarded-Proto, ${spring.profiles.active:http}
         
+        # 前端特定路由（对应 SpaController）
+        # 注意：如果项目想要实现自己的页面，那么下面的配置可能需要调整来适应
+        - id: auth-service-login
+          uri: http://localhost:8081
+          predicates:
+            - Path=/login
+          filters:
+            - PreserveHostHeader
+            - AddRequestHeader=X-Forwarded-Proto, ${spring.profiles.active:http}
+        
+        - id: auth-service-test
+          uri: http://localhost:8081
+          predicates:
+            - Path=/test
+          filters:
+            - PreserveHostHeader
+            - AddRequestHeader=X-Forwarded-Proto, ${spring.profiles.active:http}
+        
+        - id: auth-service-oauth2-callback
+          uri: http://localhost:8081
+          predicates:
+            - Path=/oauth2/callback
+          filters:
+            - PreserveHostHeader
+            - AddRequestHeader=X-Forwarded-Proto, ${spring.profiles.active:http}
+        
+        # 前端入口页面
         - id: auth-service-root
           uri: http://localhost:8081
           predicates:
             - Path=/
+          filters:
+            - PreserveHostHeader
+            - AddRequestHeader=X-Forwarded-Proto, ${spring.profiles.active:http}
+        
+        # SPA 客户端路由（对应 SpaController 的 spaRoutes 方法）
+        - id: auth-service-spa-routes
+          uri: http://localhost:8081
+          predicates:
+            - Path=/**
+            - Path!=/api/**
+            - Path!=/oauth2/**
+            - Path!=/static/**
+            - Path!=/h2-console/**
+            - Path!=/favicon.ico
           filters:
             - PreserveHostHeader
             - AddRequestHeader=X-Forwarded-Proto, ${spring.profiles.active:http}
@@ -422,6 +514,28 @@ management:
 
 - **WebFlux 版本**：支持更多高级配置，如连接池、响应式过滤器等
 - **MVC 版本**：配置更简单，与传统 Spring Boot 应用配置一致
+
+### 前端路由配置说明
+
+**重要**：如果项目想要实现自己的页面，那么下面的前端路由配置可能需要调整来适应。
+
+对于前后端分离架构，`SpaController.java` 是处理前端 React 应用客户端路由的关键组件。当使用认证服务的前端时，反向代理配置必须确保以下前端路由能正确转发到认证微服务：
+
+1. **核心前端路由**：
+   - `/login` - 登录页面
+   - `/test` - 测试页面
+   - `/oauth2/callback` - OAuth2 回调页面
+   - 所有其他非 API、非静态资源的路径
+
+2. **工作原理**：
+   - 反向代理将前端路由请求转发到认证微服务
+   - `SpaController` 接收到请求后，转发到 `index.html`
+   - 前端 React 应用接管客户端路由，根据 URL 显示相应页面
+
+3. **配置要点**：
+   - 前端路由需要单独配置，确保正确转发
+   - SPA 客户端路由需要捕获所有非 API 路径
+   - 路由顺序很重要，更具体的路径应该放在前面
 
 #### 4. 启动 Gateway
 
