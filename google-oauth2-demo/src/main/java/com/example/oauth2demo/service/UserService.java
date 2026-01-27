@@ -195,6 +195,16 @@ public class UserService {
     }
 
     /**
+     * 根据用户ID获取用户信息
+     */
+    @Transactional(readOnly = true)
+    public UserDto getUserById(String userId) {
+        UserEntity user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        return convertToDto(user);
+    }
+
+    /**
      * 获取或创建OAuth2用户（重载方法，用于向后兼容现有调用）
      */
     public UserDto getOrCreateOAuthUser(String provider,
@@ -214,6 +224,18 @@ public class UserService {
         dto.setDisplayName(user.getDisplayName());
         dto.setAvatarUrl(user.getAvatarUrl());
         dto.setAuthorities(user.getAuthorities());
+        
+        // 获取主要登录方式的provider信息
+        if (!user.getLoginMethods().isEmpty()) {
+            // 找到主要登录方式
+            UserLoginMethod primaryMethod = user.getLoginMethods().stream()
+                .filter(UserLoginMethod::isPrimary)
+                .findFirst()
+                .orElse(user.getLoginMethods().iterator().next());
+            
+            dto.setProvider(primaryMethod.getAuthProvider().name().toLowerCase());
+        }
+        
         return dto;
     }
 }

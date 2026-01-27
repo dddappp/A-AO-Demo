@@ -27,6 +27,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -46,13 +47,13 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${app.frontend.type:react}")
-    private String frontendType;
+
 
     @Autowired
     private UserService userService;
@@ -94,6 +95,7 @@ public class SecurityConfig {
     /**
      * OAuth2登录成功处理器 - 智能路由版本
      * 根据用户登录状态自动选择登录或绑定流程
+     * 支持Token双重传递（cookie + JSON响应体）
      */
     @Bean
     public AuthenticationSuccessHandler oauth2SuccessHandler() {
@@ -106,12 +108,29 @@ public class SecurityConfig {
                 try {
                     // 🎯 核心：检查用户是否已登录
                     String currentUserId = getCurrentUserIdFromRequest(request);
-                    boolean isUserLoggedIn = (currentUserId != null);
+                    boolean isUserLoggedIn = false;
+                    
+                    // 验证用户是否真正存在（防止无效token导致的绑定失败）
+                    if (currentUserId != null) {
+                        try {
+                            if (userService.getUserById(currentUserId) != null) {
+                                isUserLoggedIn = true;
+                            } else {
+                                System.out.println("User ID extracted from token does not exist: " + currentUserId);
+                                currentUserId = null;
+                            }
+                        } catch (Exception e) {
+                            System.out.println("Failed to verify user existence: " + e.getMessage());
+                            currentUserId = null;
+                        }
+                    }
                     
                     System.out.println("User login status: " + (isUserLoggedIn ? "LOGGED_IN" : "NOT_LOGGED_IN") + 
                                      ", userId: " + currentUserId);
 
                     UserDto userDto = null;
+                    String accessToken = null;
+                    String refreshToken = null;
 
                     // 处理Google用户（OpenID Connect）
                     if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
@@ -149,69 +168,119 @@ public class SecurityConfig {
                         System.out.println("Email: " + email);
                     }
 
-                    // 🎯 关键区别：绑定流程不生成新JWT token
                     if (userDto != null) {
+                        // 🎯 统一处理：无论是登录还是绑定，都生成新的JWT token
+                        accessToken = jwtTokenService.generateAccessToken(
+                            userDto.getUsername(),
+                            userDto.getEmail(),
+                            userDto.getId(),
+                            userService.getCurrentUser(userDto.getUsername()).getAuthorities()
+                        );
+
+                        refreshToken = jwtTokenService.generateRefreshToken(
+                            userDto.getUsername(),
+                            userDto.getId()
+                        );
+
+                        // 存储Access Token到HttpOnly Cookie
+                        Cookie accessTokenCookie = new Cookie("accessToken", accessToken);
+                        accessTokenCookie.setHttpOnly(true);
+                        accessTokenCookie.setPath("/");
+                        accessTokenCookie.setMaxAge(3600); // 1小时
+                        accessTokenCookie.setSecure(true); // 生产环境设为true，HTTPS必须
+                        accessTokenCookie.setAttribute("SameSite", "Lax");
+                        response.addCookie(accessTokenCookie);
+
+                        // 存储Refresh Token到HttpOnly Cookie
+                        Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
+                        refreshTokenCookie.setHttpOnly(true);
+                        refreshTokenCookie.setPath("/");
+                        refreshTokenCookie.setMaxAge(604800); // 7天
+                        refreshTokenCookie.setSecure(true); // 生产环境设为true，HTTPS必须
+                        refreshTokenCookie.setAttribute("SameSite", "Lax");
+                        response.addCookie(refreshTokenCookie);
+
                         if (isUserLoggedIn) {
-                            // 绑定流程：不修改现有token，直接重定向
                             System.out.println("Binding completed successfully for user: " + currentUserId);
-                            response.sendRedirect("/?message=binding_success");
                         } else {
-                            // 登录流程：生成JWT token
-                            String accessToken = jwtTokenService.generateAccessToken(
-                                userDto.getUsername(),
-                                userDto.getEmail(),
-                                userDto.getId(),
-                                userService.getCurrentUser(userDto.getUsername()).getAuthorities()
-                            );
-
-                            String refreshToken = jwtTokenService.generateRefreshToken(
-                                userDto.getUsername(),
-                                userDto.getId()
-                            );
-
-                            // 存储Access Token到HttpOnly Cookie
-                            Cookie accessTokenCookie = new Cookie("accessToken", accessToken);
-                            accessTokenCookie.setHttpOnly(true);
-                            accessTokenCookie.setPath("/");
-                            accessTokenCookie.setMaxAge(3600); // 1小时
-                            accessTokenCookie.setSecure(false); // 开发环境设为false
-                            accessTokenCookie.setAttribute("SameSite", "Lax");
-                            response.addCookie(accessTokenCookie);
-
-                            // 存储Refresh Token到HttpOnly Cookie
-                            Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
-                            refreshTokenCookie.setHttpOnly(true);
-                            refreshTokenCookie.setPath("/");
-                            refreshTokenCookie.setMaxAge(604800); // 7天
-                            refreshTokenCookie.setSecure(false); // 开发环境设为false
-                            refreshTokenCookie.setAttribute("SameSite", "Lax");
-                            response.addCookie(refreshTokenCookie);
-
                             System.out.println("Login completed successfully for user: " + userDto.getId());
-                            
-                            // 根据前端类型重定向
-                            if ("react".equals(frontendType)) {
-                                response.sendRedirect("/");  // React SPA
-                            } else {
-                                response.sendRedirect("/test");  // Thymeleaf页面
+                        }
+                        
+                        // 检测回调模式：优先使用state参数中的response_type，其次使用Accept头
+                        String callbackMode = "redirect";
+                        String redirectUri = "/";
+                        
+                        // 解析state参数
+                        String state = request.getParameter("state");
+                        if (state != null) {
+                            try {
+                                // 解码state参数
+                                String decodedState = java.net.URLDecoder.decode(state, "UTF-8");
+                                // 尝试解析为JSON
+                                ObjectMapper objectMapper = new ObjectMapper();
+                                Map<String, Object> stateData = objectMapper.readValue(decodedState, Map.class);
+                                
+                                // 获取回调模式
+                                if (stateData.containsKey("response_type")) {
+                                    String responseType = stateData.get("response_type").toString();
+                                    if ("json".equals(responseType)) {
+                                        callbackMode = "json";
+                                    }
+                                }
+                                
+                                // 获取重定向URI
+                                if (stateData.containsKey("redirect_uri")) {
+                                    redirectUri = stateData.get("redirect_uri").toString();
+                                }
+                            } catch (Exception e) {
+                                // 解析失败，使用默认值
+                                System.out.println("Failed to parse state parameter: " + e.getMessage());
                             }
+                        }
+                        
+                        // 如果没有指定回调模式，使用Accept头判断
+                        if ("redirect".equals(callbackMode)) {
+                            String acceptHeader = request.getHeader("Accept");
+                            if (acceptHeader != null && acceptHeader.contains("application/json")) {
+                                callbackMode = "json";
+                            }
+                        }
+                        
+                        if ("json".equals(callbackMode)) {
+                            // 返回JSON响应 - 无头服务模式
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            
+                            // 构建响应数据
+                            Map<String, Object> responseData = new HashMap<>();
+                            responseData.put("message", isUserLoggedIn ? "Binding successful" : "Login successful");
+                            responseData.put("authenticated", true);
+                            responseData.put("user", userDto);
+                            responseData.put("accessToken", accessToken);
+                            responseData.put("refreshToken", refreshToken);
+                            responseData.put("accessTokenExpiresIn", 3600); // 1小时
+                            responseData.put("refreshTokenExpiresIn", 604800); // 7天
+                            responseData.put("tokenType", "Bearer");
+                            
+                            // 序列化并写入响应
+                            ObjectMapper objectMapper = new ObjectMapper();
+                            objectMapper.writeValue(response.getWriter(), responseData);
+                        } else {
+                            // 重定向模式 - 完全由前端主导
+                            // 使用state参数中指定的redirect_uri，或使用默认值
+                            response.sendRedirect(redirectUri);
                         }
                     }
 
                 } catch (IllegalArgumentException e) {
                     // 业务逻辑错误（如账户已被绑定）
                     System.out.println("OAuth2 processing failed: " + e.getMessage());
-                    try {
-                        String errorMsg = java.net.URLEncoder.encode(e.getMessage(), "UTF-8");
-                        response.sendRedirect("/?error=" + errorMsg);
-                    } catch (Exception ex) {
-                        response.sendRedirect("/?error=oauth2_processing_failed");
-                    }
+                    handleOAuth2Error(request, response, e.getMessage());
                 } catch (Exception e) {
                     // 系统错误
                     System.err.println("OAuth2 processing error: " + e.getMessage());
                     e.printStackTrace();
-                    response.sendRedirect("/?error=oauth2_processing_failed");
+                    handleOAuth2Error(request, response, "oauth2_processing_failed");
                 }
             }
 
@@ -248,6 +317,77 @@ public class SecurityConfig {
                 } catch (Exception e) {
                     System.out.println("Failed to extract user ID from cookies: " + e.getMessage());
                     return null;
+                }
+            }
+
+            /**
+             * 处理OAuth2错误，支持JSON响应和重定向
+             */
+            private void handleOAuth2Error(HttpServletRequest request, HttpServletResponse response, String errorMessage) throws IOException {
+                // 检测回调模式：优先使用state参数中的response_type，其次使用Accept头
+                String callbackMode = "redirect";
+                String redirectUri = "/";
+                
+                // 解析state参数
+                String state = request.getParameter("state");
+                if (state != null) {
+                    try {
+                        // 解码state参数
+                        String decodedState = java.net.URLDecoder.decode(state, "UTF-8");
+                        // 尝试解析为JSON
+                        ObjectMapper objectMapper = new ObjectMapper();
+                        Map<String, Object> stateData = objectMapper.readValue(decodedState, Map.class);
+                        
+                        // 获取回调模式
+                        if (stateData.containsKey("response_type")) {
+                            String responseType = stateData.get("response_type").toString();
+                            if ("json".equals(responseType)) {
+                                callbackMode = "json";
+                            }
+                        }
+                        
+                        // 获取重定向URI
+                        if (stateData.containsKey("redirect_uri")) {
+                            redirectUri = stateData.get("redirect_uri").toString();
+                        }
+                    } catch (Exception e) {
+                        // 解析失败，使用默认值
+                        System.out.println("Failed to parse state parameter: " + e.getMessage());
+                    }
+                }
+                
+                // 如果没有指定回调模式，使用Accept头判断
+                if ("redirect".equals(callbackMode)) {
+                    String acceptHeader = request.getHeader("Accept");
+                    if (acceptHeader != null && acceptHeader.contains("application/json")) {
+                        callbackMode = "json";
+                    }
+                }
+                
+                if ("json".equals(callbackMode)) {
+                    // 返回JSON响应 - 无头服务模式
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    
+                    // 构建错误响应数据
+                    Map<String, Object> responseData = new HashMap<>();
+                    responseData.put("message", "OAuth2 processing failed");
+                    responseData.put("authenticated", false);
+                    responseData.put("error", errorMessage);
+                    responseData.put("timestamp", System.currentTimeMillis());
+                    responseData.put("path", request.getRequestURI());
+                    
+                    // 序列化并写入响应
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    objectMapper.writeValue(response.getWriter(), responseData);
+                } else {
+                    // 重定向模式 - 完全由前端主导
+                    try {
+                        String encodedError = java.net.URLEncoder.encode(errorMessage, "UTF-8");
+                        response.sendRedirect(redirectUri + (redirectUri.contains("?") ? "&" : "?") + "error=" + encodedError);
+                    } catch (Exception ex) {
+                        response.sendRedirect(redirectUri + (redirectUri.contains("?") ? "&" : "?") + "error=oauth2_processing_failed");
+                    }
                 }
             }
         };
@@ -441,17 +581,50 @@ public class SecurityConfig {
     }
 
 
-    // 创建OAuth2授权请求解析器 - 支持PKCE和强制账户选择
+    // 创建OAuth2授权请求解析器 - 支持PKCE和保留前端传入的state参数
     @Bean
     public OAuth2AuthorizationRequestResolver authorizationRequestResolver(ClientRegistrationRepository clientRegistrationRepository) {
-        DefaultOAuth2AuthorizationRequestResolver resolver =
+        DefaultOAuth2AuthorizationRequestResolver defaultResolver = 
             new DefaultOAuth2AuthorizationRequestResolver(
                 clientRegistrationRepository, "/oauth2/authorization");
 
         // 配置自定义的授权请求参数 - 先启用PKCE
-        resolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
+        defaultResolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
 
-        return resolver;
+        // 创建自定义解析器，保留前端传入的state参数
+        return new OAuth2AuthorizationRequestResolver() {
+            @Override
+            public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
+                OAuth2AuthorizationRequest authorizationRequest = defaultResolver.resolve(request);
+                if (authorizationRequest != null) {
+                    // 检查请求中是否有state参数
+                    String state = request.getParameter("state");
+                    if (state != null && !state.isEmpty()) {
+                        // 保留前端传入的state参数
+                        return OAuth2AuthorizationRequest.from(authorizationRequest)
+                                .state(state)
+                                .build();
+                    }
+                }
+                return authorizationRequest;
+            }
+
+            @Override
+            public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
+                OAuth2AuthorizationRequest authorizationRequest = defaultResolver.resolve(request, clientRegistrationId);
+                if (authorizationRequest != null) {
+                    // 检查请求中是否有state参数
+                    String state = request.getParameter("state");
+                    if (state != null && !state.isEmpty()) {
+                        // 保留前端传入的state参数
+                        return OAuth2AuthorizationRequest.from(authorizationRequest)
+                                .state(state)
+                                .build();
+                    }
+                }
+                return authorizationRequest;
+            }
+        };
     }
 
     /**

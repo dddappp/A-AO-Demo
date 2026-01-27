@@ -21,4 +21,5 @@ public class UserDto {
     private String displayName;
     private String avatarUrl;
     private Set<String> authorities;
+    private String provider;
 }

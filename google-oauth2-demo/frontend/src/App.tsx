@@ -3,6 +3,7 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import TestPage from './pages/TestPage';
 import ResourceTestPage from './pages/ResourceTestPage';
+import OAuth2CallbackPage from './pages/OAuth2CallbackPage';
 import './App.css';
 
 function AppContent() {
@@ -18,31 +19,7 @@ function AppContent() {
         <Route path="/resource-test" element={<ResourceTestPage />} />
 
         {/* OAuth2回调路由 */}
-        <Route path="/oauth2/callback" element={
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '100vh',
-            flexDirection: 'column'
-          }}>
-            <div style={{ marginBottom: '20px' }}>正在处理登录...</div>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              border: '4px solid #f3f3f3',
-              borderTop: '4px solid #3498db',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }}></div>
-            <style>{`
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            `}</style>
-          </div>
-        } />
+        <Route path="/oauth2/callback" element={<OAuth2CallbackPage />} />
 
         {/* 404页面 */}
         <Route path="*" element={<Navigate to="/" replace />} />

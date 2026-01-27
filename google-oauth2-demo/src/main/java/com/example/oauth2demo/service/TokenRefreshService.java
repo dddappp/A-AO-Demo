@@ -35,16 +35,24 @@ public class TokenRefreshService {
             String username = jwtTokenService.extractUsername(refreshTokenValue);
             String userId = jwtTokenService.getUserIdFromToken(refreshTokenValue);
 
-            // 3. 验证用户存在
+            // 3. 验证提取的信息不为空
+            if (userId == null || userId.trim().isEmpty()) {
+                throw new RuntimeException("无法从token中提取用户ID");
+            }
+            if (username == null || username.trim().isEmpty()) {
+                throw new RuntimeException("无法从token中提取用户名");
+            }
+
+            // 4. 验证用户存在
             UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));
 
-            // 4. 验证用户名匹配
-            if (!username.equals(user.getUsername())) {
+            // 5. 验证用户名匹配
+            if (user.getUsername() == null || !username.equals(user.getUsername())) {
                 throw new RuntimeException("Token用户名不匹配");
             }
 
-            // 5. 生成新的Token对
+            // 6. 生成新的Token对
             String newAccessToken = jwtTokenService.generateAccessToken(
                 user.getUsername(), user.getEmail(), user.getId(), user.getAuthorities()
             );

@@ -68,27 +68,32 @@ export function useAuth() {
     try {
       setError(null);
       console.log('Checking authentication status...');
+      
+      // 首先从cookie中获取token并存储到localStorage
+      // 这样可以确保SSO登录后token也能被正确存储
+      const getCookie = (name: string) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop()?.split(';').shift();
+        return null;
+      };
+      
+      const accessToken = getCookie('accessToken');
+      const refreshToken = getCookie('refreshToken');
+      
+      if (accessToken) {
+        localStorage.setItem('accessToken', accessToken);
+        console.log('Stored access token from cookie to localStorage');
+      }
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
+        console.log('Stored refresh token from cookie to localStorage');
+      }
+      
+      // 然后尝试获取用户信息
       const userData = await AuthService.getCurrentUser();
       console.log('User authenticated:', userData);
       setUser(userData);
-      
-      // 尝试获取Token并存储到localStorage
-      try {
-        console.log('Attempting to refresh token to get access token...');
-        const tokenResponse = await AuthService.refreshToken();
-        console.log('Token refresh successful, storing tokens to localStorage:', tokenResponse);
-        
-        // 存储令牌到localStorage，用于前端测试和异构资源服务器集成
-        if (tokenResponse.accessToken) {
-          localStorage.setItem('accessToken', tokenResponse.accessToken);
-        }
-        if (tokenResponse.refreshToken) {
-          localStorage.setItem('refreshToken', tokenResponse.refreshToken);
-        }
-      } catch (tokenErr) {
-        console.log('Token refresh failed during auth check:', tokenErr);
-        // 令牌刷新失败不影响用户认证状态检查
-      }
     } catch (err) {
       console.log('Authentication check failed:', err);
       setUser(null);
@@ -101,7 +106,7 @@ export function useAuth() {
     } finally {
       setLoading(false);
     }
-  }, [loading]);
+  }, []);
 
   // 解析JWT token，获取过期时间
   const getTokenExpiry = useCallback(() => {
@@ -255,9 +260,6 @@ export function useAuth() {
   // 自动刷新token的定时器
   useEffect(() => {
     if (user) {
-      // 立即检查一次token是否即将过期
-      autoRefreshToken();
-
       // 设置定时器，每1分钟检查一次
       const intervalId = setInterval(autoRefreshToken, 60 * 1000); // 1分钟
 
@@ -265,6 +267,19 @@ export function useAuth() {
       return () => clearInterval(intervalId);
     }
   }, [user, autoRefreshToken]);
+
+  // 检查URL参数中的错误信息
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
+      // 清除URL中的错误参数，避免刷新页面后再次显示错误
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('error');
+      window.history.replaceState({}, '', newUrl.toString());
+    }
+  }, []);
 
   // 组件挂载时检查认证状态
   useEffect(() => {

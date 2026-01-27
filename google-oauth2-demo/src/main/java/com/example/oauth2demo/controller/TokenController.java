@@ -1,6 +1,13 @@
 package com.example.oauth2demo.controller;
 
 import com.example.oauth2demo.service.TokenRefreshService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +25,7 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Token Management", description = "JWT Token管理相关API")
 public class TokenController {
 
     private final TokenRefreshService tokenRefreshService;
@@ -27,7 +35,40 @@ public class TokenController {
      * 使用refresh token获取新的access token和refresh token
      */
     @PostMapping("/refresh")
+    @Operation(
+        summary = "刷新JWT Token",
+        description = "使用refresh token获取新的access token和refresh token，支持双重传递（cookie + JSON响应体）",
+        tags = { "Token Management" }
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Token刷新成功",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"message\": \"Token refreshed successfully\", \"accessToken\": \"...\", \"refreshToken\": \"...\", \"accessTokenExpiresIn\": 3600, \"refreshTokenExpiresIn\": 604800, \"tokenType\": \"Bearer\"}"
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "401",
+            description = "Token刷新失败",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"error\": \"Token refresh failed\", \"details\": \"Invalid refresh token\"}"
+                )
+            )
+        )
+    })
     public ResponseEntity<?> refreshToken(
+            @Parameter(
+                name = "refreshToken",
+                description = "Refresh token（从cookie中获取）",
+                required = true,
+                in = io.swagger.v3.oas.annotations.enums.ParameterIn.COOKIE
+            )
             @CookieValue(value = "refreshToken", required = false) String refreshTokenCookie,
             HttpServletResponse response) {
 
@@ -75,7 +116,7 @@ public class TokenController {
         accessTokenCookie.setHttpOnly(true);
         accessTokenCookie.setPath("/");
         accessTokenCookie.setMaxAge(3600); // 1小时
-        accessTokenCookie.setSecure(false); // 开发环境
+        accessTokenCookie.setSecure(true); // 生产环境，HTTPS必须
         accessTokenCookie.setAttribute("SameSite", "Lax");
         response.addCookie(accessTokenCookie);
 
@@ -84,7 +125,7 @@ public class TokenController {
         refreshTokenCookie.setHttpOnly(true);
         refreshTokenCookie.setPath("/");
         refreshTokenCookie.setMaxAge(604800); // 7天
-        refreshTokenCookie.setSecure(false); // 开发环境
+        refreshTokenCookie.setSecure(true); // 生产环境，HTTPS必须
         refreshTokenCookie.setAttribute("SameSite", "Lax");
         response.addCookie(refreshTokenCookie);
 

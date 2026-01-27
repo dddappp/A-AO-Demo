@@ -38,11 +38,21 @@ public class SpaController {
     @GetMapping("/{path:[^\\.]*}")
     public String spaRoutes(@PathVariable String path) {
         // 排除API路径、静态资源等
-        if (path.startsWith("api/") || path.startsWith("oauth2/") ||
-            path.startsWith("h2-console/") || path.equals("favicon.ico")) {
+        if (path.startsWith("api/") || path.startsWith("h2-console/") || path.equals("favicon.ico")) {
             return null; // 不处理这些路径
         }
 
+        if ("react".equals(frontendType)) {
+            return "forward:/index.html";
+        }
+        return "redirect:/";
+    }
+
+    /**
+     * OAuth2回调路由 - 转发到前端处理
+     */
+    @GetMapping("/oauth2/callback")
+    public String oauth2Callback() {
         if ("react".equals(frontendType)) {
             return "forward:/index.html";
         }

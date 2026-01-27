@@ -13,7 +13,6 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
@@ -40,7 +39,14 @@ public class AuthorizationServerConfig {
     @Bean
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(org.springframework.security.config.annotation.web.builders.HttpSecurity http) throws Exception {
-        OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+        // 只处理OAuth2授权服务器相关的路径
+        http
+            .securityMatcher("/oauth2/authorize", "/oauth2/token", "/oauth2/jwks", "/oauth2/revoke", "/oauth2/introspect")
+            .authorizeHttpRequests(authz -> authz
+                .anyRequest().permitAll()
+            )
+            .csrf(csrf -> csrf.disable());
+        
         return http.build();
     }
 
@@ -49,7 +55,7 @@ public class AuthorizationServerConfig {
      * 在内存中配置客户端，用于本地认证
      */
     @Bean
-    public RegisteredClientRepository registeredClientRepository() {
+    public InMemoryRegisteredClientRepository registeredClientRepository() {
         RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
             .clientId("auth-client")
             .clientSecret("{noop}auth-secret")  // 开发环境，生产环境应加密

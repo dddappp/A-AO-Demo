@@ -9,6 +9,40 @@ app:
     # 优先级: 配置项 > 环境变量(JWT_SECRET) > 配置的密钥文件 > 默认文件(jwt-secret.key) > 默认密钥(仅开发环境)
     secret: ""  # 直接配置JWT密钥，生产环境推荐使用环境变量
     secret-file: ""  # 配置密钥文件路径
+  # CORS配置
+  cors:
+    allowed-origins:
+      - https://api.u2511175.nyat.app:55139
+      - http://localhost:5173
+      - http://localhost:8080
+      - http://localhost:8081
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+    allowed-headers:
+      - "*"
+    exposed-headers:
+      - Authorization
+    allow-credentials: true
+    max-age: 3600
+
+# JWT配置
+jwt:
+  # RSA密钥配置
+  rsa:
+    key-file: rsa-keys.ser
+  # Token过期时间配置（毫秒）
+  expires:
+    access-token: 3600000  # 1小时
+    refresh-token: 604800000  # 7天
+  # 令牌配置
+  token:
+    issuer: https://auth.example.com
+    audience: resource-server
+    kid: key-1
 
 spring:
   application:

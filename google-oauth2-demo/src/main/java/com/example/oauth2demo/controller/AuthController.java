@@ -7,12 +7,20 @@ import com.example.oauth2demo.repository.UserRepository;
 import com.example.oauth2demo.repository.UserLoginMethodRepository;
 import com.example.oauth2demo.service.UserService;
 import com.example.oauth2demo.service.JwtTokenService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -32,6 +40,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Tag(name = "Authentication", description = "用户认证相关API")
 public class AuthController {
 
     private final UserService userService;
@@ -45,7 +54,38 @@ public class AuthController {
      * 用户注册
      */
     @PostMapping("/register")
-    public ResponseEntity<UserDto> register(@RequestBody RegisterRequest request) {
+    @Operation(
+        summary = "用户注册",
+        description = "创建新的本地用户账号",
+        tags = { "Authentication" }
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "注册成功",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = UserDto.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "注册失败",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"error\": \"Username already exists\"}"
+                )
+            )
+        )
+    })
+    public ResponseEntity<UserDto> register(
+            @Parameter(
+                name = "request",
+                description = "注册信息",
+                required = true
+            )
+            @RequestBody RegisterRequest request) {
         UserDto user = userService.register(request);
         return ResponseEntity.ok(user);
     }
@@ -55,7 +95,47 @@ public class AuthController {
      * 使用Spring Security进行认证并建立会话
      */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestParam String username, @RequestParam String password, HttpServletRequest request, HttpServletResponse response) {
+    @Operation(
+        summary = "本地用户登录",
+        description = "使用用户名和密码登录，支持Token双重传递（cookie + JSON响应体）",
+        tags = { "Authentication" }
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "登录成功",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"message\": \"Login successful\", \"authenticated\": true, \"user\": {...}, \"accessToken\": \"...\", \"refreshToken\": \"...\", \"accessTokenExpiresIn\": 3600, \"refreshTokenExpiresIn\": 604800, \"tokenType\": \"Bearer\"}"
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "401",
+            description = "登录失败",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"error\": \"Invalid credentials\"}"
+                )
+            )
+        )
+    })
+    public ResponseEntity<?> login(
+            @Parameter(
+                name = "username",
+                description = "用户名",
+                required = true
+            )
+            @RequestParam String username,
+            @Parameter(
+                name = "password",
+                description = "密码",
+                required = true
+            )
+            @RequestParam String password,
+            HttpServletRequest request, HttpServletResponse response) {
         try {
             // 使用AuthenticationManager进行认证
             Authentication authentication = authenticationManager.authenticate(
@@ -122,18 +202,63 @@ public class AuthController {
      * 这个端点会被Spring Security保护，需要有效的JWT Token
      */
     @GetMapping("/user")
-    public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal OAuth2User oauth2User) {
-        if (oauth2User == null) {
+    @Operation(
+        summary = "获取当前用户信息",
+        description = "获取当前登录用户的详细信息",
+        tags = { "Authentication" }
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "获取成功",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"authenticated\": true, \"name\": \"John Doe\", \"email\": \"john@example.com\"}"
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "401",
+            description = "未认证",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"error\": \"User not authenticated\"}"
+                )
+            )
+        )
+    })
+    public ResponseEntity<?> getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        
+        if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
         }
 
-        // 这里可以返回用户信息
-        // 注意：实际项目中，这里应该调用UserService来获取完整的用户信息
-        Map<String, Object> userInfo = Map.of(
-            "authenticated", true,
-            "name", oauth2User.getName(),
-            "email", oauth2User.getAttribute("email")
-        );
+        Map<String, Object> userInfo = new java.util.LinkedHashMap<>();
+        userInfo.put("authenticated", true);
+
+        // 处理不同类型的认证主体
+        if (authentication.getPrincipal() instanceof OAuth2User) {
+            // OAuth2登录
+            OAuth2User oauth2User = (OAuth2User) authentication.getPrincipal();
+            userInfo.put("name", oauth2User.getName());
+            userInfo.put("email", oauth2User.getAttribute("email"));
+            userInfo.put("provider", "oauth2");
+        } else if (authentication.getPrincipal() instanceof Jwt) {
+            // JWT token登录
+            Jwt jwt = (Jwt) authentication.getPrincipal();
+            userInfo.put("name", jwt.getSubject());
+            userInfo.put("email", jwt.getClaim("email"));
+            userInfo.put("userId", jwt.getClaim("userId"));
+            userInfo.put("authorities", jwt.getClaim("authorities"));
+            userInfo.put("provider", "local");
+        } else {
+            // 其他类型的认证
+            userInfo.put("name", authentication.getName());
+            userInfo.put("provider", "unknown");
+        }
 
         return ResponseEntity.ok(userInfo);
     }
@@ -142,7 +267,30 @@ public class AuthController {
      * 检查用户是否存在（测试用）
      */
     @GetMapping("/check-user")
-    public ResponseEntity<?> checkUser(@RequestParam String username) {
+    @Operation(
+        summary = "检查用户是否存在",
+        description = "检查指定用户名是否已存在（测试用）",
+        tags = { "Authentication" }
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "检查成功",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"exists\": true, \"user\": {...}}"
+                )
+            )
+        )
+    })
+    public ResponseEntity<?> checkUser(
+            @Parameter(
+                name = "username",
+                description = "用户名",
+                required = true
+            )
+            @RequestParam String username) {
         try {
             var user = userRepository.findByUsername(username);
             if (user.isPresent()) {
@@ -167,7 +315,30 @@ public class AuthController {
      * 生成BCrypt密码哈希（测试用）
      */
     @GetMapping("/generate-hash")
-    public ResponseEntity<?> generateHash(@RequestParam String password) {
+    @Operation(
+        summary = "生成BCrypt密码哈希",
+        description = "生成指定密码的BCrypt哈希值（测试用）",
+        tags = { "Authentication" }
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "生成成功",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"password\": \"test123\", \"hash\": \"$2a$10$...\"}"
+                )
+            )
+        )
+    })
+    public ResponseEntity<?> generateHash(
+            @Parameter(
+                name = "password",
+                description = "密码",
+                required = true
+            )
+            @RequestParam String password) {
         try {
             String hash = passwordEncoder.encode(password);
             return ResponseEntity.ok(Map.of(
@@ -183,7 +354,36 @@ public class AuthController {
      * 创建测试用户（临时用）
      */
     @PostMapping("/create-test-user")
-    public ResponseEntity<?> createTestUser(@RequestParam String username, @RequestParam String password) {
+    @Operation(
+        summary = "创建测试用户",
+        description = "创建测试用的本地用户账号（临时用）",
+        tags = { "Authentication" }
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "创建成功",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"message\": \"User created successfully\", \"user\": {...}}"
+                )
+            )
+        )
+    })
+    public ResponseEntity<?> createTestUser(
+            @Parameter(
+                name = "username",
+                description = "用户名",
+                required = true
+            )
+            @RequestParam String username,
+            @Parameter(
+                name = "password",
+                description = "密码",
+                required = true
+            )
+            @RequestParam String password) {
         try {
             if (userRepository.findByUsername(username).isPresent()) {
                 return ResponseEntity.ok(Map.of("message", "User already exists"));
@@ -210,7 +410,46 @@ public class AuthController {
      */
     @PostMapping("/reset-password")
     @Profile("dev")
-    public ResponseEntity<?> resetPassword(@RequestParam String username, @RequestParam String newPassword) {
+    @Operation(
+        summary = "重置用户密码",
+        description = "重置指定用户的密码（仅开发环境可用）",
+        tags = { "Authentication" }
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "重置成功",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"message\": \"Password reset successfully\", \"username\": \"testuser\"}"
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "重置失败",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"error\": \"User not found\"}"
+                )
+            )
+        )
+    })
+    public ResponseEntity<?> resetPassword(
+            @Parameter(
+                name = "username",
+                description = "用户名",
+                required = true
+            )
+            @RequestParam String username,
+            @Parameter(
+                name = "newPassword",
+                description = "新密码",
+                required = true
+            )
+            @RequestParam String newPassword) {
         try {
             var loginMethodOptional = loginMethodRepository.findByLocalUsername(username);
             if (loginMethodOptional.isEmpty()) {
@@ -234,6 +473,33 @@ public class AuthController {
      * 登出 - 统一认证方式的登出处理
      */
     @PostMapping("/logout")
+    @Operation(
+        summary = "用户登出",
+        description = "清除用户认证状态和所有认证相关的Cookies",
+        tags = { "Authentication" }
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "登出成功",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"message\": \"Logged out successfully\"}"
+                )
+            )
+        ),
+        @ApiResponse(
+            responseCode = "500",
+            description = "登出失败",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    example = "{\"error\": \"Logout failed\"}"
+                )
+            )
+        )
+    })
     public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
         try {
             System.out.println("=== AUTH CONTROLLER LOGOUT STARTED ===");

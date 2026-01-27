@@ -27,13 +27,20 @@ const ResourceTestPage: React.FC = () => {
 
   // 监听 access token 变化
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    console.log('=== 开始检查token状态 ===');
+    // 从localStorage获取token（仅在需要访问不同域资源服务器时使用）
+    let token = localStorage.getItem('accessToken');
+    console.log('从localStorage获取的token:', token ? 'Present' : 'Missing');
     setAccessToken(token);
+    console.log('最终设置的token:', token ? 'Present' : 'Missing');
     
     // 定期检查 token 变化
     const interval = setInterval(() => {
-      const updatedToken = localStorage.getItem('accessToken');
+      console.log('=== 定期检查token变化 ===');
+      let updatedToken = localStorage.getItem('accessToken');
+      console.log('从localStorage获取的updatedToken:', updatedToken ? 'Present' : 'Missing');
       if (updatedToken !== accessToken) {
+        console.log('token发生变化，更新状态');
         setAccessToken(updatedToken);
       }
     }, 1000); // 每1秒检查一次
@@ -49,7 +56,7 @@ const ResourceTestPage: React.FC = () => {
     setTestStatus('testing');
 
     try {
-      // 从 localStorage 获取 access token
+      // 从 localStorage 获取 access token（仅在需要访问不同域资源服务器时使用）
       const token = localStorage.getItem('accessToken');
 
       if (!token) {

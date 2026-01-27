@@ -24,7 +24,7 @@ CORS(app, resources={
 })
 
 # 认证服务器配置
-AUTH_SERVER_URL = "https://auth.example.com"
+AUTH_SERVER_URL = "https://api.u2511175.nyat.app:55139"
 JWKS_URL = "https://api.u2511175.nyat.app:55139/oauth2/jwks"
 
 # JWKS缓存
@@ -112,7 +112,7 @@ def validate_token(token):
                 key,
                 algorithms=[alg],
                 audience="resource-server",
-                issuer=AUTH_SERVER_URL,
+                issuer="https://auth.example.com",
                 options={"verify_exp": True}
             )
             logger.info(f"Token validated successfully for user: {decoded.get('sub')}")

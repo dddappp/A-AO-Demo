@@ -3,7 +3,8 @@ package com.example.oauth2demo.service;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.Getter;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Service;
 
 import java.security.*;
@@ -21,16 +22,104 @@ import java.nio.file.Paths;
  */
 @Service
 @Getter
+@ConfigurationProperties(prefix = "jwt")
 public class JwtTokenService {
 
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
-    private final String rsaKeyFilePath;
     private static final int RSA_KEY_SIZE = 2048;
 
-    public JwtTokenService(@Value("${jwt.rsa.key-file:}") String rsaKeyFilePath) {
-        this.rsaKeyFilePath = rsaKeyFilePath != null && !rsaKeyFilePath.isEmpty() ? rsaKeyFilePath : "rsa-keys.ser";
-        KeyPair keyPair = loadOrGenerateKeyPair();
+    // JWT配置属性
+    private RsaConfig rsa;
+    private ExpiresConfig expires;
+    private TokenConfig token;
+
+    // RSA配置内部类
+    public static class RsaConfig {
+        private String keyFile;
+
+        public String getKeyFile() {
+            return keyFile;
+        }
+
+        public void setKeyFile(String keyFile) {
+            this.keyFile = keyFile;
+        }
+    }
+
+    // Token过期时间配置内部类
+    public static class ExpiresConfig {
+        private long accessToken;
+        private long refreshToken;
+
+        public long getAccessToken() {
+            return accessToken;
+        }
+
+        public void setAccessToken(long accessToken) {
+            this.accessToken = accessToken;
+        }
+
+        public long getRefreshToken() {
+            return refreshToken;
+        }
+
+        public void setRefreshToken(long refreshToken) {
+            this.refreshToken = refreshToken;
+        }
+    }
+
+    // Token配置内部类
+    public static class TokenConfig {
+        private String issuer;
+        private String audience;
+        private String kid;
+
+        public String getIssuer() {
+            return issuer;
+        }
+
+        public void setIssuer(String issuer) {
+            this.issuer = issuer;
+        }
+
+        public String getAudience() {
+            return audience;
+        }
+
+        public void setAudience(String audience) {
+            this.audience = audience;
+        }
+
+        public String getKid() {
+            return kid;
+        }
+
+        public void setKid(String kid) {
+            this.kid = kid;
+        }
+    }
+
+    public JwtTokenService() {
+        // 初始化配置默认值
+        if (rsa == null) {
+            rsa = new RsaConfig();
+            rsa.setKeyFile("rsa-keys.ser");
+        }
+        if (expires == null) {
+            expires = new ExpiresConfig();
+            expires.setAccessToken(3600000); // 默认1小时
+            expires.setRefreshToken(604800000); // 默认7天
+        }
+        if (token == null) {
+            token = new TokenConfig();
+            token.setIssuer("https://auth.example.com");
+            token.setAudience("resource-server");
+            token.setKid("key-1");
+        }
+
+        String rsaKeyFilePath = rsa.getKeyFile() != null && !rsa.getKeyFile().isEmpty() ? rsa.getKeyFile() : "rsa-keys.ser";
+        KeyPair keyPair = loadOrGenerateKeyPair(rsaKeyFilePath);
         this.privateKey = keyPair.getPrivate();
         this.publicKey = keyPair.getPublic();
         
@@ -38,7 +127,12 @@ public class JwtTokenService {
         System.out.println("   Public Key Algorithm: " + publicKey.getAlgorithm());
         System.out.println("   Key Size: " + RSA_KEY_SIZE);
         System.out.println("   Public Key Format: " + publicKey.getFormat());
-        System.out.println("   Key File Path: " + this.rsaKeyFilePath);
+        System.out.println("   Key File Path: " + rsaKeyFilePath);
+        System.out.println("   Access Token Expires In: " + expires.getAccessToken() / 1000 + " seconds");
+        System.out.println("   Refresh Token Expires In: " + expires.getRefreshToken() / 1000 + " seconds");
+        System.out.println("   Token Issuer: " + token.getIssuer());
+        System.out.println("   Token Audience: " + token.getAudience());
+        System.out.println("   Token Kid: " + token.getKid());
         
         // 打印公钥的Base64编码，用于调试
         if (publicKey instanceof java.security.interfaces.RSAPublicKey) {
@@ -51,7 +145,7 @@ public class JwtTokenService {
     /**
      * 加载或生成 RSA 密钥对
      */
-    private KeyPair loadOrGenerateKeyPair() {
+    private KeyPair loadOrGenerateKeyPair(String rsaKeyFilePath) {
         try {
             // 尝试从文件加载密钥对
             Path keyFile = Paths.get(rsaKeyFilePath);
@@ -158,10 +252,10 @@ public class JwtTokenService {
         
         // OAuth2 标准声明
         long issuedAtMs = System.currentTimeMillis();
-        long expiresInMs = 3600000; // 1小时
+        long expiresInMs = expires.getAccessToken(); // 从配置文件读取
         
-        claims.put("iss", "https://auth.example.com");
-        claims.put("aud", "resource-server");
+        claims.put("iss", token.getIssuer());
+        claims.put("aud", token.getAudience());
         claims.put("jti", UUID.randomUUID().toString());
 
         return Jwts.builder()
@@ -169,7 +263,7 @@ public class JwtTokenService {
                 .setSubject(username)
                 .setIssuedAt(new Date(issuedAtMs))
                 .setExpiration(new Date(issuedAtMs + expiresInMs))
-                .setHeaderParam("kid", "key-1")  // 用于 JWKS 匹配
+                .setHeaderParam("kid", token.getKid())  // 用于 JWKS 匹配
                 .signWith(privateKey, SignatureAlgorithm.RS256)
                 .compact();
     }
@@ -184,16 +278,16 @@ public class JwtTokenService {
         claims.put("jti", UUID.randomUUID().toString());
         
         long issuedAtMs = System.currentTimeMillis();
-        long expiresInMs = 604800000; // 7天
+        long expiresInMs = expires.getRefreshToken(); // 从配置文件读取
         
-        claims.put("iss", "https://auth.example.com");
+        claims.put("iss", token.getIssuer());
 
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(username)
                 .setIssuedAt(new Date(issuedAtMs))
                 .setExpiration(new Date(issuedAtMs + expiresInMs))
-                .setHeaderParam("kid", "key-1")
+                .setHeaderParam("kid", token.getKid())
                 .signWith(privateKey, SignatureAlgorithm.RS256)
                 .compact();
     }
@@ -233,7 +327,7 @@ public class JwtTokenService {
                     .getBody()
                     .getSubject();
         } catch (Exception e) {
-            return null;
+            throw new RuntimeException("Failed to extract username from token", e);
         }
     }
 
@@ -249,7 +343,40 @@ public class JwtTokenService {
                     .getBody()
                     .get("userId", String.class);
         } catch (Exception e) {
-            return null;
+            throw new RuntimeException("Failed to extract user ID from token", e);
         }
+    }
+
+    /**
+     * 获取 JWT 解码器
+     * 用于 OAuth2 资源服务器验证 JWT Token
+     */
+    public org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder() {
+        return NimbusJwtDecoder.withPublicKey((java.security.interfaces.RSAPublicKey) publicKey).build();
+    }
+
+    // Getter和Setter方法
+    public RsaConfig getRsa() {
+        return rsa;
+    }
+
+    public void setRsa(RsaConfig rsa) {
+        this.rsa = rsa;
+    }
+
+    public ExpiresConfig getExpires() {
+        return expires;
+    }
+
+    public void setExpires(ExpiresConfig expires) {
+        this.expires = expires;
+    }
+
+    public TokenConfig getToken() {
+        return token;
+    }
+
+    public void setToken(TokenConfig token) {
+        this.token = token;
     }
 }

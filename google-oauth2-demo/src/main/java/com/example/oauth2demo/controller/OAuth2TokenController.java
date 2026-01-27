@@ -41,12 +41,13 @@ public class OAuth2TokenController {
         log.debug("JWKS endpoint requested");
         try {
             PublicKey publicKey = jwtTokenService.getPublicKey();
+            String kid = jwtTokenService.getToken().getKid();  // 从配置文件读取 kid
             
             // 将公钥转换为 JWK 格式
             if (publicKey instanceof RSAPublicKey) {
                 RSAPublicKey rsaKey = (RSAPublicKey) publicKey;
                 RSAKey jwk = new RSAKey.Builder(rsaKey)
-                        .keyID("key-1")  // 使用与 Token 头中 kid 相同的值
+                        .keyID(kid)  // 使用与 Token 头中 kid 相同的值
                         .algorithm(JWSAlgorithm.RS256)
                         .build();
                 
@@ -54,7 +55,7 @@ public class OAuth2TokenController {
                 List<Map<String, Object>> keys = new ArrayList<>();
                 keys.add(jwk.toJSONObject());
                 
-                log.debug("JWKS returned successfully with kid: key-1");
+                log.debug("JWKS returned successfully with kid: " + kid);
                 return ResponseEntity.ok(Map.of("keys", keys));
             } else {
                 log.error("Public key is not RSA key");
@@ -76,15 +77,51 @@ public class OAuth2TokenController {
      * Token 内省端点
      * 验证 Token 有效性并返回 Token 信息
      * 符合 RFC 7662 (Token Introspection) 规范
+     * 支持两种路径：/oauth2/introspect 和 /oauth2/api/introspect
+     * 支持两种请求格式：查询参数和表单提交
      */
-    @PostMapping("/api/introspect")
-    public ResponseEntity<?> introspect(@RequestBody MultiValueMap<String, String> formData) {
+    @PostMapping({"/introspect", "/api/introspect"})
+    public ResponseEntity<?> introspect(
+            @RequestParam(value = "token", required = false) String token,
+            @RequestBody(required = false) MultiValueMap<String, String> formData,
+            HttpServletRequest request) {
         log.info("Token introspection request received");
         
-        // 从请求体中获取 token 参数
-        String token = formData.getFirst("token");
+        // 尝试从多个来源获取token
+        String tokenValue = token;
         
-        if (token == null || token.trim().isEmpty()) {
+        // 如果查询参数中没有token，尝试从表单数据中获取
+        if (tokenValue == null && formData != null) {
+            tokenValue = formData.getFirst("token");
+        }
+        
+        // 如果还是没有token，尝试从请求体中直接获取（处理原始POST请求）
+        if (tokenValue == null) {
+            try {
+                StringBuilder sb = new StringBuilder();
+                BufferedReader reader = request.getReader();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+                String body = sb.toString();
+                if (body != null && body.contains("token=")) {
+                    // 解析表单数据格式的请求体
+                    String[] parts = body.split("&");
+                    for (String part : parts) {
+                        if (part.startsWith("token=")) {
+                            tokenValue = part.substring("token=".length());
+                            tokenValue = URLDecoder.decode(tokenValue, "UTF-8");
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Error reading request body", e);
+            }
+        }
+        
+        if (tokenValue == null || tokenValue.trim().isEmpty()) {
             log.warn("Empty token provided for introspection");
             return ResponseEntity.ok(Map.of("active", false));
         }
@@ -94,7 +131,7 @@ public class OAuth2TokenController {
             Claims claims = Jwts.parserBuilder()
                     .setSigningKey(jwtTokenService.getPublicKey())
                     .build()
-                    .parseClaimsJws(token)
+                    .parseClaimsJws(tokenValue)
                     .getBody();
             
             log.debug("Token verified successfully, user: {}", claims.getSubject());

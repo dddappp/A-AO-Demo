@@ -3,6 +3,7 @@ package com.example.oauth2demo.config;
 import com.example.oauth2demo.service.JwtTokenService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -10,7 +11,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
@@ -22,13 +22,10 @@ import java.util.*;
  * 保护业务API端点，从HttpOnly Cookie中验证JWT Token
  */
 @Configuration
+@RequiredArgsConstructor
 public class ResourceServerConfig {
 
     private final JwtTokenService jwtTokenService;
-
-    public ResourceServerConfig(JwtTokenService jwtTokenService) {
-        this.jwtTokenService = jwtTokenService;
-    }
 
     /**
      * 自定义Bearer Token解析器，从Cookie中读取Token
@@ -64,9 +61,7 @@ public class ResourceServerConfig {
      */
     @Bean
     public JwtDecoder jwtDecoder() {
-        // 使用 RSA 公钥验证 JWT 签名
-        return NimbusJwtDecoder.withPublicKey((java.security.interfaces.RSAPublicKey) jwtTokenService.getPublicKey())
-                .build();
+        return jwtTokenService.jwtDecoder();
     }
 
     /**
@@ -94,7 +89,7 @@ public class ResourceServerConfig {
      * 配置受保护的API端点
      */
     @Bean
-    @Order(3)
+    @Order(2)
     public SecurityFilterChain resourceServerSecurityFilterChain(HttpSecurity http,
                                                                  BearerTokenResolver bearerTokenResolver,
                                                                  JwtDecoder jwtDecoder,

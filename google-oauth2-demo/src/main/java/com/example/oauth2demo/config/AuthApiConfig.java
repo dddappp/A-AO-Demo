@@ -19,7 +19,7 @@ public class AuthApiConfig {
      * 只处理认证相关的API端点，不应用JWT验证
      */
     @Bean
-    @Order(1)
+    @Order(0)
     public SecurityFilterChain authApiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .securityMatcher("/api/auth/**")  // 只匹配认证API
